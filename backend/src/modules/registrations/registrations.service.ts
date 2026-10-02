@@ -293,7 +293,7 @@ export class RegistrationsService {
         deptMap.set(d.id, d.id)
       }
     }
-    const deptIdToName = new Map(departmentsData.map((d) => [d.id, d.name]))
+    const deptIdToName = new Map<string, string>(departmentsData.map((d: any) => [d.id, d.name]))
 
     const effectiveUser: AuthUser = {
       ...user,
@@ -301,23 +301,6 @@ export class RegistrationsService {
       department_id: departmentId,
       current_semester: semester,
     }
-
-    const defaultPathway = pathways[0]
-    const slots = await this.resolvePathwaySlots(defaultPathway, effectiveUser, deptMap, deptIdToName)
-
-    // Fetch candidate minor courses for student (courses from other departments in same semester)
-    const { data: minorCoursesRaw } = await this.supabase.admin
-      .from('courses')
-      .select('id, course_code, title, department_id, semester, credits, category, tag')
-      .eq('semester', semester)
-      .neq('department_id', departmentId)
-      .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
-      .order('title', { ascending: true })
-
-    const minorCourses = (minorCoursesRaw ?? []).map((c) => ({
-      ...c,
-      department_name: deptIdToName.get(c.department_id) || 'General',
-    }))
 
     const [prefRes, regResWith8] = await Promise.all([
       this.supabase.admin
@@ -351,6 +334,26 @@ export class RegistrationsService {
       existingReg = fallbackReg
     }
 
+    // Resolve slots for the student's chosen pathway (or default first pathway)
+    const defaultPathway = pathways[0]
+    const chosenPathwayId = existingPref?.pathway_id ?? existingReg?.pathway_id ?? defaultPathway.id
+    const targetPathway = pathways.find((p) => p.id === chosenPathwayId) || defaultPathway
+    const slots = await this.resolvePathwaySlots(targetPathway, effectiveUser, deptMap, deptIdToName)
+
+    // Fetch candidate minor courses for student (courses from other departments in same semester)
+    const { data: minorCoursesRaw } = await this.supabase.admin
+      .from('courses')
+      .select('id, course_code, title, department_id, semester, credits, category, tag')
+      .eq('semester', semester)
+      .neq('department_id', departmentId)
+      .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
+      .order('title', { ascending: true })
+
+    const minorCourses = (minorCoursesRaw ?? []).map((c) => ({
+      ...c,
+      department_name: deptIdToName.get(c.department_id) || 'General',
+    }))
+
     let preferences: Record<string, { course_id: string; rank: number }[]> = {}
     let allocationMetadata: Record<string, any> = {
       ...(typeof existingPref?.allocation_metadata === 'object' && existingPref?.allocation_metadata ? existingPref.allocation_metadata : {}),
@@ -373,22 +376,18 @@ export class RegistrationsService {
       preferences = existingReg.selections as any
     }
 
-    // If no explicit preferences stored yet, derive from confirmed slots (up to 8 slots)
-    if (Object.keys(preferences).length === 0 && existingReg) {
-      const derivedPrefs: Record<string, { course_id: string; rank: number }[]> = {}
-      const derivedMeta: Record<string, any> = { ...allocationMetadata }
+    // Backfill any confirmed slots from existingReg into preferences map if missing
+    if (existingReg) {
       for (let s = 1; s <= 8; s++) {
         const slotKey = `slot_${s}`
         const cid = (existingReg as any)[`${slotKey}_course_id`]
-        if (cid) {
-          derivedPrefs[slotKey] = [{ course_id: cid, rank: 1 }]
-          if (!derivedMeta[slotKey]) {
-            derivedMeta[slotKey] = { allocated_by: 'fixed', course_id: cid }
+        if (cid && (!preferences[slotKey] || preferences[slotKey].length === 0)) {
+          preferences[slotKey] = [{ course_id: cid, rank: 1 }]
+          if (!allocationMetadata[slotKey]) {
+            allocationMetadata[slotKey] = { allocated_by: 'fixed', course_id: cid }
           }
         }
       }
-      preferences = derivedPrefs
-      allocationMetadata = derivedMeta
     }
 
     const submittedAt = existingPref?.submitted_at ?? existingReg?.submitted_at ?? null
@@ -402,8 +401,10 @@ export class RegistrationsService {
       maxCredits: blueprint.max_credits ?? settings.max_credits ?? 24,
       min_credits: blueprint.min_credits ?? settings.min_credits ?? 20,
       max_credits: blueprint.max_credits ?? settings.max_credits ?? 24,
+      totalCredits: existingReg ? Number(existingReg.total_credits) || null : null,
+      total_credits: existingReg ? Number(existingReg.total_credits) || null : null,
       pathways,
-      selectedPathwayId: existingPref?.pathway_id ?? existingReg?.pathway_id ?? defaultPathway.id,
+      selectedPathwayId: chosenPathwayId,
       slots,
       minorCourses,
       existingRegistration: Object.keys(preferences).length > 0 ? preferences : null,
@@ -476,7 +477,7 @@ export class RegistrationsService {
         deptMap.set(d.id, d.id)
       }
     }
-    const deptIdToName = new Map((departmentsData ?? []).map((d) => [d.id, d.name]))
+    const deptIdToName = new Map<string, string>((departmentsData ?? []).map((d: any) => [d.id, d.name]))
 
     const slots = await this.resolvePathwaySlots(pathway, user, deptMap, deptIdToName)
 
@@ -726,7 +727,7 @@ export class RegistrationsService {
         throw new InternalServerErrorException('Failed to validate selected courses')
       }
 
-      const courseMap = new Map(electiveCourses.map((c) => [c.id, c]))
+      const courseMap = new Map<string, any>(electiveCourses.map((c: any) => [c.id, c]))
       for (const id of allElectiveCourseIds) {
         if (!courseMap.has(id)) {
           throw new BadRequestException(`Course ID ${id} is invalid or does not exist`)

@@ -233,8 +233,9 @@ export default function RegisterPage() {
         const initialPrefs: Record<number, SlotRankedPreferences> = {}
         for (let i = 1; i <= 8; i++) {
           const list = existingPrefs[`slot_${i}`] || []
+          const existingSlotCid = rawBp.existingSlots?.[`slot_${i}`] || ''
           initialPrefs[i] = {
-            rank1: list.find((p: any) => p.rank === 1)?.course_id || '',
+            rank1: list.find((p: any) => p.rank === 1)?.course_id || existingSlotCid || '',
             rank2: list.find((p: any) => p.rank === 2)?.course_id || '',
             rank3: list.find((p: any) => p.rank === 3)?.course_id || '',
           }
@@ -390,24 +391,61 @@ export default function RegisterPage() {
     setError('')
   }
 
+  // Helper to resolve the course metadata for a slot accurately
+  function getCourseForSlot(slot: BlueprintSlot): Course | null {
+    const slotNum = slot.slot
+    const slotKey = `slot_${slotNum}`
+    const existingCourseId = existingSlots[slotKey]
+    const prefCourseId = rankedPreferences[slotNum]?.rank1
+
+    const targetCourseId = prefCourseId || existingCourseId
+
+    // 1. Direct course attached to the slot (e.g. FIXED core papers)
+    if (slot.course) {
+      if (!targetCourseId || slot.course.id === targetCourseId) {
+        return slot.course
+      }
+    }
+
+    // 2. Look in this slot's options
+    if (targetCourseId && slot.options && slot.options.length > 0) {
+      const found = slot.options.find((c) => c.id === targetCourseId)
+      if (found) return found
+    }
+
+    // 3. Look in minorCourses
+    if (targetCourseId && minorCourses.length > 0) {
+      const inMinors = minorCourses.find((c) => c.id === targetCourseId)
+      if (inMinors) return inMinors
+    }
+
+    // 4. Look across all slots in resolvedSlots (options or course)
+    if (targetCourseId) {
+      for (const s of resolvedSlots) {
+        if (s.course && s.course.id === targetCourseId) return s.course
+        if (s.options) {
+          const found = s.options.find((c) => c.id === targetCourseId)
+          if (found) return found
+        }
+      }
+    }
+
+    // 5. Fallback: if slot has a course, return it
+    if (slot.course) {
+      return slot.course
+    }
+
+    return null
+  }
+
   // Calculate credits strictly for the base 6 papers (per user instruction)
   function calculateBaseCredits(): number {
     if (!resolvedSlots.length) return 0
     let total = 0
     resolvedSlots.slice(0, 6).forEach((slot) => {
-      const isFixed =
-        slot.rule === 'FIXED' ||
-        slot.rule === 'CAMPUS_FIXED' ||
-        slot.rule === 'AEC_ELECT' ||
-        (!!slot.course && (!slot.options || slot.options.length === 0))
-      if (isFixed && slot.course) {
-        total += slot.course.credits
-      } else {
-        const primaryId = rankedPreferences[slot.slot]?.rank1
-        if (primaryId && slot.options) {
-          const course = slot.options.find((c) => c.id === primaryId)
-          if (course) total += course.credits
-        }
+      const course = getCourseForSlot(slot)
+      if (course && course.credits != null) {
+        total += Number(course.credits) || 0
       }
     })
     return total
@@ -417,17 +455,21 @@ export default function RegisterPage() {
   function calculateExtraCredits(): number {
     let total = 0
     if (extraSlotsCount >= 1) {
-      const p7 = rankedPreferences[7]?.rank1
+      const p7 = rankedPreferences[7]?.rank1 || existingSlots['slot_7']
       if (p7) {
-        const c = minorCourses.find((x) => x.id === p7)
-        if (c) total += c.credits
+        const c =
+          minorCourses.find((x) => x.id === p7) ||
+          resolvedSlots.flatMap((s) => s.options || []).find((x) => x.id === p7)
+        if (c && c.credits != null) total += Number(c.credits) || 0
       }
     }
     if (extraSlotsCount >= 2) {
-      const p8 = rankedPreferences[8]?.rank1
+      const p8 = rankedPreferences[8]?.rank1 || existingSlots['slot_8']
       if (p8) {
-        const c = minorCourses.find((x) => x.id === p8)
-        if (c) total += c.credits
+        const c =
+          minorCourses.find((x) => x.id === p8) ||
+          resolvedSlots.flatMap((s) => s.options || []).find((x) => x.id === p8)
+        if (c && c.credits != null) total += Number(c.credits) || 0
       }
     }
     return total
@@ -451,27 +493,28 @@ export default function RegisterPage() {
       } else {
         const slotKey = `slot_${slot.slot}`
         const currentPrefs = rankedPreferences[slot.slot] || { rank1: '', rank2: '', rank3: '' }
+        const rank1Id = currentPrefs.rank1 || existingSlots[slotKey]
 
-        if (!currentPrefs.rank1) {
+        if (!rank1Id) {
           setError(`Please select at least a 1st choice preference for "${slot.name}" (or click "✕ Remove Paper" if not taking it).`)
           return
         }
 
-        if (chosenRank1Courses.has(currentPrefs.rank1)) {
-          const prevSlot = chosenRank1Courses.get(currentPrefs.rank1)
+        if (chosenRank1Courses.has(rank1Id)) {
+          const prevSlot = chosenRank1Courses.get(rank1Id)
           setError(`Duplicate paper chosen: The paper selected in ${slot.name} is already selected in Paper ${prevSlot}. Each paper must be unique across all slots.`)
           return
         }
-        chosenRank1Courses.set(currentPrefs.rank1, slot.slot)
+        chosenRank1Courses.set(rank1Id, slot.slot)
 
         const choices: { course_id: string; rank: number }[] = []
-        choices.push({ course_id: currentPrefs.rank1, rank: 1 })
-        if (currentPrefs.rank2 && currentPrefs.rank2 !== currentPrefs.rank1) {
+        choices.push({ course_id: rank1Id, rank: 1 })
+        if (currentPrefs.rank2 && currentPrefs.rank2 !== rank1Id) {
           choices.push({ course_id: currentPrefs.rank2, rank: 2 })
         }
         if (
           currentPrefs.rank3 &&
-          currentPrefs.rank3 !== currentPrefs.rank1 &&
+          currentPrefs.rank3 !== rank1Id &&
           currentPrefs.rank3 !== currentPrefs.rank2
         ) {
           choices.push({ course_id: currentPrefs.rank3, rank: 3 })
@@ -806,30 +849,40 @@ export default function RegisterPage() {
                 )}
 
               {/* Credit Counter */}
-              {windowIsOpen && (
-                <div className={styles.creditCounter}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <div>
-                      <span className={styles.creditLabel}>Estimated Credits (Base 6 Papers): </span>
-                      <span
-                        className={`${styles.creditValue} ${
-                          baseCredits === 0 ? '' : isValidCredits ? styles.valid : styles.invalid
-                        }`}
-                      >
-                        {baseCredits}
-                        <span className={styles.creditRange}>
-                          &nbsp;(min {minCredits} — max {maxCredits})
-                        </span>
+              <div className={styles.creditCounter}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span className={styles.creditLabel}>
+                      {windowIsOpen ? 'Credits (Base 6 Papers):' : 'Total Confirmed Credits (Base 6 Papers):'}
+                    </span>
+                    <span
+                      className={`${styles.creditValue} ${
+                        baseCredits === 0 ? '' : isValidCredits ? styles.valid : styles.invalid
+                      }`}
+                    >
+                      {baseCredits}
+                      <span className={styles.creditRange}>
+                        &nbsp;(min {minCredits} — max {maxCredits})
                       </span>
-                    </div>
-                    {extraCredits > 0 && (
-                      <span style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 600 }}>
-                        + {extraCredits} optional minor credits ({extraSlotsCount} paper{extraSlotsCount > 1 ? 's' : ''} added)
+                    </span>
+                    {isValidCredits && (
+                      <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
+                        ✓ Valid Load
+                      </span>
+                    )}
+                    {!isValidCredits && baseCredits > 0 && (
+                      <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#b91c1c', padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
+                        ⚠️ {baseCredits < minCredits ? `Need ${minCredits - baseCredits} more cr` : `Exceeds max by ${baseCredits - maxCredits} cr`}
                       </span>
                     )}
                   </div>
+                  {extraCredits > 0 && (
+                    <span style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 600 }}>
+                      + {extraCredits} optional minor credits ({extraSlotsCount} paper{extraSlotsCount > 1 ? 's' : ''} added)
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
               <p className={styles.sectionTitle}>
                 {windowIsOpen ? 'Select Your Ranked Preferences' : 'Course Allocation Status'}
@@ -848,8 +901,8 @@ export default function RegisterPage() {
 
                   // Find course metadata if allocated or fixed
                   const allocatedCourse = isFixed
-                    ? slot.course
-                    : slot.options?.find((c) => c.id === existingCourseId)
+                    ? (slot.course || getCourseForSlot(slot))
+                    : getCourseForSlot(slot)
 
                   const isConfirmed = isAllocated || (isFixed && !!slot.course)
 
