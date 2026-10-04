@@ -41,6 +41,8 @@ export default function StudentDashboardPage() {
   const router = useRouter()
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [hasSubmission, setHasSubmission] = useState(false)
+  const [hasRegistration, setHasRegistration] = useState(false)
+  const [allocationCompleted, setAllocationCompleted] = useState(false)
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [totalRegisteredCredits, setTotalRegisteredCredits] = useState(0)
   const [registrationWindow, setRegistrationWindow] = useState<RegistrationWindow | null>(null)
@@ -56,6 +58,8 @@ export default function StudentDashboardPage() {
           if (parsed?.studentInfo) {
             setStudentInfo(parsed.studentInfo)
             setHasSubmission(parsed.hasSubmission ?? false)
+            setHasRegistration(parsed.hasRegistration ?? false)
+            setAllocationCompleted(parsed.allocationCompleted ?? false)
             setEnrolledCourses(parsed.enrolledCourses || [])
             setTotalRegisteredCredits(parsed.totalRegisteredCredits || 0)
             if (parsed.registrationWindow) setRegistrationWindow(parsed.registrationWindow)
@@ -91,6 +95,8 @@ export default function StudentDashboardPage() {
         }
         setStudentInfo(data.studentInfo)
         setHasSubmission(data.hasSubmission)
+        setHasRegistration(data.hasRegistration ?? false)
+        setAllocationCompleted(data.allocationCompleted ?? false)
         setEnrolledCourses(data.enrolledCourses || [])
         setTotalRegisteredCredits(data.totalRegisteredCredits || 0)
         setRegistrationWindow(data.registrationWindow || null)
@@ -183,6 +189,8 @@ export default function StudentDashboardPage() {
     <StudentDashboardClient
       studentInfo={studentInfo}
       hasSubmission={hasSubmission}
+      hasRegistration={hasRegistration}
+      allocationCompleted={allocationCompleted}
       enrolledCourses={enrolledCourses}
       totalRegisteredCredits={totalRegisteredCredits}
       registrationWindow={registrationWindow}

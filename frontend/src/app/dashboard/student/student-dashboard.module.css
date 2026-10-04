@@ -1188,6 +1188,18 @@
   border: 1px solid #bbf7d0;
 }
 
+.regStatusSuccessful {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.regStatusClosed {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
 .regStatusPending {
   background: #fef3c7;
   color: #92400e;

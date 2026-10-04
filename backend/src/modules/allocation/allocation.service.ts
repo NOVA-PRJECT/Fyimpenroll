@@ -296,6 +296,23 @@ export class AllocationService {
       )
     }
 
+    // Step A.2: Check if allocation has already been completed for this semester and academic year
+    const { data: completedRun } = await this.supabase.admin
+      .from('allocation_runs')
+      .select('id, completed_at')
+      .eq('campus_id', campusId)
+      .eq('academic_year', body.academicYear)
+      .eq('semester', body.semester)
+      .eq('status', 'completed')
+      .maybeSingle()
+
+    if (completedRun) {
+      throw new ConflictException(
+        `Allocation has already been completed for Semester ${body.semester} (${body.academicYear}). ` +
+        `In production, allocation can only be executed once per semester per academic year.`,
+      )
+    }
+
     // Step B: Insert allocation_runs row with status 'running'
     const { data: run, error: runErr } = await this.supabase.admin
       .from('allocation_runs')

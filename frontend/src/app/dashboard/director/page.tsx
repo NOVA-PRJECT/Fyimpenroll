@@ -167,13 +167,15 @@ export default function DirectorDashboard() {
   }
 
   async function handleRunAllocation(forceRerun: boolean = false) {
-    if (windowIsOpen) {
-      setShowWindowOpenWarning(true)
+    if (allocationRun?.status === 'completed') {
+      setAllocationError(
+        'Allocation for this semester has already been completed and locked. It can only be executed once per semester per academic year.',
+      )
       return
     }
 
-    if (!forceRerun && allocationRun?.status === 'completed') {
-      setShowRerunConfirm(true)
+    if (windowIsOpen) {
+      setShowWindowOpenWarning(true)
       return
     }
 
@@ -1012,35 +1014,45 @@ export default function DirectorDashboard() {
               </div>
 
               {/* Action Button */}
-              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <button
-                  className={styles.primaryBtn}
-                  onClick={() => handleRunAllocation(false)}
-                  disabled={triggeringRun || allocationRun?.status === 'running'}
-                  style={{
-                    background: allocationRun?.status === 'completed'
-                      ? '#0284c7'
-                      : allocationRun?.status === 'failed'
-                      ? '#d97706'
-                      : '#059669',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  {triggeringRun || allocationRun?.status === 'running' ? (
-                    <>
-                      <span className={styles.spinner} />
-                      Allocating Courses...
-                    </>
-                  ) : allocationRun?.status === 'completed' ? (
-                    'Re-Run Allocation →'
-                  ) : allocationRun?.status === 'failed' ? (
-                    'Retry Course Allocation →'
-                  ) : (
-                    'Run Course Allocation →'
-                  )}
-                </button>
+              <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <button
+                    className={styles.primaryBtn}
+                    onClick={() => handleRunAllocation(false)}
+                    disabled={triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'completed'}
+                    style={{
+                      background: allocationRun?.status === 'completed'
+                        ? '#334155'
+                        : allocationRun?.status === 'failed'
+                        ? '#d97706'
+                        : '#059669',
+                      cursor: allocationRun?.status === 'completed' ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      opacity: allocationRun?.status === 'completed' ? 0.85 : 1,
+                    }}
+                  >
+                    {triggeringRun || allocationRun?.status === 'running' ? (
+                      <>
+                        <span className={styles.spinner} />
+                        Allocating Courses...
+                      </>
+                    ) : allocationRun?.status === 'completed' ? (
+                      '✓ Allocation Completed (Locked for this semester)'
+                    ) : allocationRun?.status === 'failed' ? (
+                      'Retry Course Allocation →'
+                    ) : (
+                      'Run Course Allocation →'
+                    )}
+                  </button>
+                </div>
+                {allocationRun?.status === 'completed' && (
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#10b981', fontSize: '1rem' }}>🔒</span>
+                    In production, allocation can only be executed once per semester per academic year. Students can now make direct slot changes for available seats.
+                  </p>
+                )}
               </div>
             </div>
 

@@ -13,6 +13,8 @@ interface Course {
   title: string
   credits: number
   department_name?: string
+  remaining_seats?: number
+  seat_limit?: number
 }
 
 function CustomSelect({
@@ -58,6 +60,9 @@ function CustomSelect({
             <span className={styles.triggerMeta}>
               {selectedCourse.course_code ? `${selectedCourse.course_code} • ` : ''}
               {selectedCourse.department_name || 'General'} • {selectedCourse.credits} cr
+              {selectedCourse.remaining_seats !== undefined && (
+                <> • <strong style={{ color: selectedCourse.remaining_seats > 5 ? '#059669' : '#d97706' }}>{selectedCourse.remaining_seats} seats left</strong></>
+              )}
             </span>
           </div>
         ) : (
@@ -93,12 +98,29 @@ function CustomSelect({
                   }}
                 >
                   <div className={styles.optionUpper}>{course.title}</div>
-                  <div className={styles.optionLower}>
+                  <div className={styles.optionLower} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={styles.optionDept}>
                       {course.course_code ? `${course.course_code} • ` : ''}
                       {course.department_name || 'General'}
                     </span>
-                    <span className={styles.optionCredits}>{course.credits} cr</span>
+                    <span className={styles.optionCredits} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {course.credits} cr
+                      {course.remaining_seats !== undefined && (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '0.1rem 0.4rem',
+                            borderRadius: '4px',
+                            background: course.remaining_seats > 5 ? '#ecfdf5' : '#fffbeb',
+                            color: course.remaining_seats > 5 ? '#059669' : '#d97706',
+                            border: `1px solid ${course.remaining_seats > 5 ? '#a7f3d0' : '#fde68a'}`,
+                          }}
+                        >
+                          {course.remaining_seats} seat{course.remaining_seats === 1 ? '' : 's'} left
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -137,7 +159,13 @@ interface BlueprintData {
   pathway_id?: string
   existingPreferences?: Record<string, { course_id: string; rank: number }[]>
   allocationMetadata?: Record<string, any>
+  allocationCompleted?: boolean
+  allocationCompletedAt?: string | null
+  availableSeats?: Record<string, number>
   existingSlots?: Record<string, string | null>
+  allocatedCourses?: Record<string, Course>
+  slotChangesRemaining?: number
+  slotChangesNextReset?: string | null
 }
 
 interface StudentInfo {
@@ -181,55 +209,80 @@ export default function RegisterPage() {
   const [existingSubmission, setExistingSubmission] = useState<any | null>(null)
   const [windowIsOpen, setWindowIsOpen] = useState<boolean>(true)
 
+  // Post-allocation direct slot update states
+  const [allocationCompleted, setAllocationCompleted] = useState<boolean>(false)
+  const [allocationCompletedAt, setAllocationCompletedAt] = useState<string | null>(null)
+  const [availableSeats, setAvailableSeats] = useState<Record<string, number>>({})
+  const [allocatedCourses, setAllocatedCourses] = useState<Record<string, Course>>({})
+  const [editingSlot, setEditingSlot] = useState<number | null>(null)
+  const [selectedCourseForSlot, setSelectedCourseForSlot] = useState<string>('')
+  const [updatingSlot, setUpdatingSlot] = useState<boolean>(false)
+  const [slotChangesRemaining, setSlotChangesRemaining] = useState<number>(3)
+  const [slotChangesNextReset, setSlotChangesNextReset] = useState<string | null>(null)
+
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
-  useEffect(() => {
-    async function loadBlueprint() {
-      try {
-        const response = await fetch('/api/registrations/blueprint')
-        const data = await response.json()
+  async function loadBlueprint() {
+    try {
+      const response = await fetch('/api/registrations/blueprint')
+      const data = await response.json()
 
-        if (!response.ok) {
-          const errMsg = data.message || data.error || 'Failed to load courses. Please try again.'
-          setError(errMsg)
-          setPageState('error')
-          return
-        }
+      if (!response.ok) {
+        const errMsg = data.message || data.error || 'Failed to load courses. Please try again.'
+        setError(errMsg)
+        setPageState('error')
+        return
+      }
 
-        const rawBp = data.data ?? data
-        const isOpen = rawBp.windowOpen !== undefined ? rawBp.windowOpen : rawBp.window_status !== 'CLOSED'
-        setWindowIsOpen(isOpen)
+      const rawBp = data.data ?? data
+      const isOpen = rawBp.windowOpen !== undefined ? rawBp.windowOpen : rawBp.window_status !== 'CLOSED'
+      setWindowIsOpen(isOpen)
 
-        if (data.student) {
-          setStudentInfo({
-            full_name: data.student.full_name,
-            current_semester: data.student.current_semester,
-          })
-        }
+      const isAllocCompleted = !!rawBp.allocationCompleted
+      setAllocationCompleted(isAllocCompleted)
+      setAllocationCompletedAt(rawBp.allocationCompletedAt || null)
+      if (rawBp.availableSeats) {
+        setAvailableSeats(rawBp.availableSeats)
+      }
+      if (rawBp.allocatedCourses) {
+        setAllocatedCourses(rawBp.allocatedCourses)
+      }
 
-        setBlueprint({
-          ...rawBp,
-          window_status: isOpen ? 'OPEN' : 'CLOSED',
+      setSlotChangesRemaining(rawBp.slotChangesRemaining !== undefined ? rawBp.slotChangesRemaining : 3)
+      setSlotChangesNextReset(rawBp.slotChangesNextReset || null)
+
+      if (data.student) {
+        setStudentInfo({
+          full_name: data.student.full_name,
+          current_semester: data.student.current_semester,
         })
+      }
 
-        const minors: Course[] = rawBp.minorCourses || []
-        setMinorCourses(minors)
+      setBlueprint({
+        ...rawBp,
+        window_status: isOpen ? 'OPEN' : 'CLOSED',
+      })
 
-        if (rawBp.existingRegistration || rawBp.existingSlots) {
-          setExistingSubmission(rawBp.existingRegistration || {})
-        }
+      const minors: Course[] = rawBp.minorCourses || []
+      setMinorCourses(minors)
 
-        if (rawBp.existingSlots) {
-          setExistingSlots(rawBp.existingSlots)
-        }
-        if (rawBp.allocationMetadata) {
-          setAllocationMetadata(rawBp.allocationMetadata)
-        }
+      if (rawBp.existingRegistration || rawBp.existingSlots) {
+        setExistingSubmission(rawBp.existingRegistration || {})
+      }
 
-        // Hydrate preferences for up to 8 slots
-        const existingPrefs = rawBp.existingPreferences || {}
+      if (rawBp.existingSlots) {
+        setExistingSlots(rawBp.existingSlots)
+      }
+      if (rawBp.allocationMetadata) {
+        setAllocationMetadata(rawBp.allocationMetadata)
+      }
+
+      // Hydrate preferences: In post-allocation mode, preferences have ZERO importance!
+      // Active enrollments are driven exclusively by existingSlots from student_registrations.
+      const existingPrefs = rawBp.existingPreferences || {}
+      if (!isAllocCompleted) {
         const initialPrefs: Record<number, SlotRankedPreferences> = {}
         for (let i = 1; i <= 8; i++) {
           const list = existingPrefs[`slot_${i}`] || []
@@ -240,49 +293,116 @@ export default function RegisterPage() {
             rank3: list.find((p: any) => p.rank === 3)?.course_id || '',
           }
         }
-
-        // Re-hydrate extraSlotsCount if slot 7 or 8 existed
-        const hasSlot7 = (existingPrefs.slot_7 && existingPrefs.slot_7.length > 0) || !!rawBp.existingSlots?.slot_7
-        const hasSlot8 = (existingPrefs.slot_8 && existingPrefs.slot_8.length > 0) || !!rawBp.existingSlots?.slot_8
-        if (hasSlot8) {
-          setExtraSlotsCount(2)
-        } else if (hasSlot7) {
-          setExtraSlotsCount(1)
-        }
-
         setRankedPreferences(initialPrefs)
-
-        // Single pathway — slots already resolved
-        if (rawBp.slots && rawBp.slots.length > 0) {
-          setResolvedSlots(rawBp.slots)
-          setSelectedPathwayId(rawBp.selectedPathwayId || rawBp.pathway_id || null)
-          setPageState('ready')
-          return
+      } else {
+        const regSlots: Record<number, SlotRankedPreferences> = {}
+        for (let i = 1; i <= 8; i++) {
+          const slotCid = rawBp.existingSlots?.[`slot_${i}`] || ''
+          regSlots[i] = { rank1: slotCid, rank2: '', rank3: '' }
         }
-
-        // Multiple pathways — show picker
-        if (rawBp.pathways && rawBp.pathways.length > 1) {
-          if (rawBp.selectedPathwayId) {
-            setSelectedPathwayId(rawBp.selectedPathwayId)
-          }
-          setPageState('pathway_picker')
-          return
-        }
-
-        if (!isOpen && !rawBp.existingSlots) {
-          setPageState('closed')
-          return
-        }
-
-        setPageState('ready')
-      } catch (err) {
-        setError('Error loading registration blueprint. Please try again.')
-        setPageState('error')
+        setRankedPreferences(regSlots)
       }
-    }
 
+      // Re-hydrate extraSlotsCount if slot 7 or 8 existed
+      const hasSlot7 = (existingPrefs.slot_7 && existingPrefs.slot_7.length > 0) || !!rawBp.existingSlots?.slot_7
+      const hasSlot8 = (existingPrefs.slot_8 && existingPrefs.slot_8.length > 0) || !!rawBp.existingSlots?.slot_8
+      if (hasSlot8) {
+        setExtraSlotsCount(2)
+      } else if (hasSlot7) {
+        setExtraSlotsCount(1)
+      }
+
+      // Single pathway — slots already resolved
+      if (rawBp.slots && rawBp.slots.length > 0) {
+        setResolvedSlots(rawBp.slots)
+        setSelectedPathwayId(rawBp.selectedPathwayId || rawBp.pathway_id || null)
+        setPageState('ready')
+        return
+      }
+
+      // Multiple pathways — show picker
+      if (rawBp.pathways && rawBp.pathways.length > 1) {
+        if (rawBp.selectedPathwayId) {
+          setSelectedPathwayId(rawBp.selectedPathwayId)
+        }
+        setPageState('pathway_picker')
+        return
+      }
+
+      if (!isOpen && !rawBp.existingSlots && !isAllocCompleted) {
+        setPageState('closed')
+        return
+      }
+
+      setPageState('ready')
+    } catch (err) {
+      setError('Error loading registration blueprint. Please try again.')
+      setPageState('error')
+    }
+  }
+
+  useEffect(() => {
     loadBlueprint()
   }, [])
+
+  async function handleUpdateSlot(slotNumber: number, courseId: string) {
+    if (!courseId) {
+      setError('Please select an available paper from the list.')
+      return
+    }
+
+    setUpdatingSlot(true)
+    setError('')
+    setSuccessMsg('')
+
+    try {
+      const res = await fetch('/api/registrations/update-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slot_key: `slot_${slotNumber}`,
+          course_id: courseId,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Failed to update course registration')
+      }
+
+      if (data.slotChangesRemaining !== undefined) {
+        setSlotChangesRemaining(data.slotChangesRemaining)
+      }
+      if (data.slotChangesNextReset !== undefined) {
+        setSlotChangesNextReset(data.slotChangesNextReset)
+      }
+
+      // Optimistically update existingSlots and allocatedCourses immediately
+      setExistingSlots((prev) => ({
+        ...prev,
+        [`slot_${slotNumber}`]: courseId,
+      }))
+      setRankedPreferences((prev) => ({
+        ...prev,
+        [slotNumber]: { rank1: courseId, rank2: '', rank3: '' },
+      }))
+      if (data.course) {
+        setAllocatedCourses((prev) => ({
+          ...prev,
+          [courseId]: data.course,
+        }))
+      }
+
+      setSuccessMsg(data.message || `Successfully assigned Paper ${slotNumber}!`)
+      setEditingSlot(null)
+      setSelectedCourseForSlot('')
+      await loadBlueprint()
+    } catch (err: any) {
+      setError(err.message || 'Failed to update course registration')
+    } finally {
+      setUpdatingSlot(false)
+    }
+  }
 
   async function selectPathway(pathwayId: string) {
     setSelectedPathwayId(pathwayId)
@@ -396,43 +516,50 @@ export default function RegisterPage() {
     const slotNum = slot.slot
     const slotKey = `slot_${slotNum}`
     const existingCourseId = existingSlots[slotKey]
-    const prefCourseId = rankedPreferences[slotNum]?.rank1
 
-    const targetCourseId = prefCourseId || existingCourseId
+    // In post-allocation mode, the only authoritative paper is existingSlots[slotKey]
+    const targetCourseId = allocationCompleted
+      ? existingCourseId
+      : (rankedPreferences[slotNum]?.rank1 || existingCourseId)
 
-    // 1. Direct course attached to the slot (e.g. FIXED core papers)
-    if (slot.course) {
-      if (!targetCourseId || slot.course.id === targetCourseId) {
-        return slot.course
-      }
+    if (!targetCourseId) {
+      return (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED') ? (slot.course || null) : null
     }
 
-    // 2. Look in this slot's options
-    if (targetCourseId && slot.options && slot.options.length > 0) {
+    // 1. Direct course lookup in allocatedCourses map (from backend student_registrations)
+    if (allocatedCourses[targetCourseId]) {
+      return allocatedCourses[targetCourseId]
+    }
+
+    // 2. Look in this slot's blueprint options
+    if (slot.options && slot.options.length > 0) {
       const found = slot.options.find((c) => c.id === targetCourseId)
       if (found) return found
     }
 
-    // 3. Look in minorCourses
-    if (targetCourseId && minorCourses.length > 0) {
+    // 3. Direct course attached to the slot (e.g. FIXED core papers)
+    if (slot.course && slot.course.id === targetCourseId) {
+      return slot.course
+    }
+
+    // 4. Look in minorCourses
+    if (minorCourses.length > 0) {
       const inMinors = minorCourses.find((c) => c.id === targetCourseId)
       if (inMinors) return inMinors
     }
 
-    // 4. Look across all slots in resolvedSlots (options or course)
-    if (targetCourseId) {
-      for (const s of resolvedSlots) {
-        if (s.course && s.course.id === targetCourseId) return s.course
-        if (s.options) {
-          const found = s.options.find((c) => c.id === targetCourseId)
-          if (found) return found
-        }
+    // 5. Look across all slots in resolvedSlots (options or course)
+    for (const s of resolvedSlots) {
+      if (s.course && s.course.id === targetCourseId) return s.course
+      if (s.options) {
+        const found = s.options.find((c) => c.id === targetCourseId)
+        if (found) return found
       }
     }
 
-    // 5. Fallback: if slot has a course, return it
-    if (slot.course) {
-      return slot.course
+    // 6. Fallback only if fixed slot rule
+    if (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED') {
+      return slot.course || null
     }
 
     return null
@@ -774,7 +901,76 @@ export default function RegisterPage() {
           resolvedSlots.length > 0 && (
             <>
               {/* Window Status Banner */}
-              {(() => {
+              {allocationCompleted ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1.25rem' }}>
+                  <div
+                    className={styles.windowBanner}
+                    style={{
+                      background: 'rgba(2, 132, 199, 0.08)',
+                      borderColor: '#0284c7',
+                      color: '#0369a1',
+                      margin: 0,
+                    }}
+                  >
+                    <div className={styles.windowDot} style={{ background: '#0284c7' }} />
+                    ✓ Course Allocation Complete — Direct Seat Registration Mode (Seats update in real time; only papers with available seats can be chosen)
+                  </div>
+
+                  {/* 27-Hour Slot Change Quota Indicator */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                      padding: '0.8rem 1.1rem',
+                      borderRadius: '0.5rem',
+                      background: slotChangesRemaining > 0 ? '#f0fdf4' : '#fef2f2',
+                      border: `1px solid ${slotChangesRemaining > 0 ? '#bbf7d0' : '#fecaca'}`,
+                      color: slotChangesRemaining > 0 ? '#166534' : '#991b1b',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <span style={{ fontSize: '1.25rem' }}>
+                        {slotChangesRemaining > 0 ? '🔄' : '🔒'}
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>
+                          Course Changes Remaining: {slotChangesRemaining} of 3
+                        </div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '0.1rem' }}>
+                          {slotChangesRemaining > 0
+                            ? 'Policy: Maximum 3 course changes allowed within any rolling 27-hour period.'
+                            : 'Rate limit reached: Maximum 3 changes used in the last 27 hours.'}
+                        </div>
+                      </div>
+                    </div>
+                    {slotChangesNextReset && (
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          padding: '0.3rem 0.65rem',
+                          borderRadius: '4px',
+                          background: slotChangesRemaining > 0 ? '#dcfce7' : '#fee2e2',
+                          border: `1px solid ${slotChangesRemaining > 0 ? '#86efac' : '#fca5a5'}`,
+                        }}
+                      >
+                        {slotChangesRemaining === 0 ? 'Next change unlocks:' : 'Quota resets earliest:'}{' '}
+                        {new Date(slotChangesNextReset).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}{' '}
+                        ({new Date(slotChangesNextReset).toLocaleDateString('en-IN', {
+                          month: 'short',
+                          day: 'numeric',
+                        })})
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (() => {
                 const isClosingSoon =
                   windowIsOpen && blueprint.deadline
                     ? new Date(blueprint.deadline).getTime() - Date.now() <= 24 * 60 * 60 * 1000 &&
@@ -826,6 +1022,7 @@ export default function RegisterPage() {
               {blueprint.pathways &&
                 blueprint.pathways.length > 1 &&
                 windowIsOpen &&
+                !allocationCompleted &&
                 pageState === 'ready' && (
                   <button
                     type="button"
@@ -853,7 +1050,11 @@ export default function RegisterPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span className={styles.creditLabel}>
-                      {windowIsOpen ? 'Credits (Base 6 Papers):' : 'Total Confirmed Credits (Base 6 Papers):'}
+                      {allocationCompleted
+                        ? 'Total Enrolled Credits:'
+                        : windowIsOpen
+                        ? 'Credits (Base 6 Papers):'
+                        : 'Total Confirmed Credits (Base 6 Papers):'}
                     </span>
                     <span
                       className={`${styles.creditValue} ${
@@ -885,7 +1086,11 @@ export default function RegisterPage() {
               </div>
 
               <p className={styles.sectionTitle}>
-                {windowIsOpen ? 'Select Your Ranked Preferences' : 'Course Allocation Status'}
+                {allocationCompleted
+                  ? 'Your Course Allocations & Available Slots'
+                  : windowIsOpen
+                  ? 'Select Your Ranked Preferences'
+                  : 'Course Allocation Status'}
               </p>
 
               <div className={styles.slotsContainer}>
@@ -898,6 +1103,13 @@ export default function RegisterPage() {
                   const slotKey = `slot_${slot.slot}`
                   const existingCourseId = existingSlots[slotKey]
                   const isAllocated = !!existingCourseId
+                  const slotAllocMeta = allocationMetadata[slotKey]
+                  const isFixedSlot =
+                    isFixed ||
+                    slotAllocMeta?.allocated_by === 'fixed' ||
+                    slot.rule === 'FIXED' ||
+                    slot.rule === 'CAMPUS_FIXED' ||
+                    slot.rule === 'AEC_ELECT'
 
                   // Find course metadata if allocated or fixed
                   const allocatedCourse = isFixed
@@ -905,6 +1117,7 @@ export default function RegisterPage() {
                     : getCourseForSlot(slot)
 
                   const isConfirmed = isAllocated || (isFixed && !!slot.course)
+                  const isCurrentlyEditing = editingSlot === slot.slot
 
                   return (
                     <div
@@ -920,7 +1133,7 @@ export default function RegisterPage() {
                             </span>
                           )}
                         </span>
-                        {slot.slot > 6 && windowIsOpen && (
+                        {slot.slot > 6 && (windowIsOpen || allocationCompleted) && !isConfirmed && (
                           <button
                             type="button"
                             onClick={() => handleRemovePaper(slot.slot)}
@@ -946,141 +1159,341 @@ export default function RegisterPage() {
                         )}
                       </div>
 
-                      {/* Case 1: Confirmed Allocation (Unified for Core/Fixed & Allocated Electives) */}
-                      {isConfirmed && allocatedCourse ? (
-                        <div className={styles.confirmedCard}>
-                          <div className={styles.confirmedCardBody}>
-                            <div className={styles.confirmedBadgeRow}>
-                              <span className={styles.confirmedBadge}>
-                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                                Confirmed Allocation
+                      {/* POST-ALLOCATION DIRECT REGISTRATION FLOW */}
+                      {allocationCompleted ? (
+                        isCurrentlyEditing ? (
+                          /* Interactive Slot Editor Mode */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                              <label style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>
+                                Select Open Course ({slot.name})
+                              </label>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                Showing papers with available seats
                               </span>
                             </div>
 
-                            <h4 className={styles.confirmedTitle}>
-                              {allocatedCourse.title || 'Allocated Paper'}
-                            </h4>
+                            {(() => {
+                              const rawOptions = slot.slot > 6 ? minorCourses : (slot.options ?? [])
+                              const optionsWithSeats: Course[] = rawOptions
+                                .map((c) => {
+                                  const seats = availableSeats[c.id] ?? 0
+                                  return {
+                                    ...c,
+                                    remaining_seats: seats,
+                                  }
+                                })
+                                .filter((c) => (c.remaining_seats ?? 0) > 0 || c.id === existingCourseId)
 
-                            <div className={styles.confirmedMeta}>
-                              {allocatedCourse.course_code && (
-                                <span className={styles.confirmedCode}>
-                                  {allocatedCourse.course_code}
+                              return (
+                                <>
+                                  <CustomSelect
+                                    options={optionsWithSeats}
+                                    value={selectedCourseForSlot || existingCourseId || ''}
+                                    onChange={(val) => setSelectedCourseForSlot(val)}
+                                    disabled={updatingSlot}
+                                    placeholder="— Select a course with open seats —"
+                                  />
+
+                                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateSlot(slot.slot, selectedCourseForSlot || existingCourseId || '')}
+                                      disabled={updatingSlot || (!selectedCourseForSlot && !existingCourseId)}
+                                      style={{
+                                        background: '#0284c7',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '0.5rem 1.1rem',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        cursor: updatingSlot ? 'not-allowed' : 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                      }}
+                                    >
+                                      {updatingSlot ? 'Registering Seat...' : '✓ Confirm & Register Seat'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingSlot(null)
+                                        setSelectedCourseForSlot('')
+                                        setError('')
+                                      }}
+                                      disabled={updatingSlot}
+                                      style={{
+                                        background: '#f1f5f9',
+                                        color: '#475569',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '6px',
+                                        padding: '0.5rem 0.9rem',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
+                              )
+                            })()}
+                          </div>
+                        ) : isConfirmed && allocatedCourse ? (
+                          /* Confirmed Card with Change Option */
+                          <div className={styles.confirmedCard}>
+                            <div className={styles.confirmedCardBody}>
+                              <div className={styles.confirmedBadgeRow} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <span
+                                  className={styles.confirmedBadge}
+                                  style={{
+                                    background: isFixedSlot ? '#f1f5f9' : '#ecfdf5',
+                                    color: isFixedSlot ? '#475569' : '#059669',
+                                    border: `1px solid ${isFixedSlot ? '#cbd5e1' : '#a7f3d0'}`,
+                                  }}
+                                >
+                                  {isFixedSlot ? '🔒 Fixed Core Course' : '✓ Confirmed Allocation'}
                                 </span>
-                              )}
-                              <span className={styles.confirmedDept}>
-                                {allocatedCourse.department_name || 'General Department'}
+                                {!isFixedSlot && (
+                                  slotChangesRemaining > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingSlot(slot.slot)
+                                        setSelectedCourseForSlot(existingCourseId || '')
+                                        setError('')
+                                      }}
+                                      style={{
+                                        background: '#f0f9ff',
+                                        color: '#0284c7',
+                                        border: '1px solid #bae6fd',
+                                        borderRadius: '6px',
+                                        padding: '0.3rem 0.75rem',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                      }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = '#e0f2fe')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = '#f0f9ff')}
+                                    >
+                                      Change Course ✎
+                                    </button>
+                                  ) : (
+                                    <span
+                                      title={slotChangesNextReset ? `Quota exhausted. Unlocks at ${new Date(slotChangesNextReset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Limit of 3 changes per 27 hours reached'}
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        padding: '0.25rem 0.55rem',
+                                        borderRadius: '4px',
+                                        background: '#f1f5f9',
+                                        color: '#64748b',
+                                        border: '1px solid #cbd5e1',
+                                        fontWeight: 600,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        cursor: 'not-allowed',
+                                      }}
+                                    >
+                                      🔒 Limit Reached (3/3)
+                                    </span>
+                                  )
+                                )}
+                              </div>
+
+                              <h4 className={styles.confirmedTitle}>
+                                {allocatedCourse.title || 'Allocated Paper'}
+                              </h4>
+
+                              <div className={styles.confirmedMeta}>
+                                {allocatedCourse.course_code && (
+                                  <span className={styles.confirmedCode}>
+                                    {allocatedCourse.course_code}
+                                  </span>
+                                )}
+                                <span className={styles.confirmedDept}>
+                                  {allocatedCourse.department_name || 'General Department'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {allocatedCourse.credits != null && (
+                              <span className={styles.confirmedCreditPill}>
+                                {allocatedCourse.credits} cr
                               </span>
-                            </div>
+                            )}
                           </div>
-
-                          {allocatedCourse.credits != null && (
-                            <span className={styles.confirmedCreditPill}>
-                              {allocatedCourse.credits} cr
-                            </span>
-                          )}
-                        </div>
-                      ) : !windowIsOpen ? (
-                        /* Case 2: Window Closed & Not Allocated */
-                        <div className={styles.unallocatedCard}>
-                          <p className={styles.unallocatedTitle}>
-                            <span>⚠️</span> Not yet allocated — contact your HOD
-                          </p>
-                          <p className={styles.unallocatedText}>
-                            Your submitted preferences could not be resolved during automated rounds.
-                            Please contact your department HOD for manual placement.
-                          </p>
-                        </div>
+                        ) : (
+                          /* Unallocated Slot in Post-Allocation Mode */
+                          <div className={styles.unallocatedCard} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <div>
+                              <p className={styles.unallocatedTitle} style={{ margin: 0 }}>
+                                <span>⚠️</span> Unassigned Paper Slot
+                              </p>
+                              <p className={styles.unallocatedText} style={{ margin: '0.25rem 0 0 0' }}>
+                                This slot is unassigned. Choose from courses with remaining seats.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSlot(slot.slot)
+                                setSelectedCourseForSlot('')
+                                setError('')
+                              }}
+                              disabled={slotChangesRemaining === 0}
+                              style={{
+                                background: slotChangesRemaining > 0 ? '#0284c7' : '#94a3b8',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.4rem 0.9rem',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: slotChangesRemaining > 0 ? 'pointer' : 'not-allowed',
+                              }}
+                            >
+                              {slotChangesRemaining > 0 ? 'Choose Course +' : '🔒 Changes Locked'}
+                            </button>
+                          </div>
+                        )
                       ) : (
-                        /* Case 3: Elective Slot — Window Open (Student Picking Preferences) */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
-                            {slot.slot > 6
-                              ? 'Select an elective course offered by any department outside your own for this Minor Paper.'
-                              : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and prerequisites.'}
-                          </p>
+                        /* PRE-ALLOCATION MODE */
+                        isConfirmed && allocatedCourse ? (
+                          <div className={styles.confirmedCard}>
+                            <div className={styles.confirmedCardBody}>
+                              <div className={styles.confirmedBadgeRow}>
+                                <span className={styles.confirmedBadge}>
+                                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                  Confirmed Allocation
+                                </span>
+                              </div>
 
-                          <div>
-                            <div>
-                              <label
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: '#0284c7',
-                                  fontWeight: 700,
-                                  textTransform: 'uppercase',
-                                  display: 'block',
-                                  marginBottom: '0.25rem',
-                                }}
-                              >
-                                1st Choice
-                              </label>
+                              <h4 className={styles.confirmedTitle}>
+                                {allocatedCourse.title || 'Allocated Paper'}
+                              </h4>
+
+                              <div className={styles.confirmedMeta}>
+                                {allocatedCourse.course_code && (
+                                  <span className={styles.confirmedCode}>
+                                    {allocatedCourse.course_code}
+                                  </span>
+                                )}
+                                <span className={styles.confirmedDept}>
+                                  {allocatedCourse.department_name || 'General Department'}
+                                </span>
+                              </div>
                             </div>
-                            <CustomSelect
-                              options={slot.options ?? []}
-                              value={rankedPreferences[slot.slot]?.rank1 ?? ''}
-                              onChange={(val) => handlePreferenceChange(slot.slot, 'rank1', val)}
-                              disabled={pageState === 'submitting'}
-                              placeholder="— Select 1st Choice Preference —"
-                            />
+
+                            {allocatedCourse.credits != null && (
+                              <span className={styles.confirmedCreditPill}>
+                                {allocatedCourse.credits} cr
+                              </span>
+                            )}
                           </div>
+                        ) : !windowIsOpen ? (
+                          <div className={styles.unallocatedCard}>
+                            <p className={styles.unallocatedTitle}>
+                              <span>⚠️</span> Not yet allocated — contact your HOD
+                            </p>
+                            <p className={styles.unallocatedText}>
+                              Your submitted preferences could not be resolved during automated rounds.
+                              Please contact your department HOD for manual placement.
+                            </p>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
+                              {slot.slot > 6
+                                ? 'Select an elective course offered by any department outside your own for this Minor Paper.'
+                                : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and prerequisites.'}
+                            </p>
 
-                          {/* 2nd Choice (Backup Round 2) — only if more than 1 option exists */}
-                          {(slot.options?.length ?? 0) > 1 && (
                             <div>
-                              <label
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: '#64748b',
-                                  fontWeight: 600,
-                                  textTransform: 'uppercase',
-                                  display: 'block',
-                                  marginBottom: '0.25rem',
-                                }}
-                              >
-                                2nd Choice
-                              </label>
+                              <div>
+                                <label
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: '#0284c7',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    display: 'block',
+                                    marginBottom: '0.25rem',
+                                  }}
+                                >
+                                  1st Choice
+                                </label>
+                              </div>
                               <CustomSelect
-                                options={(slot.options ?? []).filter(
-                                  (c) => c.id !== rankedPreferences[slot.slot]?.rank1,
-                                )}
-                                value={rankedPreferences[slot.slot]?.rank2 ?? ''}
-                                onChange={(val) => handlePreferenceChange(slot.slot, 'rank2', val)}
+                                options={slot.options ?? []}
+                                value={rankedPreferences[slot.slot]?.rank1 ?? ''}
+                                onChange={(val) => handlePreferenceChange(slot.slot, 'rank1', val)}
                                 disabled={pageState === 'submitting'}
-                                placeholder="— Select 2nd Choice (Optional) —"
+                                placeholder="— Select 1st Choice Preference —"
                               />
                             </div>
-                          )}
 
-                          {/* 3rd Choice (Backup Round 3) — only if more than 2 options exist */}
-                          {(slot.options?.length ?? 0) > 2 && (
-                            <div>
-                              <label
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: '#64748b',
-                                  fontWeight: 600,
-                                  textTransform: 'uppercase',
-                                  display: 'block',
-                                  marginBottom: '0.25rem',
-                                }}
-                              >
-                                3rd Choice
-                              </label>
-                              <CustomSelect
-                                options={(slot.options ?? []).filter(
-                                  (c) =>
-                                    c.id !== rankedPreferences[slot.slot]?.rank1 &&
-                                    c.id !== rankedPreferences[slot.slot]?.rank2,
-                                )}
-                                value={rankedPreferences[slot.slot]?.rank3 ?? ''}
-                                onChange={(val) => handlePreferenceChange(slot.slot, 'rank3', val)}
-                                disabled={pageState === 'submitting'}
-                                placeholder="— Select 3rd Choice (Optional) —"
-                              />
-                            </div>
-                          )}
-                        </div>
+                            {(slot.options?.length ?? 0) > 1 && (
+                              <div>
+                                <label
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    display: 'block',
+                                    marginBottom: '0.25rem',
+                                  }}
+                                >
+                                  2nd Choice
+                                </label>
+                                <CustomSelect
+                                  options={(slot.options ?? []).filter(
+                                    (c) => c.id !== rankedPreferences[slot.slot]?.rank1,
+                                  )}
+                                  value={rankedPreferences[slot.slot]?.rank2 ?? ''}
+                                  onChange={(val) => handlePreferenceChange(slot.slot, 'rank2', val)}
+                                  disabled={pageState === 'submitting'}
+                                  placeholder="— Select 2nd Choice (Optional) —"
+                                />
+                              </div>
+                            )}
+
+                            {(slot.options?.length ?? 0) > 2 && (
+                              <div>
+                                <label
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    display: 'block',
+                                    marginBottom: '0.25rem',
+                                  }}
+                                >
+                                  3rd Choice
+                                </label>
+                                <CustomSelect
+                                  options={(slot.options ?? []).filter(
+                                    (c) =>
+                                      c.id !== rankedPreferences[slot.slot]?.rank1 &&
+                                      c.id !== rankedPreferences[slot.slot]?.rank2,
+                                  )}
+                                  value={rankedPreferences[slot.slot]?.rank3 ?? ''}
+                                  onChange={(val) => handlePreferenceChange(slot.slot, 'rank3', val)}
+                                  disabled={pageState === 'submitting'}
+                                  placeholder="— Select 3rd Choice (Optional) —"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )
                       )}
                     </div>
                   )
@@ -1143,7 +1556,7 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {windowIsOpen && (pageState === 'ready' || pageState === 'submitting') && (
+              {!allocationCompleted && windowIsOpen && (pageState === 'ready' || pageState === 'submitting') && (
                 <button
                   className={styles.submitBtn}
                   onClick={handleSubmit}

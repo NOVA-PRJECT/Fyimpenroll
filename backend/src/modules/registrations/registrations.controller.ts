@@ -54,4 +54,29 @@ export class RegistrationsController {
   ) {
     return this.registrationsService.submitCourses(body, user)
   }
+
+  @Get('available-seats')
+  async getAvailableSeats(
+    @Query('semester') semester: string,
+    @Query('slot_key') slotKey: string,
+    @Query('pathway_id') pathwayId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.registrationsService.getAvailableSeats(
+      Number(semester),
+      slotKey,
+      pathwayId,
+      user,
+    )
+  }
+
+  @Post('update-slot')
+  @RateLimit('registration')
+  @UseGuards(RateLimitGuard)
+  async updateSlot(
+    @Body() body: { slot_key: string; course_id: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.registrationsService.updateSlot(body, user)
+  }
 }

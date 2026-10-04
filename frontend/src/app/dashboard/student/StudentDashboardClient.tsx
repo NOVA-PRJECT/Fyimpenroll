@@ -44,6 +44,8 @@ export interface EnrolledCourse {
 interface StudentDashboardClientProps {
   studentInfo: StudentInfo
   hasSubmission: boolean
+  hasRegistration?: boolean
+  allocationCompleted?: boolean
   enrolledCourses?: EnrolledCourse[]
   totalRegisteredCredits?: number
   registrationWindow?: RegistrationWindow | null
@@ -78,6 +80,8 @@ type StudentTab = 'overview' | 'notifications' | 'courses' | 'timetable' | 'camp
 export default function StudentDashboardClient({
   studentInfo,
   hasSubmission,
+  hasRegistration = false,
+  allocationCompleted = false,
   enrolledCourses = [],
   totalRegisteredCredits = 0,
   registrationWindow,
@@ -136,6 +140,55 @@ export default function StudentDashboardClient({
         minute: '2-digit',
       })
     : null
+
+  // Contextual registration status state machine
+  const isWindowOpen = registrationWindow?.isOpen ?? false
+  const isRegistered = hasRegistration || (enrolledCourses && enrolledCourses.length > 0) || hasSubmission
+
+  let regStatusBadge = '● Action Required'
+  let regStatusClass = styles.regStatusPending
+  let regDescription =
+    'Review your semester blueprint, curriculum pathway, and select your ranked elective course choices for this semester.'
+  let regCtaText = 'Enter Course Registration →'
+  let regNotificationStatus = '⏳ Pending Submission'
+  let regNotificationColor = '#ea580c'
+
+  if (!isWindowOpen) {
+    if (isRegistered) {
+      regStatusBadge = '✓ Registration Successful'
+      regStatusClass = styles.regStatusSuccessful
+      regDescription = `Your course registration for Semester ${studentInfo.current_semester} has been successfully completed and confirmed. Official papers are locked for this term.`
+      regCtaText = 'View Registered Courses →'
+      regNotificationStatus = '✓ Registration Successful'
+      regNotificationColor = '#059669'
+    } else {
+      regStatusBadge = '🔒 Window Closed'
+      regStatusClass = styles.regStatusClosed
+      regDescription = `The course registration window for Semester ${studentInfo.current_semester} is currently closed. You did not submit course preferences for this term.`
+      regCtaText = 'View Registration Status →'
+      regNotificationStatus = '🔒 Window Closed (Incomplete)'
+      regNotificationColor = '#dc2626'
+    }
+  } else {
+    // Window is open
+    if (allocationCompleted) {
+      regStatusBadge = '✓ Courses Allocated & Confirmed'
+      regStatusClass = styles.regStatusSubmitted
+      regDescription =
+        'Official course allocation is complete. Direct slot adjustment is open (subject to the maximum 3 changes per 27 hours policy).'
+      regCtaText = 'Adjust Course Slots →'
+      regNotificationStatus = '✓ Courses Allocated & Confirmed'
+      regNotificationColor = '#16a34a'
+    } else if (hasSubmission) {
+      regStatusBadge = '✓ Preferences Submitted'
+      regStatusClass = styles.regStatusSubmitted
+      regDescription =
+        'Your course preferences for this semester are recorded. You can review or modify your elective rankings anytime while the registration window remains open.'
+      regCtaText = 'Review & Update Course Preferences →'
+      regNotificationStatus = '✓ Preferences Submitted'
+      regNotificationColor = '#16a34a'
+    }
+  }
 
   return (
     <div className={styles.pageWrapper}>
@@ -331,34 +384,24 @@ export default function StudentDashboardClient({
                     <div className={styles.registrationCard}>
                       <div className={styles.regCardHeader}>
                         <h2 className={styles.regCardTitle}>Course Registration</h2>
-                        <span
-                          className={`${styles.regStatusBadge} ${
-                            hasSubmission ? styles.regStatusSubmitted : styles.regStatusPending
-                          }`}
-                        >
-                          {hasSubmission ? '✓ Preferences Submitted' : '● Action Required'}
+                        <span className={`${styles.regStatusBadge} ${regStatusClass}`}>
+                          {regStatusBadge}
                         </span>
                       </div>
 
-                      <p className={styles.regDescription}>
-                        {hasSubmission
-                          ? 'Your course preferences for this semester are recorded. You can review or modify your elective rankings anytime while the registration window remains open.'
-                          : 'Review your semester blueprint, curriculum pathway, and select your ranked elective course choices for this semester.'}
-                      </p>
+                      <p className={styles.regDescription}>{regDescription}</p>
 
                       <Link
                         href="/dashboard/student/register"
                         className={styles.regCtaBtn}
                       >
-                        {hasSubmission
-                          ? 'Review & Update Course Preferences →'
-                          : 'Enter Course Registration →'}
+                        {regCtaText}
                       </Link>
 
                       <p className={styles.regHintText}>
-                        {registrationWindow?.isOpen
-                          ? 'Registration window is currently open. Ensure your final preferences are saved before the deadline.'
-                          : 'Please monitor the Notifications tab for official window dates and registration guidelines.'}
+                        {isWindowOpen
+                          ? 'Registration window is currently open. Ensure your final preferences or slot choices are saved before the deadline.'
+                          : 'Registration window is closed. Official courses for this semester are confirmed and locked.'}
                       </p>
                     </div>
 
@@ -551,8 +594,8 @@ export default function StudentDashboardClient({
 
                 <div className={styles.notificationItem}>
                   <span className={styles.notificationItemLabel}>Your Current Status</span>
-                  <span className={styles.notificationItemValue} style={{ color: hasSubmission ? '#16a34a' : '#ea580c' }}>
-                    {hasSubmission ? '✓ Preferences Submitted' : '⏳ Pending Submission'}
+                  <span className={styles.notificationItemValue} style={{ color: regNotificationColor }}>
+                    {regNotificationStatus}
                   </span>
                 </div>
               </div>

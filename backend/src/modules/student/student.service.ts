@@ -39,7 +39,7 @@ export class StudentService {
 
     const effectiveCampusId = student.campus_id || user.campus_id
 
-    const [regResWith8, prefRes, settingsRes] = await Promise.all([
+    const [regResWith8, prefRes, settingsRes, allocRunRes] = await Promise.all([
       this.supabase.admin
         .from('student_registrations')
         .select(`
@@ -72,6 +72,17 @@ export class StudentService {
             .eq('campus_id', effectiveCampusId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
+      effectiveCampusId
+        ? this.supabase.admin
+            .from('allocation_runs')
+            .select('id, status, completed_at')
+            .eq('campus_id', effectiveCampusId)
+            .eq('semester', student.current_semester)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ])
 
     let reg: any = regResWith8.data
@@ -98,6 +109,10 @@ export class StudentService {
 
     const pref = prefRes.data
     const settings = settingsRes.data
+    const allocationCompleted = !!allocRunRes?.data
+    const hasRegistration =
+      !!reg &&
+      [1, 2, 3, 4, 5, 6, 7, 8].some((s) => !!(reg as any)[`slot_${s}_course_id`])
 
     const deadline = settings?.deadline ? new Date(settings.deadline) : null
     const now = new Date()
@@ -235,6 +250,8 @@ export class StudentService {
     return {
       studentInfo,
       hasSubmission: !!reg || !!pref,
+      hasRegistration,
+      allocationCompleted,
       must_change_password: student.must_change_password,
       enrolledCourses,
       totalRegisteredCredits: totalRegisteredCredits || (reg ? Number(reg.total_credits) || 0 : 0),

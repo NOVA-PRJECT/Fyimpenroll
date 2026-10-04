@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -302,7 +303,7 @@ export class RegistrationsService {
       current_semester: semester,
     }
 
-    const [prefRes, regResWith8] = await Promise.all([
+    const [prefRes, regResWith8, completedRunRes] = await Promise.all([
       this.supabase.admin
         .from('registration_preferences')
         .select('id, pathway_id, preferences, allocation_metadata, submitted_at')
@@ -317,7 +318,20 @@ export class RegistrationsService {
         .eq('semester', semester)
         .eq('academic_year', settings.academic_year)
         .maybeSingle(),
+      this.supabase.admin
+        .from('allocation_runs')
+        .select('id, status, completed_at')
+        .eq('campus_id', campusId)
+        .eq('academic_year', settings.academic_year)
+        .eq('semester', semester)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
+
+    const allocationCompleted = !!completedRunRes?.data
+    const allocationCompletedAt = completedRunRes?.data?.completed_at || null
 
     const existingPref = prefRes.data
     let existingReg: any = regResWith8.data
@@ -360,33 +374,134 @@ export class RegistrationsService {
       ...(typeof existingReg?.allocation_metadata === 'object' && existingReg?.allocation_metadata ? existingReg.allocation_metadata : {}),
     }
 
-    if (existingPref?.preferences) {
-      const raw = existingPref.preferences
-      if (Array.isArray(raw)) {
-        for (const item of raw) {
-          const slotKey = `slot_${item.slot}`
-          if (Array.isArray(item.choices)) {
-            preferences[slotKey] = item.choices
+    if (allocationCompleted) {
+      // Once allocation has run, pre-allocation registration_preferences have ZERO importance.
+      // Active enrollments are driven exclusively by student_registrations.
+      preferences = {}
+      if (existingReg) {
+        for (let s = 1; s <= 8; s++) {
+          const slotKey = `slot_${s}`
+          const cid = (existingReg as any)[`${slotKey}_course_id`]
+          if (cid) {
+            preferences[slotKey] = [{ course_id: cid, rank: 1 }]
           }
         }
-      } else if (typeof raw === 'object') {
-        preferences = raw as any
       }
-    } else if (existingReg?.selections && Object.keys(existingReg.selections).length > 0) {
-      preferences = existingReg.selections as any
+    } else {
+      if (existingPref?.preferences) {
+        const raw = existingPref.preferences
+        if (Array.isArray(raw)) {
+          for (const item of raw) {
+            const slotKey = `slot_${item.slot}`
+            if (Array.isArray(item.choices)) {
+              preferences[slotKey] = item.choices
+            }
+          }
+        } else if (typeof raw === 'object') {
+          preferences = raw as any
+        }
+      } else if (existingReg?.selections && Object.keys(existingReg.selections).length > 0) {
+        preferences = existingReg.selections as any
+      }
+
+      // Backfill any confirmed slots from existingReg into preferences map if missing
+      if (existingReg) {
+        for (let s = 1; s <= 8; s++) {
+          const slotKey = `slot_${s}`
+          const cid = (existingReg as any)[`${slotKey}_course_id`]
+          if (cid && (!preferences[slotKey] || preferences[slotKey].length === 0)) {
+            preferences[slotKey] = [{ course_id: cid, rank: 1 }]
+            if (!allocationMetadata[slotKey]) {
+              allocationMetadata[slotKey] = { allocated_by: 'fixed', course_id: cid }
+            }
+          }
+        }
+      }
     }
 
-    // Backfill any confirmed slots from existingReg into preferences map if missing
+    // Resolve course metadata for all currently enrolled slots in student_registrations
+    const allocatedCourses: Record<string, any> = {}
     if (existingReg) {
+      const enrolledCids: string[] = []
       for (let s = 1; s <= 8; s++) {
-        const slotKey = `slot_${s}`
-        const cid = (existingReg as any)[`${slotKey}_course_id`]
-        if (cid && (!preferences[slotKey] || preferences[slotKey].length === 0)) {
-          preferences[slotKey] = [{ course_id: cid, rank: 1 }]
-          if (!allocationMetadata[slotKey]) {
-            allocationMetadata[slotKey] = { allocated_by: 'fixed', course_id: cid }
+        const cid = (existingReg as any)[`slot_${s}_course_id`]
+        if (cid) enrolledCids.push(cid)
+      }
+      if (enrolledCids.length > 0) {
+        const { data: enrolledData } = await this.supabase.admin
+          .from('courses')
+          .select('id, course_code, title, credits, department_id, semester, seat_limit, category')
+          .in('id', enrolledCids)
+
+        if (enrolledData) {
+          for (const c of enrolledData) {
+            allocatedCourses[c.id] = {
+              ...c,
+              department_name: deptIdToName.get(c.department_id) || 'General',
+            }
           }
         }
+      }
+    }
+
+    // Calculate real-time available seats for candidate courses post-allocation
+    const availableSeats: Record<string, number> = {}
+    if (allocationCompleted) {
+      const { data: allRegs } = await this.supabase.admin
+        .from('student_registrations')
+        .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+        .eq('campus_id', campusId)
+        .eq('academic_year', settings.academic_year)
+        .eq('semester', semester)
+
+      const seatCounts: Record<string, number> = {}
+      if (allRegs) {
+        for (const reg of allRegs) {
+          for (let s = 1; s <= 8; s++) {
+            const cid = (reg as any)[`slot_${s}_course_id`]
+            if (cid) {
+              seatCounts[cid] = (seatCounts[cid] || 0) + 1
+            }
+          }
+        }
+      }
+
+      const allReferencedCourses: any[] = []
+      for (const slot of slots) {
+        if (slot.options) allReferencedCourses.push(...slot.options)
+        if (slot.course) allReferencedCourses.push(slot.course)
+      }
+      allReferencedCourses.push(...minorCourses)
+
+      for (const c of allReferencedCourses) {
+        if (c && c.id) {
+          const limit = c.seat_limit ? Number(c.seat_limit) : 60
+          const enrolled = seatCounts[c.id] || 0
+          availableSeats[c.id] = Math.max(0, limit - enrolled)
+        }
+      }
+    }
+
+    // Compute remaining slot changes within the 27-hour rolling window
+    let slotChangesRemaining = 3
+    let slotChangesNextReset: string | null = null
+
+    if (allocationCompleted) {
+      const WINDOW_MS = 27 * 60 * 60 * 1000
+      const now = Date.now()
+      const regMeta = (existingReg?.allocation_metadata as Record<string, any>) || {}
+      const history = Array.isArray(regMeta.slot_change_history) ? regMeta.slot_change_history : []
+      const recentChanges = history.filter(
+        (entry: any) => entry?.at && now - new Date(entry.at).getTime() < WINDOW_MS,
+      )
+
+      slotChangesRemaining = Math.max(0, 3 - recentChanges.length)
+      if (recentChanges.length > 0) {
+        const sorted = [...recentChanges].sort(
+          (a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+        )
+        const oldest = sorted[0]
+        slotChangesNextReset = new Date(new Date(oldest.at).getTime() + WINDOW_MS).toISOString()
       }
     }
 
@@ -410,6 +525,12 @@ export class RegistrationsService {
       existingRegistration: Object.keys(preferences).length > 0 ? preferences : null,
       existingPreferences: preferences,
       allocationMetadata: allocationMetadata,
+      allocatedCourses,
+      allocationCompleted,
+      allocationCompletedAt,
+      availableSeats,
+      slotChangesRemaining,
+      slotChangesNextReset,
       submittedAt: submittedAt,
       student: {
         full_name: user.full_name || '',
@@ -559,6 +680,24 @@ export class RegistrationsService {
     const deadline = settings.deadline ? new Date(settings.deadline) : null
     if (!deadline || new Date() >= deadline) {
       throw new ForbiddenException('Registration window is closed')
+    }
+
+    // Post-allocation guard: Block preference submissions once allocation has completed for this semester
+    const { data: completedRun } = await this.supabase.admin
+      .from('allocation_runs')
+      .select('id')
+      .eq('campus_id', campusId)
+      .eq('academic_year', settings.academic_year)
+      .eq('semester', semester)
+      .eq('status', 'completed')
+      .limit(1)
+      .maybeSingle()
+
+    if (completedRun) {
+      throw new ForbiddenException(
+        'Course allocation has already been completed for this semester. ' +
+        'Please use direct slot update to change your course registration.',
+      )
     }
 
     const pathways = (blueprint.pathways as Pathway[]) || []
@@ -920,6 +1059,430 @@ export class RegistrationsService {
         ? 'Course registration preferences updated successfully'
         : 'Course registration preferences submitted successfully',
       total_credits: totalCredits,
+    }
+  }
+
+  // ──────────────── Post-Allocation: Available Seats ────────────────
+  async getAvailableSeats(
+    semester: number,
+    slotKey: string,
+    pathwayId: string | undefined,
+    user: AuthUser,
+  ) {
+    if (!slotKey || !/^slot_[1-8]$/.test(slotKey)) {
+      throw new BadRequestException('Invalid slot_key. Expected slot_1 to slot_8')
+    }
+
+    let campusId = user.campus_id
+    let departmentId = user.department_id
+    let currentSem = user.current_semester
+
+    if (!campusId || !departmentId || !currentSem) {
+      const { data: student } = await this.supabase.admin
+        .from('students')
+        .select('campus_id, department_id, current_semester')
+        .eq('id', user.userId)
+        .single()
+
+      if (student) {
+        campusId = campusId || student.campus_id
+        departmentId = departmentId || student.department_id
+        currentSem = currentSem || student.current_semester
+      }
+    }
+
+    const sem = semester || currentSem || 1
+
+    const { data: settings } = await this.supabase.admin
+      .from('campus_settings')
+      .select('academic_year')
+      .eq('campus_id', campusId)
+      .maybeSingle()
+
+    if (!settings?.academic_year) {
+      throw new NotFoundException('Campus settings not configured')
+    }
+
+    let candidateCourses: any[] = []
+    const slotNumber = parseInt(slotKey.replace('slot_', ''), 10)
+
+    if (slotNumber >= 7) {
+      const { data: minors } = await this.supabase.admin
+        .from('courses')
+        .select('id, course_code, title, department_id, semester, credits, category, tag, seat_limit')
+        .eq('semester', sem)
+        .neq('department_id', departmentId)
+        .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
+        .order('title', { ascending: true })
+
+      candidateCourses = minors ?? []
+    } else {
+      const { data: blueprint } = await this.supabase.admin
+        .from('semester_blueprints')
+        .select('*')
+        .eq('department_id', departmentId)
+        .eq('semester', sem)
+        .maybeSingle()
+
+      if (!blueprint) {
+        throw new NotFoundException('Semester blueprint not found')
+      }
+
+      const pathways = (blueprint.pathways as Pathway[]) || []
+      const chosenPathway = pathways.find((p) => p.id === pathwayId) || pathways[0]
+      if (!chosenPathway) {
+        throw new BadRequestException('Pathway not found')
+      }
+
+      const { data: depts } = await this.supabase.admin.from('departments').select('id, name, code')
+      const deptMap = new Map<string, string>()
+      const deptIdToName = new Map<string, string>()
+      for (const d of depts ?? []) {
+        if (d.code) {
+          deptMap.set(d.code, d.id)
+          deptMap.set(d.code.toUpperCase(), d.id)
+          deptMap.set(d.code.toLowerCase(), d.id)
+        }
+        if (d.id) {
+          deptMap.set(d.id, d.id)
+          deptIdToName.set(d.id, d.name)
+        }
+      }
+
+      const effectiveUser: AuthUser = {
+        ...user,
+        campus_id: campusId,
+        department_id: departmentId,
+        current_semester: sem,
+      }
+
+      const slots = await this.resolvePathwaySlots(chosenPathway, effectiveUser, deptMap, deptIdToName)
+      const targetSlot = slots.find((s) => s.slot === slotNumber)
+
+      if (!targetSlot) {
+        throw new NotFoundException(`Slot ${slotKey} not found in blueprint`)
+      }
+
+      if (
+        targetSlot.rule === SLOT_RULES.FIXED ||
+        targetSlot.rule === SLOT_RULES.CAMPUS_FIXED ||
+        targetSlot.rule === SLOT_RULES.AEC_ELECT
+      ) {
+        return {
+          success: true,
+          courses: [],
+          isFixed: true,
+          message: 'Fixed core slots cannot be changed.',
+        }
+      }
+
+      candidateCourses = targetSlot.options ?? []
+    }
+
+    const { data: allRegs } = await this.supabase.admin
+      .from('student_registrations')
+      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+      .eq('campus_id', campusId)
+      .eq('academic_year', settings.academic_year)
+      .eq('semester', sem)
+
+    const seatCounts: Record<string, number> = {}
+    if (allRegs) {
+      for (const reg of allRegs) {
+        for (let s = 1; s <= 8; s++) {
+          const cid = (reg as any)[`slot_${s}_course_id`]
+          if (cid) {
+            seatCounts[cid] = (seatCounts[cid] || 0) + 1
+          }
+        }
+      }
+    }
+
+    const availableCourses = candidateCourses
+      .map((c) => {
+        const seatLimit = c.seat_limit ? Number(c.seat_limit) : 60
+        const enrolled = seatCounts[c.id] || 0
+        const remainingSeats = Math.max(0, seatLimit - enrolled)
+        return {
+          id: c.id,
+          course_code: c.course_code,
+          title: c.title,
+          credits: c.credits,
+          department_id: c.department_id,
+          department_name: c.department_name,
+          category: c.category,
+          seat_limit: seatLimit,
+          remaining_seats: remainingSeats,
+        }
+      })
+      .filter((c) => c.remaining_seats > 0)
+
+    return {
+      success: true,
+      courses: availableCourses,
+      isFixed: false,
+    }
+  }
+
+  // ──────────────── Post-Allocation: Direct Slot Update ────────────────
+  async updateSlot(
+    body: { slot_key: string; course_id: string },
+    user: AuthUser,
+  ) {
+    const { slot_key, course_id } = body
+    if (!slot_key || !/^slot_[1-8]$/.test(slot_key)) {
+      throw new BadRequestException('Invalid slot_key. Expected slot_1 to slot_8')
+    }
+    if (!course_id) {
+      throw new BadRequestException('course_id is required')
+    }
+
+    let campusId = user.campus_id
+    let departmentId = user.department_id
+    let currentSemester = user.current_semester
+
+    if (!campusId || !departmentId || !currentSemester) {
+      const { data: student } = await this.supabase.admin
+        .from('students')
+        .select('campus_id, department_id, current_semester')
+        .eq('id', user.userId)
+        .single()
+
+      if (student) {
+        campusId = campusId || student.campus_id
+        departmentId = departmentId || student.department_id
+        currentSemester = currentSemester || student.current_semester
+      }
+    }
+
+    if (!campusId || !currentSemester) {
+      throw new BadRequestException('Incomplete student academic profile')
+    }
+
+    const { data: settings } = await this.supabase.admin
+      .from('campus_settings')
+      .select('academic_year, min_credits, max_credits')
+      .eq('campus_id', campusId)
+      .maybeSingle()
+
+    if (!settings?.academic_year) {
+      throw new NotFoundException('Campus registration settings not configured')
+    }
+
+    // Step 1: Ensure allocation has completed for this semester and academic year
+    const { data: completedRun } = await this.supabase.admin
+      .from('allocation_runs')
+      .select('id')
+      .eq('campus_id', campusId)
+      .eq('academic_year', settings.academic_year)
+      .eq('semester', currentSemester)
+      .eq('status', 'completed')
+      .limit(1)
+      .maybeSingle()
+
+    if (!completedRun) {
+      throw new BadRequestException(
+        'Course allocation has not yet run for this semester. Direct slot updates are only available after allocation has completed.',
+      )
+    }
+
+    // Step 2: Fetch student's existing registration record
+    const { data: reg, error: regErr } = await this.supabase.admin
+      .from('student_registrations')
+      .select('*')
+      .eq('student_id', user.userId)
+      .eq('semester', currentSemester)
+      .eq('academic_year', settings.academic_year)
+      .maybeSingle()
+
+    if (regErr || !reg) {
+      throw new NotFoundException('Student registration record not found for this semester. Please contact your HOD.')
+    }
+
+    const allocationMeta = (reg.allocation_metadata as Record<string, any>) || {}
+    if (allocationMeta[slot_key]?.allocated_by === 'fixed') {
+      throw new ForbiddenException('Cannot modify a fixed core course slot.')
+    }
+
+    if (reg[`${slot_key}_course_id`] === course_id) {
+      return {
+        success: true,
+        message: 'Course is already assigned to this slot',
+        total_credits: reg.total_credits,
+      }
+    }
+
+    // Step 2.5: Enforce 27-hour rolling rate limit (max 3 changes per 27 hours)
+    const WINDOW_MS = 27 * 60 * 60 * 1000
+    const now = Date.now()
+    const history = Array.isArray(allocationMeta.slot_change_history)
+      ? allocationMeta.slot_change_history
+      : []
+
+    const recentChanges = history.filter(
+      (entry: any) => entry?.at && now - new Date(entry.at).getTime() < WINDOW_MS,
+    )
+
+    if (recentChanges.length >= 3) {
+      const sorted = [...recentChanges].sort(
+        (a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+      )
+      const oldest = sorted[0]
+      const unlockTime = new Date(new Date(oldest.at).getTime() + WINDOW_MS)
+      const diffMs = Math.max(0, unlockTime.getTime() - now)
+      const hours = Math.floor(diffMs / (60 * 60 * 1000))
+      const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000))
+      const timeStr = `${hours}h ${minutes}m`
+
+      throw new ForbiddenException(
+        `Rate limit exceeded: You have reached the maximum limit of 3 course changes within a 27-hour window. Your next change unlocks in ${timeStr} (${unlockTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).`,
+      )
+    }
+
+    // Step 3: Ensure student doesn't choose the same course in multiple slots
+    for (let s = 1; s <= 8; s++) {
+      const k = `slot_${s}`
+      if (k !== slot_key && reg[`${k}_course_id`] === course_id) {
+        throw new BadRequestException('You are already registered for this course in another slot.')
+      }
+    }
+
+    // Step 4: Verify the target course exists and belongs to current semester
+    const { data: course, error: cErr } = await this.supabase.admin
+      .from('courses')
+      .select('id, course_code, title, credits, department_id, semester, seat_limit, category')
+      .eq('id', course_id)
+      .single()
+
+    if (cErr || !course) {
+      throw new NotFoundException('Selected course not found')
+    }
+
+    if (course.semester !== currentSemester) {
+      throw new BadRequestException(
+        `Course belongs to semester ${course.semester}, but your current semester is ${currentSemester}`,
+      )
+    }
+
+    // Step 5: Capacity check — count active enrollments across student_registrations
+    const seatLimit = course.seat_limit ? Number(course.seat_limit) : 60
+    const { count: enrolledCount } = await this.supabase.admin
+      .from('student_registrations')
+      .select('*', { count: 'exact', head: true })
+      .eq('campus_id', campusId)
+      .eq('academic_year', settings.academic_year)
+      .eq('semester', currentSemester)
+      .or(
+        `slot_1_course_id.eq.${course.id},slot_2_course_id.eq.${course.id},slot_3_course_id.eq.${course.id},slot_4_course_id.eq.${course.id},slot_5_course_id.eq.${course.id},slot_6_course_id.eq.${course.id},slot_7_course_id.eq.${course.id},slot_8_course_id.eq.${course.id}`,
+      )
+
+    if ((enrolledCount ?? 0) >= seatLimit) {
+      throw new ConflictException(
+        `Course ${course.course_code} (${course.title}) has reached maximum capacity (${seatLimit}/${seatLimit} seats). Please select another available course.`,
+      )
+    }
+
+    // Step 6: Recalculate total credits with the new course
+    const prevCourseId = reg[`${slot_key}_course_id`]
+    const assignedCourseIds: string[] = []
+    for (let s = 1; s <= 8; s++) {
+      const k = `slot_${s}`
+      const cid = k === slot_key ? course.id : reg[`${k}_course_id`]
+      if (cid) assignedCourseIds.push(cid)
+    }
+
+    let calculatedCredits = 0
+    if (assignedCourseIds.length > 0) {
+      const { data: assignedCourses } = await this.supabase.admin
+        .from('courses')
+        .select('credits')
+        .in('id', assignedCourseIds)
+      calculatedCredits = (assignedCourses || []).reduce((acc: number, c: any) => acc + (c.credits || 0), 0)
+    }
+
+    // Step 7: Update student_registrations row and track change in slot_change_history
+    const PRUNE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000 // keep last 7 days of history
+    const prunedHistory = history.filter(
+      (entry: any) => entry?.at && now - new Date(entry.at).getTime() < PRUNE_THRESHOLD_MS,
+    )
+
+    const newHistoryEntry = {
+      slot_key,
+      previous_course_id: prevCourseId || null,
+      new_course_id: course.id,
+      course_code: course.course_code,
+      at: new Date(now).toISOString(),
+    }
+
+    const updatedMeta = {
+      ...allocationMeta,
+      [slot_key]: {
+        allocated_by: 'student_direct',
+        updated_at: new Date(now).toISOString(),
+        previous_course_id: prevCourseId || null,
+        course_id: course.id,
+      },
+      slot_change_history: [...prunedHistory, newHistoryEntry],
+    }
+
+    const { error: updateErr } = await this.supabase.admin
+      .from('student_registrations')
+      .update({
+        [`${slot_key}_course_id`]: course.id,
+        allocation_metadata: updatedMeta,
+        total_credits: calculatedCredits,
+      })
+      .eq('id', reg.id)
+
+    if (updateErr) {
+      this.logger.error(`Failed to update student registration: ${updateErr.message}`)
+      throw new InternalServerErrorException('Failed to update course registration slot')
+    }
+
+    // Compute updated quota values
+    const updatedRemaining = Math.max(0, 3 - (recentChanges.length + 1))
+    let slotChangesNextReset: string | null = null
+    const allRecent = [...recentChanges, newHistoryEntry]
+    if (allRecent.length > 0) {
+      const sorted = [...allRecent].sort(
+        (a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+      )
+      slotChangesNextReset = new Date(new Date(sorted[0].at).getTime() + WINDOW_MS).toISOString()
+    }
+
+    // Step 8: Audit log the post-allocation update
+    await this.auditLogger.log({
+      eventType: AuditEvents.REGISTRATION_SUBMITTED,
+      userId: user.userId,
+      userRole: user.role,
+      action: `student direct slot update post-allocation for ${slot_key} to course ${course.course_code}`,
+      resourceType: 'student_registrations',
+      resourceId: reg.id,
+      status: 'success',
+      metadata: {
+        slot_key,
+        previous_course_id: prevCourseId,
+        new_course_id: course.id,
+        course_code: course.course_code,
+        total_credits: calculatedCredits,
+        slot_changes_remaining: updatedRemaining,
+      },
+    })
+
+    return {
+      success: true,
+      message: `Successfully updated ${slot_key} to ${course.course_code} - ${course.title}`,
+      total_credits: calculatedCredits,
+      slot_key,
+      course_id: course.id,
+      slotChangesRemaining: updatedRemaining,
+      slotChangesNextReset,
+      course: {
+        id: course.id,
+        course_code: course.course_code,
+        title: course.title,
+        credits: course.credits,
+      },
     }
   }
 }
