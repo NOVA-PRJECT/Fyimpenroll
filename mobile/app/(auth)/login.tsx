@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -13,6 +15,9 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { Input } from '../../src/components/common/Input';
 import { Button } from '../../src/components/common/Button';
 import { Card } from '../../src/components/common/Card';
+import { apiClient } from '../../src/api/client';
+import { API_ENDPOINTS } from '../../src/api/endpoints';
+import { ENV } from '../../src/config/env';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,6 +28,34 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Backend connectivity diagnostic
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [serverLatency, setServerLatency] = useState<number | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const checkServerConnection = async () => {
+    setServerStatus('checking');
+    setServerError(null);
+    const start = Date.now();
+    try {
+      const data = await apiClient.get(API_ENDPOINTS.HEALTH, { skipAuth: true });
+      if (data && data.status === 'ok') {
+        setServerLatency(Date.now() - start);
+        setServerStatus('online');
+      } else {
+        setServerStatus('offline');
+        setServerError('Unexpected server response');
+      }
+    } catch (err: any) {
+      setServerStatus('offline');
+      setServerError(err?.message || 'Connection failed');
+    }
+  };
+
+  useEffect(() => {
+    checkServerConnection();
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -143,6 +176,66 @@ export default function LoginScreen() {
           />
         </Card>
 
+        {/* Backend Connectivity Status Diagnostic */}
+        <TouchableOpacity
+          onPress={checkServerConnection}
+          activeOpacity={0.7}
+          style={[
+            styles.serverBadge,
+            {
+              backgroundColor:
+                serverStatus === 'online'
+                  ? 'rgba(16, 185, 129, 0.08)'
+                  : serverStatus === 'offline'
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : 'rgba(100, 116, 139, 0.08)',
+              borderColor:
+                serverStatus === 'online'
+                  ? colors.success
+                  : serverStatus === 'offline'
+                  ? colors.danger
+                  : colors.border,
+            },
+          ]}
+        >
+          <View style={styles.serverBadgeContent}>
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    serverStatus === 'online'
+                      ? colors.success
+                      : serverStatus === 'offline'
+                      ? colors.danger
+                      : colors.warning,
+                },
+              ]}
+            />
+            {serverStatus === 'checking' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginRight: 6 }} />
+                <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                  Testing Backend Connection...
+                </Text>
+              </View>
+            ) : serverStatus === 'online' ? (
+              <Text style={[typography.caption, { color: colors.success, fontWeight: '600' }]}>
+                Backend Online ({ENV.API_BASE_URL.replace(/^http:\/\//, '')}) • {serverLatency}ms
+              </Text>
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[typography.caption, { color: colors.danger, fontWeight: '600' }]}>
+                  Backend Offline ({ENV.API_BASE_URL.replace(/^http:\/\//, '')})
+                </Text>
+                <Text style={[typography.caption, { color: colors.danger, fontSize: 11, marginTop: 2 }]}>
+                  Tap to retry • {serverError}
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+
         <View style={styles.footerContainer}>
           <Text
             style={[
@@ -200,6 +293,25 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     marginBottom: 16,
+  },
+  serverBadge: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  serverBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   footerContainer: {
     marginTop: 32,

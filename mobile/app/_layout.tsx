@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { queryClient } from '../src/lib/query-client';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
@@ -15,7 +15,8 @@ function NavigationGuard() {
   const { session, role, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, typography } = useTheme();
+  const [isTimedOut, setIsTimedOut] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -61,7 +62,45 @@ function NavigationGuard() {
     }
   }, [session, role, isLoading, segments, router]);
 
+  // Timeout: if loading hasn't resolved in 12s (offline at startup), show retry UI
+  useEffect(() => {
+    if (!isLoading) {
+      setIsTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsTimedOut(true), 12000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   if (isLoading) {
+    if (isTimedOut) {
+      return (
+        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+          <Text style={[typography.h3, { color: colors.danger, marginBottom: 12 }]}>
+            Unable to Connect
+          </Text>
+          <Text
+            style={[
+              typography.body,
+              {
+                color: colors.textSecondary,
+                textAlign: 'center',
+                marginBottom: 24,
+                paddingHorizontal: 32,
+              },
+            ]}
+          >
+            Could not reach the server. Check your connection and try again.
+          </Text>
+          <TouchableOpacity
+            onPress={() => setIsTimedOut(false)}
+            style={[styles.retryButton, { borderColor: colors.primary }]}
+          >
+            <Text style={[typography.button, { color: colors.primary }]}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     return (
       <View
         style={[
@@ -110,5 +149,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  retryButton: {
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
   },
 });

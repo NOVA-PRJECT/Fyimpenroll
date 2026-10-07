@@ -229,7 +229,12 @@ export default function PeriodMarkingScreen() {
 
         {/* Multiple Active Slots Switcher (Back-to-back or parallel classes) */}
         {activeSlots.length > 1 && (
-          <View style={styles.slotPickerRow}>
+          <View
+            style={[
+              styles.slotPickerRow,
+              { borderTopColor: colors.borderLight },
+            ]}
+          >
             <Text style={[typography.bodySmall, { color: colors.textSecondary, marginBottom: 6 }]}>
               Select Class:
             </Text>
@@ -290,9 +295,14 @@ export default function PeriodMarkingScreen() {
       {/* NO ACTIVE CLASS EMPTY STATE */}
       {!isLoading && !error && activeSlots.length === 0 && (
         <Card variant="flat" style={styles.emptyStateCard}>
-          <View style={styles.emptyIconCircle}>
-            <Ionicons name="time-outline" size={36} color={colors.primary} />
-          </View>
+          <View
+              style={[
+                styles.emptyIconCircle,
+                { backgroundColor: colors.primaryLight + '30' },
+              ]}
+            >
+              <Ionicons name="time-outline" size={36} color={colors.primary} />
+            </View>
           <Text style={[typography.h3, { color: colors.textPrimary, marginTop: 12 }]}>
             No Active Lecture Right Now
           </Text>
@@ -308,7 +318,15 @@ export default function PeriodMarkingScreen() {
           </Text>
 
           {nextSlot && (
-            <View style={styles.nextSlotBox}>
+            <View
+              style={[
+                styles.nextSlotBox,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
               <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>
                 NEXT SCHEDULED CLASS
               </Text>
@@ -359,7 +377,15 @@ export default function PeriodMarkingScreen() {
           </Card>
 
           {/* Quick Attendance Stats Strip */}
-          <View style={styles.statsStrip}>
+          <View
+            style={[
+              styles.statsStrip,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             <View style={styles.statBox}>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Enrolled</Text>
               <Text style={[typography.h3, { color: colors.textPrimary }]}>{roster.length}</Text>
@@ -509,7 +535,6 @@ const styles = StyleSheet.create({
   slotPickerRow: {
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
     paddingTop: 10,
   },
   slotPillContainer: {
@@ -532,7 +557,6 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#e6f0fa',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -540,9 +564,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     width: '100%',
     alignItems: 'center',
   },
@@ -557,10 +579,8 @@ const styles = StyleSheet.create({
   },
   statsStrip: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     marginBottom: 12,
     overflow: 'hidden',
   },

@@ -107,7 +107,7 @@ export default function HodHomeScreen() {
       {/* Critical Absence Flags */}
       <View style={styles.sectionHeader}>
         <Text style={[typography.h3, { color: colors.textPrimary }]}>
-          Critical Attendance Alerts (&lt;75%)
+          Critical Attendance Alerts ({'<'}75%)
         </Text>
       </View>
 

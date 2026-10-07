@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "scheme": "fyimp",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#1E3A8A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.fyimp.mobile",
@@ -29,7 +25,16 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-location",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1E3A8A",
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
