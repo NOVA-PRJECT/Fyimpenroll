@@ -26,6 +26,7 @@ function ConfirmResetForm() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [canRetrySync, setCanRetrySync] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -141,9 +142,41 @@ function ConfirmResetForm() {
   const checks = getChecks(password)
   const passwordLevel = getPasswordLevel(password)
 
+  async function handleRetrySync() {
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const syncRes = await fetch('/api/auth/sync-password-status', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+      const syncData = await syncRes.json().catch(() => ({}))
+      if (!syncRes.ok || syncData.success === false) {
+        setSubmitError(syncData.message || 'Synchronization retry failed. Please try again.')
+        setSubmitting(false)
+        return
+      }
+
+      await supabase.auth.signOut().catch(() => {})
+      router.replace(
+        '/login?message=Password%20updated%20successfully.%20Please%20log%20in%20with%20your%20new%20password.',
+      )
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Synchronization request failed. Please check your connection.')
+      setSubmitting(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError('')
+    setCanRetrySync(false)
 
     const validation = validatePassword(password, confirmPassword)
     if (!validation.valid) {
@@ -171,20 +204,29 @@ function ConfirmResetForm() {
       }
 
       // Step F.3: If that succeeds, call POST /api/auth/complete-password-reset with credentials: 'include'
-      try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData?.session?.access_token
-        await fetch('/api/auth/complete-password-reset', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        })
-      } catch (backendErr) {
-        // Step F.4: If backend call fails, log the error but still proceed
-        console.error('complete-password-reset backend call error:', backendErr)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const resetRes = await fetch('/api/auth/complete-password-reset', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ passwordUpdated: true }),
+      })
+
+      const resetData = await resetRes.json().catch(() => ({}))
+
+      // Step F.4: F10 fix - If backend synchronization fails, do NOT show false success or redirect
+      if (!resetRes.ok || resetData.success === false) {
+        const errorMsg =
+          resetData.message ||
+          'Password updated in authentication system, but student account synchronization failed. Please retry synchronization below.'
+        setSubmitError(errorMsg)
+        setCanRetrySync(true)
+        setSubmitting(false)
+        return
       }
 
       // Explicit sign out so student logs in explicitly
@@ -304,18 +346,32 @@ function ConfirmResetForm() {
         <div className="p-6 md:p-8 space-y-5 bg-white">
           {/* Submit Error Banner */}
           {submitError && (
-            <div className="rounded-lg p-3.5 flex items-start gap-3 text-xs bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a]">
-              <span className="material-symbols-outlined text-[#ba1a1a] text-[18px] mt-0.5 shrink-0">
-                error
-              </span>
-              <span className="flex-1">{submitError}</span>
-              <button
-                type="button"
-                onClick={() => setSubmitError('')}
-                className="text-[#93000a] hover:opacity-70"
-              >
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
+            <div className="rounded-lg p-3.5 flex flex-col gap-2.5 text-xs bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a]">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-[#ba1a1a] text-[18px] mt-0.5 shrink-0">
+                  error
+                </span>
+                <span className="flex-1 leading-relaxed">{submitError}</span>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError('')}
+                  className="text-[#93000a] hover:opacity-70"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+              {canRetrySync && (
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRetrySync}
+                    disabled={submitting}
+                    className="px-3 py-1.5 bg-[#ba1a1a] text-white font-medium text-xs rounded hover:bg-[#93000a] disabled:opacity-50 transition-colors shadow-sm"
+                  >
+                    {submitting ? 'Retrying Synchronization...' : 'Retry Synchronization'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

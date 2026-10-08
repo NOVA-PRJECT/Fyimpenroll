@@ -48,7 +48,12 @@ export class AssignmentsController {
       user,
       parsed.data.teacher_id,
       parsed.data.course_id,
-      ip
+      ip,
+      {
+        campus_id: parsed.data.campus_id,
+        academic_year: parsed.data.academic_year,
+        semester: parsed.data.semester,
+      }
     );
   }
 

@@ -67,8 +67,22 @@ export class StudentController {
       user,
     )
 
+    if (!result.success) {
+      return result
+    }
+
     if (result.token) {
       res.cookie('auth_token', result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 3600 * 1000,
+      })
+    }
+
+    if (result.refreshToken) {
+      res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

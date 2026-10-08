@@ -10,6 +10,8 @@ import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
+import { SEMESTERS } from '../../core/constants/semesters'
+import { validatePathwaySlots } from '../../core/utils/slotRules'
 
 function generatePathwayId(name: string): string {
   const slug = name
@@ -28,6 +30,143 @@ export class HodService {
     private readonly auditLogger: AuditLoggerService,
     private readonly serverLogger: ServerLoggerService,
   ) {}
+
+  // ──────────────── Catalog Readiness Checklist (F53, D07) ────────────────
+  async getCatalogReadiness(user: AuthUser) {
+    const departmentId = user.department_id
+    if (!departmentId) {
+      throw new ForbiddenException('User is not affiliated with any academic department.')
+    }
+
+    // 1. Fetch blueprints across all semesters
+    const { data: blueprints, error: bpError } = await this.supabase.admin
+      .from('semester_blueprints')
+      .select('semester, min_credits, max_credits, pathways')
+      .eq('department_id', departmentId)
+
+    if (bpError) {
+      throw new InternalServerErrorException(`Failed to fetch blueprints: ${bpError.message}`)
+    }
+
+    const bpMap = new Map((blueprints || []).map((b) => [b.semester, b]))
+
+    // 2. Fetch courses across all semesters
+    const { data: courses, error: courseError } = await this.supabase.admin
+      .from('courses')
+      .select('id, course_code, title, semester, category, credits, seat_limit')
+      .eq('department_id', departmentId)
+
+    if (courseError) {
+      throw new InternalServerErrorException(`Failed to fetch courses: ${courseError.message}`)
+    }
+
+    const coursesBySem = new Map<number, any[]>()
+    for (const c of courses || []) {
+      const s = c.semester
+      if (!coursesBySem.has(s)) coursesBySem.set(s, [])
+      coursesBySem.get(s)!.push(c)
+    }
+
+    // 3. Build readiness matrix for all 10 semesters without fabricating placeholder curriculum
+    const semestersReport = SEMESTERS.map((sem) => {
+      const bp = bpMap.get(sem)
+      const semCourses = coursesBySem.get(sem) || []
+      const hasBlueprint = !!bp
+      const hasCourses = semCourses.length > 0
+
+      const missingElements: string[] = []
+      if (!hasBlueprint) missingElements.push('semester_blueprint')
+      if (!hasCourses) missingElements.push('courses')
+
+      let status: 'ready' | 'partial' | 'missing' = 'missing'
+      if (hasBlueprint && hasCourses) {
+        status = 'ready'
+      } else if (hasBlueprint || hasCourses) {
+        status = 'partial'
+      }
+
+      const pathways = (bp?.pathways || []) as any[]
+      const hasResearchPathway = pathways.some((p: any) =>
+        /research|dissertation|project|internship/i.test(p.name || ''),
+      )
+
+      return {
+        semester: sem,
+        status,
+        has_blueprint: hasBlueprint,
+        course_count: semCourses.length,
+        min_credits: bp?.min_credits ?? null,
+        max_credits: bp?.max_credits ?? null,
+        pathway_count: pathways.length,
+        has_research_or_project_pathway: hasResearchPathway,
+        missing_elements: missingElements,
+      }
+    })
+
+    const readyCount = semestersReport.filter((r) => r.status === 'ready').length
+    const partialCount = semestersReport.filter((r) => r.status === 'partial').length
+    const missingCount = semestersReport.filter((r) => r.status === 'missing').length
+
+    // D01, D02, D06: Configuration & catalog consistency checks
+    const advisoryWarnings: Array<{ type: string; semester?: number; course_code?: string; message: string }> = []
+
+    // D01: Mismatched course code prefix vs semester
+    for (const c of courses || []) {
+      const codeMatch = (c.course_code || '').match(/^KU0?(\d+)/i)
+      if (codeMatch) {
+        const codeSem = parseInt(codeMatch[1], 10)
+        if (codeSem !== c.semester && codeSem >= 1 && codeSem <= 10) {
+          advisoryWarnings.push({
+            type: 'CODE_SEMESTER_MISMATCH',
+            semester: c.semester,
+            course_code: c.course_code,
+            message: `Course ${c.course_code} (${c.title}) code prefix indicates semester ${codeSem}, but is assigned to semester ${c.semester}. HOD should verify syllabus semester and align code or semester.`,
+          })
+        }
+      }
+    }
+
+    // D02: Duplicate fixed paper in blueprint
+    for (const b of blueprints || []) {
+      for (const p of (b.pathways || []) as any[]) {
+        const { valid, errors } = validatePathwaySlots(p.slots || [])
+        if (!valid) {
+          for (const err of errors) {
+            advisoryWarnings.push({
+              type: 'BLUEPRINT_DUPLICATE_FIXED',
+              semester: b.semester,
+              message: `Semester ${b.semester} blueprint pathway "${p.name || 'Unnamed'}": ${err}`,
+            })
+          }
+        }
+      }
+    }
+
+    // D06: AEC capacity inspection
+    for (const c of courses || []) {
+      if (c.category === 'AEC' && (c.seat_limit ?? 60) <= 60) {
+        advisoryWarnings.push({
+          type: 'AEC_CAPACITY_CONSTRAINED',
+          semester: c.semester,
+          course_code: c.course_code,
+          message: `AEC course ${c.course_code} has global capacity ${c.seat_limit ?? 60}. Verify combined inter-campus demand before registration closure.`,
+        })
+      }
+    }
+
+    return {
+      department_id: departmentId,
+      summary: {
+        total_semesters: SEMESTERS.length,
+        ready: readyCount,
+        partial: partialCount,
+        missing: missingCount,
+        advisory_warning_count: advisoryWarnings.length,
+      },
+      semesters: semestersReport,
+      advisory_warnings: advisoryWarnings,
+    }
+  }
 
   // ──────────────── Blueprint ────────────────
   async getBlueprint(semester: number, user: AuthUser) {
@@ -63,6 +202,16 @@ export class HodService {
         slot: s.slot ?? idx + 1,
       })),
     }))
+
+    // F20, D02: Validate each pathway against duplicate fixed courses and valid slot constraints
+    for (const p of pathwaysWithIds) {
+      const { valid, errors } = validatePathwaySlots(p.slots || [])
+      if (!valid) {
+        throw new BadRequestException(
+          `Blueprint pathway "${p.name || 'Pathway'}" validation failed: ${errors.join('; ')}`,
+        )
+      }
+    }
 
     // Synchronize flat legacy slot columns with the first/default pathway's reordered slots
     const defaultPathway = pathwaysWithIds[0]
@@ -172,10 +321,15 @@ export class HodService {
       prerequisite_course_ids,
     } = body
 
-    const targetDeptId = body.department_id || user.department_id
-    if (!targetDeptId) {
-      throw new BadRequestException('Department ID is required to create a course')
+    if (!user.department_id) {
+      throw new ForbiddenException('HOD has no assigned department affiliation (access denied)')
     }
+
+    if (body.department_id && body.department_id !== user.department_id) {
+      throw new ForbiddenException('HODs cannot create courses under a foreign department')
+    }
+
+    const targetDeptId = user.department_id
 
     const { data: created, error } = await this.supabase.admin
       .from('courses')
@@ -255,17 +409,34 @@ export class HodService {
       updatePayload.prerequisite_course_ids = Array.isArray(prerequisite_course_ids) ? prerequisite_course_ids : []
     }
 
-    const targetDeptId = body.department_id || user.department_id
-    let query = this.supabase.admin
+    if (!user.department_id) {
+      throw new ForbiddenException('HOD has no assigned department affiliation (access denied)')
+    }
+
+    // 1. Verify target course exists and belongs to the authenticated HOD's department
+    const { data: existingCourse, error: fetchErr } = await this.supabase.admin
+      .from('courses')
+      .select('id, course_code, department_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (fetchErr || !existingCourse) {
+      throw new NotFoundException('Course not found')
+    }
+
+    if (existingCourse.department_id !== user.department_id) {
+      throw new ForbiddenException('You can only update courses belonging to your own department')
+    }
+
+    if (body.department_id && body.department_id !== user.department_id) {
+      throw new ForbiddenException('Course department ownership cannot be transferred via update')
+    }
+
+    const { error } = await this.supabase.admin
       .from('courses')
       .update(updatePayload)
       .eq('id', id)
-
-    if (targetDeptId) {
-      query = query.eq('department_id', targetDeptId)
-    }
-
-    const { error } = await query
+      .eq('department_id', user.department_id)
 
     if (error) {
       this.serverLogger.error(`Failed to update course: ${JSON.stringify(error)}`, 'HodService')
@@ -288,6 +459,25 @@ export class HodService {
   }
 
   async deleteCourse(courseId: string, user: AuthUser) {
+    if (!user.department_id) {
+      throw new ForbiddenException('HOD has no assigned department affiliation (access denied)')
+    }
+
+    // 1. Verify target course exists and belongs to the authenticated HOD's department
+    const { data: existingCourse, error: fetchErr } = await this.supabase.admin
+      .from('courses')
+      .select('id, course_code, department_id')
+      .eq('id', courseId)
+      .maybeSingle()
+
+    if (fetchErr || !existingCourse) {
+      throw new NotFoundException('Course not found')
+    }
+
+    if (existingCourse.department_id !== user.department_id) {
+      throw new ForbiddenException('You can only delete courses belonging to your own department')
+    }
+
     const { error } = await this.supabase.admin
       .from('courses')
       .delete()
@@ -470,27 +660,59 @@ export class HodService {
   }
 
   async removeStudent(studentId: string, user: AuthUser) {
-    const { error } = await this.supabase.admin
+    if (!user.department_id) {
+      throw new ForbiddenException('HOD has no assigned department affiliation (access denied)')
+    }
+
+    // 1. Load target student and verify existence & student identity
+    const { data: student, error: fetchError } = await this.supabase.admin
+      .from('students')
+      .select('id, full_name, department_id, campus_id')
+      .eq('id', studentId)
+      .maybeSingle()
+
+    if (fetchError || !student) {
+      throw new NotFoundException('Student not found')
+    }
+
+    // 2. Authorize student against HOD department & campus
+    if (student.department_id !== user.department_id) {
+      throw new ForbiddenException('Cannot remove a student from another department')
+    }
+    if (user.campus_id && student.campus_id && student.campus_id !== user.campus_id) {
+      throw new ForbiddenException('Cannot remove a student from another campus')
+    }
+
+    // 3. Delete student record from database
+    const { error: deleteError } = await this.supabase.admin
       .from('students')
       .delete()
       .eq('id', studentId)
       .eq('department_id', user.department_id)
 
-    if (error) {
-      this.serverLogger.error(`Failed to delete student ${studentId}: ${error.message}`, 'HodService')
-      throw new BadRequestException(`Failed to delete student: ${error.message}`)
+    if (deleteError) {
+      this.serverLogger.error(`Failed to delete student ${studentId}: ${deleteError.message}`, 'HodService')
+      throw new BadRequestException(`Failed to delete student: ${deleteError.message}`)
     }
 
-    await this.supabase.admin.auth.admin.deleteUser(studentId)
+    // 4. Only after verified database deletion, remove user from Supabase Auth
+    const { error: authDeleteError } = await this.supabase.admin.auth.admin.deleteUser(studentId)
+    if (authDeleteError) {
+      this.serverLogger.warn(
+        `Student database record was removed, but Supabase Auth deletion returned warning: ${authDeleteError.message}`,
+        'HodService',
+      )
+    }
 
     await this.auditLogger.log({
       eventType: 'student_deleted',
       userId: user.userId,
       userRole: user.role,
-      action: `deleted student: ${studentId}`,
+      action: `deleted student: ${student.full_name} (${studentId})`,
       resourceType: 'student',
       resourceId: studentId,
       status: 'success',
+      metadata: { department_id: user.department_id, campus_id: user.campus_id },
     })
 
     return { success: true, message: 'Student removed successfully' }
@@ -599,6 +821,8 @@ export class HodService {
         slot_4_course_id,
         slot_5_course_id,
         slot_6_course_id,
+        slot_7_course_id,
+        slot_8_course_id,
         selections,
         students!inner(full_name, department_id)
       `)
@@ -608,13 +832,34 @@ export class HodService {
       query = query.eq('semester', semester)
     }
 
-    const { data: registrations, error } = await query
+    let { data: registrations, error } = await query
+    if (error && (error.message?.includes('slot_7_course_id') || error.message?.includes('slot_8_course_id'))) {
+      let fallbackQuery = this.supabase.admin
+        .from('student_registrations')
+        .select(`
+          student_id,
+          semester,
+          slot_1_course_id,
+          slot_2_course_id,
+          slot_3_course_id,
+          slot_4_course_id,
+          slot_5_course_id,
+          slot_6_course_id,
+          selections,
+          students!inner(full_name, department_id)
+        `)
+        .eq('students.department_id', user.department_id)
+      if (semester) fallbackQuery = fallbackQuery.eq('semester', semester)
+      const fallbackRes = await fallbackQuery
+      registrations = fallbackRes.data as any
+      error = fallbackRes.error
+    }
     if (error) throw new InternalServerErrorException('Failed to fetch registration records')
 
     // Collect all course IDs from registrations to lookup titles
     const allCourseIds = new Set<string>()
     for (const reg of registrations ?? []) {
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 8; i++) {
         const cid = (reg as any)[`slot_${i}_course_id`]
         if (cid) allCourseIds.add(cid)
       }
@@ -680,9 +925,9 @@ export class HodService {
 
     const { data, error } = await this.supabase.admin
       .from('faculty')
-      .select('id, full_name, email, role, created_at')
+      .select('id, full_name, email, role')
       .eq('department_id', departmentId)
-      .in('role', ['teacher', 'teaching_staff'])
+      .eq('role', 'teacher')
       .order('full_name', { ascending: true })
 
     if (error) {
@@ -821,8 +1066,28 @@ export class HodService {
       throw new InternalServerErrorException(`Failed to delete teacher record: ${deleteFacultyError.message}`)
     }
 
-    // Delete auth account
-    await this.supabase.admin.auth.admin.deleteUser(teacherId)
+    // Delete auth account and verify outcome (F68)
+    const { error: authDeleteError } = await this.supabase.admin.auth.admin.deleteUser(teacherId)
+
+    if (authDeleteError) {
+      this.serverLogger.warn(
+        `Faculty deleted but Auth account deletion failed for teacher ${teacherId}: ${authDeleteError.message}`,
+      )
+      await this.auditLogger.log({
+        eventType: 'teacher_deleted_partial_warning',
+        userId: user.userId,
+        userRole: user.role,
+        action: `Deleted department teacher faculty profile for ${teacher.full_name} (${teacherId}), but Auth deletion failed: ${authDeleteError.message}`,
+        resourceType: 'faculty',
+        resourceId: teacherId,
+        status: 'failure',
+      })
+      return {
+        success: true,
+        warning: `Teacher profile was deleted, but Auth account cleanup failed: ${authDeleteError.message}`,
+        message: `Teacher ${teacher.full_name} removed from department (auth cleanup incomplete).`,
+      }
+    }
 
     await this.auditLogger.log({
       eventType: 'teacher_deleted',

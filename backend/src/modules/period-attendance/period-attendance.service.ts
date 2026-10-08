@@ -9,6 +9,7 @@ import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { ServerLoggerService } from '../../core/logging/server-logger.service';
 import { AuthUser } from '../../core/auth/types';
+import { AuthorizationPolicy } from '../../core/auth/authorization-policy';
 import { PERIOD_GRACE_MINUTES } from './period-attendance.constants';
 import { getISTDateTime } from '../../core/utils/date-time.util';
 
@@ -294,14 +295,23 @@ export class PeriodAttendanceService {
   /**
    * Helper to retrieve all enrolled students for a specific course.
    */
-  async getEnrolledRoster(courseId: string) {
-    // Supports both flat slot columns (slot_1_course_id..slot_6_course_id) and JSONB selections
-    const { data: registrations, error: regError } = await this.supabase.admin
+  async getEnrolledRoster(courseId: string, academicYear?: string, campusId?: string) {
+    // Supports flat slot columns (slot_1_course_id..slot_8_course_id) and JSONB selections (F15)
+    let query = this.supabase.admin
       .from('student_registrations')
       .select('student_id')
       .or(
-        `slot_1_course_id.eq.${courseId},slot_2_course_id.eq.${courseId},slot_3_course_id.eq.${courseId},slot_4_course_id.eq.${courseId},slot_5_course_id.eq.${courseId},slot_6_course_id.eq.${courseId}`
+        `slot_1_course_id.eq.${courseId},slot_2_course_id.eq.${courseId},slot_3_course_id.eq.${courseId},slot_4_course_id.eq.${courseId},slot_5_course_id.eq.${courseId},slot_6_course_id.eq.${courseId},slot_7_course_id.eq.${courseId},slot_8_course_id.eq.${courseId}`
       );
+
+    if (academicYear) {
+      query = query.eq('academic_year', academicYear);
+    }
+    if (campusId) {
+      query = query.eq('campus_id', campusId);
+    }
+
+    const { data: registrations, error: regError } = await query;
 
     if (regError) {
       throw new InternalServerErrorException(`Failed to fetch student registrations: ${regError.message}`);
@@ -334,6 +344,8 @@ export class PeriodAttendanceService {
     ip: string,
     clientTimestamp?: string
   ) {
+    AuthorizationPolicy.assertNotRosterOnly(user, 'submit period attendance');
+
     // 1. Fetch timetable entry and slot times
     const { data: entry, error: entryError } = await this.supabase.admin
       .from('timetable_entries')

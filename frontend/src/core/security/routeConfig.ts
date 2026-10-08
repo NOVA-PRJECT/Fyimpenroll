@@ -17,3 +17,9 @@ export const DASHBOARD_ROLE_MAP: Record<string, Role> = {
   '/dashboard/teacher': 'teacher',
   '/dashboard/student': 'student',
 }
+
+// Shared multi-role dashboard routes (F57).
+// teaching_staff is strictly excluded (roster-only boundary from Plan 01).
+export const SHARED_DASHBOARD_ROUTES: Record<string, Role[]> = {
+  '/dashboard/credit-ledger': ['student', 'teacher', 'hod', 'campus_director', 'superadmin'],
+}

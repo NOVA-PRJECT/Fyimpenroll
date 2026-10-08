@@ -85,7 +85,7 @@ const UpdateStudentSchema = z.object({
 }))
 
 const BlueprintSchema = z.object({
-  semester: z.coerce.number().int().min(1).max(8),
+  semester: z.coerce.number().int().min(1).max(10),
   min_credits: z.coerce.number().int().min(0).max(50),
   max_credits: z.coerce.number().int().min(0).max(50),
   pathways: z.array(z.any()).optional().default([]),
@@ -96,6 +96,12 @@ const BlueprintSchema = z.object({
 @Roles('hod')
 export class HodController {
   constructor(private readonly hodService: HodService) {}
+
+  // ──────────────── Catalog Readiness ────────────────
+  @Get('catalog-readiness')
+  async getCatalogReadiness(@CurrentUser() user: AuthUser) {
+    return this.hodService.getCatalogReadiness(user)
+  }
 
   // ──────────────── Blueprint ────────────────
   @Get('blueprint')

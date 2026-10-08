@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+﻿import { Injectable, Logger } from '@nestjs/common'
 import { SupabaseService } from '../database/supabase.service'
 
 export interface AuditLogEntry {

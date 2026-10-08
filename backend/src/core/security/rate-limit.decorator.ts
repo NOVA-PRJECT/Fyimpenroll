@@ -1,4 +1,4 @@
-import { SetMetadata } from '@nestjs/common'
+﻿import { SetMetadata } from '@nestjs/common'
 
 export type RateLimitType = 'admin' | 'timetable' | 'registration' | 'password_change' | 'campus_sign_in'
 

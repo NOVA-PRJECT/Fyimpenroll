@@ -30,7 +30,7 @@ export class CreditLedgerController {
    * Access scoping is enforced inside CreditLedgerService.
    */
   @Get(':studentId')
-  @Roles('student', 'teacher', 'teaching_staff', 'hod', 'campus_director', 'superadmin')
+  @Roles('student', 'teacher', 'hod', 'campus_director', 'superadmin')
   async getStudentLedger(
     @Param('studentId') studentId: string,
     @CurrentUser() user: AuthUser

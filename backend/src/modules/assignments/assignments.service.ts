@@ -43,7 +43,7 @@ export class AssignmentsService {
       .from('faculty')
       .select('id, full_name, email, role')
       .eq('department_id', departmentId)
-      .in('role', ['teacher', 'teaching_staff'])
+      .eq('role', 'teacher')
       .order('full_name', { ascending: true });
 
     if (facultyError) {
@@ -56,7 +56,7 @@ export class AssignmentsService {
     if (courseIds.length > 0) {
       const { data: assignData, error: assignError } = await this.supabase.admin
         .from('teacher_course_assignments')
-        .select('id, teacher_id, course_id, assigned_at, assigned_by')
+        .select('id, teacher_id, course_id, assigned_at, assigned_by, campus_id, academic_year, semester')
         .in('course_id', courseIds);
 
       if (assignError) {
@@ -68,6 +68,21 @@ export class AssignmentsService {
     // Map faculty by ID for rapid lookup
     const facultyMap = new Map((faculty || []).map((f) => [f.id, f]));
 
+    // Resolve any visiting teachers from other campuses/departments
+    const missingTeacherIds = (assignments || [])
+      .map((a) => a.teacher_id)
+      .filter((tId) => !facultyMap.has(tId));
+
+    if (missingTeacherIds.length > 0) {
+      const { data: visitingFaculty } = await this.supabase.admin
+        .from('faculty')
+        .select('id, full_name, email, role')
+        .in('id', missingTeacherIds);
+      for (const vf of visitingFaculty || []) {
+        facultyMap.set(vf.id, vf);
+      }
+    }
+
     // Group assigned teachers into each course
     const coursesWithTeachers = (courses || []).map((course) => {
       const courseAssignments = assignments
@@ -77,8 +92,11 @@ export class AssignmentsService {
           return {
             assignment_id: a.id,
             teacher_id: a.teacher_id,
-            teacher_name: teacher?.full_name || 'Faculty Member',
+            teacher_name: teacher?.full_name || 'Visiting Faculty',
             teacher_email: teacher?.email || '',
+            campus_id: a.campus_id || null,
+            academic_year: a.academic_year || null,
+            semester: a.semester ?? course.semester ?? null,
             assigned_at: a.assigned_at,
           };
         });
@@ -98,18 +116,24 @@ export class AssignmentsService {
   }
 
   /**
-   * Assigns a teacher to a course (Upsert on (teacher_id, course_id)).
+   * Assigns a teacher to a course (supporting visiting teachers across campuses and term identity).
    */
-  async assignTeacher(user: AuthUser, teacherId: string, courseId: string, ip: string) {
+  async assignTeacher(
+    user: AuthUser,
+    teacherId: string,
+    courseId: string,
+    ip: string,
+    opts?: { campus_id?: string; academic_year?: string; semester?: number },
+  ) {
     const departmentId = user.department_id;
     if (!departmentId) {
       throw new ForbiddenException('Only department HODs can assign teachers.');
     }
 
-    // Verify course belongs to HOD's department
+    // Verify course belongs to HOD's department (preserving catalog ownership)
     const { data: course, error: courseCheckError } = await this.supabase.admin
       .from('courses')
-      .select('id, department_id, title, course_code')
+      .select('id, department_id, title, course_code, semester')
       .eq('id', courseId)
       .maybeSingle();
 
@@ -121,10 +145,10 @@ export class AssignmentsService {
       throw new ForbiddenException('Cannot assign teachers to courses outside your department.');
     }
 
-    // Verify target faculty exists, belongs to HOD's department, and is strictly not HOD
+    // Verify target faculty exists and strictly enforce role === 'teacher'
     const { data: targetFaculty, error: facultyError } = await this.supabase.admin
       .from('faculty')
-      .select('id, department_id, role, full_name')
+      .select('id, department_id, campus_id, role, full_name')
       .eq('id', teacherId)
       .maybeSingle();
 
@@ -132,30 +156,59 @@ export class AssignmentsService {
       throw new NotFoundException('Teacher faculty record not found.');
     }
 
-    if (targetFaculty.department_id !== departmentId) {
-      throw new ForbiddenException('Cannot assign faculty from another department.');
+    if (targetFaculty.role === 'teaching_staff') {
+      throw new ForbiddenException(
+        'Only faculty with the teacher role can be assigned to instruct courses. Teaching staff accounts are roster-only.',
+      );
     }
 
-    if (targetFaculty.role === 'hod') {
-      throw new BadRequestException('HOD cannot be assigned as a course teacher. Please select an individual teacher or teaching staff.');
+    if (targetFaculty.role !== 'teacher') {
+      throw new ForbiddenException(
+        `Only faculty with the teacher role can be assigned to instruct courses (received role '${targetFaculty.role}').`,
+      );
     }
+
+    // Resolve campus and term identity
+    const campusId = opts?.campus_id || user.campus_id;
+    let academicYear = opts?.academic_year;
+    if (!academicYear) {
+      const { data: settings } = await this.supabase.admin
+        .from('campus_settings')
+        .select('academic_year')
+        .eq('campus_id', campusId)
+        .maybeSingle();
+      academicYear = settings?.academic_year || '2025-26';
+    }
+    const semester = opts?.semester ?? course.semester ?? null;
 
     const assignedAt = new Date().toISOString();
 
-    // Upsert into teacher_course_assignments
-    const { data, error } = await this.supabase.admin
+    const assignmentPayload: any = {
+      teacher_id: teacherId,
+      course_id: courseId,
+      assigned_by: user.userId,
+      assigned_at: assignedAt,
+      campus_id: campusId,
+      academic_year: academicYear,
+      semester,
+    };
+
+    // Upsert into teacher_course_assignments with composite campus/term conflict target
+    let { data, error } = await this.supabase.admin
       .from('teacher_course_assignments')
-      .upsert(
-        {
-          teacher_id: teacherId,
-          course_id: courseId,
-          assigned_by: user.userId,
-          assigned_at: assignedAt,
-        },
-        { onConflict: 'teacher_id,course_id' }
-      )
+      .upsert(assignmentPayload, { onConflict: 'teacher_id,course_id,campus_id,academic_year,semester' })
       .select()
       .single();
+
+    if (error && (error.message?.includes('uq_teacher_course_assignments_term') || error.message?.includes('ON CONFLICT'))) {
+      const fallbackRes = await this.supabase.admin
+        .from('teacher_course_assignments')
+        .upsert(assignmentPayload, { onConflict: 'teacher_id,course_id' })
+        .select()
+        .single();
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       throw new InternalServerErrorException(`Failed to assign teacher: ${error.message}`);
@@ -201,7 +254,7 @@ export class AssignmentsService {
     // 1. Verify all courses belong to HOD's department
     const { data: courses, error: coursesError } = await this.supabase.admin
       .from('courses')
-      .select('id, department_id, course_code')
+      .select('id, department_id, course_code, semester')
       .in('id', courseIds);
 
     if (coursesError || !courses || courses.length !== courseIds.length) {
@@ -214,10 +267,10 @@ export class AssignmentsService {
       }
     }
 
-    // 2. Verify all teachers belong to HOD's department and are strictly not HOD
+    // 2. Verify all teachers exist and strictly have role === 'teacher' (allow visiting teachers across campuses)
     const { data: facultyMembers, error: facultyError } = await this.supabase.admin
       .from('faculty')
-      .select('id, department_id, role, full_name')
+      .select('id, department_id, role, full_name, campus_id')
       .in('id', teacherIds);
 
     if (facultyError || !facultyMembers || facultyMembers.length !== teacherIds.length) {
@@ -225,27 +278,44 @@ export class AssignmentsService {
     }
 
     for (const f of facultyMembers) {
-      if (f.department_id !== departmentId) {
-        throw new ForbiddenException(`Faculty member ${f.full_name} does not belong to your department.`);
+      if (f.role === 'teaching_staff') {
+        throw new ForbiddenException(
+          `Faculty member (${f.full_name}) is teaching staff (roster-only) and cannot be assigned to teach courses.`,
+        );
       }
-      if (f.role === 'hod') {
-        throw new BadRequestException(`HOD (${f.full_name}) cannot be assigned as a course teacher.`);
+      if (f.role !== 'teacher') {
+        throw new ForbiddenException(
+          `Faculty member (${f.full_name}) cannot be assigned as a course teacher (only role 'teacher' is permitted; received '${f.role}').`,
+        );
       }
     }
 
+    const courseMap = new Map((courses || []).map((c) => [c.id, c]));
     const assignedAt = new Date().toISOString();
     const rowsToUpsert = assignments.map((a) => ({
       teacher_id: a.teacher_id,
       course_id: a.course_id,
       assigned_by: user.userId,
       assigned_at: assignedAt,
+      campus_id: a.campus_id || user.campus_id,
+      academic_year: a.academic_year || '2025-26',
+      semester: a.semester ?? courseMap.get(a.course_id)?.semester ?? null,
     }));
 
     // 3. Single batch upsert into teacher_course_assignments
-    const { data, error } = await this.supabase.admin
+    let { data, error } = await this.supabase.admin
       .from('teacher_course_assignments')
-      .upsert(rowsToUpsert, { onConflict: 'teacher_id,course_id' })
+      .upsert(rowsToUpsert, { onConflict: 'teacher_id,course_id,campus_id,academic_year,semester' })
       .select();
+
+    if (error && (error.message?.includes('uq_teacher_course_assignments_term') || error.message?.includes('ON CONFLICT'))) {
+      const fallbackRes = await this.supabase.admin
+        .from('teacher_course_assignments')
+        .upsert(rowsToUpsert, { onConflict: 'teacher_id,course_id' })
+        .select();
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       throw new InternalServerErrorException(`Failed to batch assign teachers: ${error.message}`);
@@ -304,7 +374,7 @@ export class AssignmentsService {
     // Verify new teacher faculty exists, belongs to HOD's department, and is strictly not HOD
     const { data: targetFaculty, error: facultyError } = await this.supabase.admin
       .from('faculty')
-      .select('id, department_id, role, full_name')
+      .select('id, department_id, campus_id, role, full_name')
       .eq('id', newTeacherId)
       .maybeSingle();
 
@@ -312,12 +382,16 @@ export class AssignmentsService {
       throw new NotFoundException('New teacher faculty record not found.');
     }
 
-    if (user.role === 'hod' && targetFaculty.department_id !== user.department_id) {
-      throw new ForbiddenException('Cannot assign faculty from another department.');
+    if (targetFaculty.role === 'teaching_staff') {
+      throw new ForbiddenException(
+        'Only faculty with the teacher role can be assigned to instruct courses. Teaching staff accounts are roster-only.',
+      );
     }
 
-    if (targetFaculty.role === 'hod') {
-      throw new BadRequestException('HOD cannot be assigned as a course teacher. Please select an individual teacher or teaching staff.');
+    if (targetFaculty.role !== 'teacher') {
+      throw new ForbiddenException(
+        `Only faculty with the teacher role can be assigned to instruct courses (received role '${targetFaculty.role}').`,
+      );
     }
 
     const assignedAt = new Date().toISOString();

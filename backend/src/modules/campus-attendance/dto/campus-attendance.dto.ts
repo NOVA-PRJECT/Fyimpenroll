@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const CampusSignInSchema = z.object({
   latitude: z.number().min(-90).max(90),

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+﻿import { Module } from '@nestjs/common'
 import { TimetableService } from './timetable.service'
 import { TimetableController } from './timetable.controller'
 import { AuthCoreModule } from '../../core/auth/auth-core.module'

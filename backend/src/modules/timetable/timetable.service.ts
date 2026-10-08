@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -12,6 +13,7 @@ import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
+import { AuthorizationPolicy } from '../../core/auth/authorization-policy'
 import { runGenerationJob } from './solver/job'
 import { getRedisClient } from './solver/redisClient'
 
@@ -112,17 +114,62 @@ export class TimetableService {
 
   // ──────────────── Entries ────────────────
   async getEntries(academicYear: string, semester: number, departmentId: string | undefined, user: AuthUser) {
+    const scope = AuthorizationPolicy.resolveTimetableScope(user)
+
     let campusDeptIds: string[] = []
-    if (user.campus_id) {
-      const { data: depts } = await this.supabase.admin
+    if (scope.campusId) {
+      const { data: depts, error: deptsErr } = await this.supabase.admin
         .from('departments')
-        .select('id')
-        .eq('campus_id', user.campus_id)
+        .select('id, name, code')
+        .eq('campus_id', scope.campusId)
+        .order('name')
+
+      if (deptsErr) {
+        throw new InternalServerErrorException(`Failed to resolve campus departments: ${deptsErr.message}`)
+      }
       campusDeptIds = (depts || []).map((d: any) => d.id)
     }
 
+    // If campus director and campus has no departments, return empty results immediately
+    if (user.role === 'campus_director' && campusDeptIds.length === 0) {
+      return {
+        academicYear,
+        semester,
+        departments: [],
+        entries: [],
+        conflicts: [],
+      }
+    }
+
+    // Verify requested department parameter against actor's authorized scope
+    if (departmentId) {
+      if (user.role === 'campus_director') {
+        if (!campusDeptIds.includes(departmentId)) {
+          throw new ForbiddenException('Requested department does not belong to your campus')
+        }
+      } else if (user.role === 'hod') {
+        if (departmentId !== user.department_id) {
+          throw new ForbiddenException('HOD can only view timetable entries for their own department')
+        }
+      } else if (user.role === 'student') {
+        if (user.department_id && departmentId !== user.department_id) {
+          throw new ForbiddenException('Students can only view timetable entries for their enrolled department')
+        }
+      }
+    }
+
+    // Check teacher assigned courses across campuses (supporting visiting cross-campus instruction)
+    let teacherAssignedCourseIds: string[] = []
+    if (user.role === 'teacher') {
+      const { data: assignments } = await this.supabase.admin
+        .from('teacher_course_assignments')
+        .select('course_id')
+        .eq('teacher_id', user.userId)
+      teacherAssignedCourseIds = (assignments || []).map((a: any) => a.course_id)
+    }
+
     let deptsFetchQuery = this.supabase.admin.from('departments').select('id, name, code').order('name')
-    if (user.campus_id && campusDeptIds.length > 0) {
+    if (scope.campusId && campusDeptIds.length > 0) {
       deptsFetchQuery = deptsFetchQuery.in('id', campusDeptIds)
     }
     const { data: allDepartmentsData } = await deptsFetchQuery
@@ -156,10 +203,28 @@ export class TimetableService {
       .eq('academic_year', academicYear)
       .eq('semester', semester)
 
+    // STUDENTS only see published entries, NEVER drafts or generated unreviewed schedules
+    if (user.role === 'student') {
+      query = query.eq('status', 'published')
+    }
+
+    // Apply strict server-derived department / assignment scoping
     if (departmentId) {
       query = query.eq('department_id', departmentId)
-    } else if (user.campus_id && campusDeptIds.length > 0) {
+    } else if (user.role === 'hod' && user.department_id) {
+      query = query.eq('department_id', user.department_id)
+    } else if (user.role === 'teacher' && teacherAssignedCourseIds.length > 0 && !user.campus_id && !user.department_id) {
+      query = query.in('course_id', teacherAssignedCourseIds)
+    } else if (scope.campusId && campusDeptIds.length > 0) {
       query = query.in('department_id', campusDeptIds)
+    } else if (!scope.isUniversityScope) {
+      return {
+        academicYear,
+        semester,
+        departments: allDepartmentsData || [],
+        entries: [],
+        conflicts: [],
+      }
     }
 
     const { data: entries, error } = await query
@@ -184,6 +249,17 @@ export class TimetableService {
       isLabBlock: entry.is_lab_block,
       status: entry.status,
     }))
+
+    // STUDENTS never receive conflict rows!
+    if (user.role === 'student') {
+      return {
+        academicYear,
+        semester,
+        departments: allDepartmentsData || [],
+        entries: formattedEntries,
+        conflicts: [],
+      }
+    }
 
     // Query unresolved conflicts for this academic year & semester
     let conflictQuery = this.supabase.admin
@@ -227,7 +303,7 @@ export class TimetableService {
       conflictingStudentCount: c.conflicting_student_count || 0,
     }))
 
-    if (user.campus_id && campusDeptIds.length > 0) {
+    if (scope.campusId && campusDeptIds.length > 0) {
       formattedConflicts = formattedConflicts.filter(
         (c: any) => !c.departmentId || campusDeptIds.includes(c.departmentId),
       )
@@ -407,11 +483,27 @@ export class TimetableService {
   async publish(academicYear: string, semester: number, user: AuthUser, force = false) {
     let campusDeptIds: string[] = []
     if (user.campus_id) {
-      const { data: depts } = await this.supabase.admin
+      const { data: depts, error: deptsErr } = await this.supabase.admin
         .from('departments')
         .select('id')
         .eq('campus_id', user.campus_id)
+
+      if (deptsErr) {
+        throw new InternalServerErrorException(`Failed to resolve campus departments: ${deptsErr.message}`)
+      }
       campusDeptIds = (depts || []).map((d: any) => d.id)
+
+      // Guard F05: If campus has no departments, do NOT fall back to global update across other campuses!
+      if (campusDeptIds.length === 0) {
+        return {
+          success: true,
+          message: 'Campus has no registered departments. No timetable entries to publish.',
+          publishedCount: 0,
+          publishedAt: new Date().toISOString(),
+        }
+      }
+    } else if (user.role !== 'superadmin') {
+      throw new ForbiddenException('Cannot publish timetable without authorized campus scope')
     }
 
     let conflictQuery = this.supabase.admin
@@ -467,8 +559,10 @@ export class TimetableService {
       .eq('semester', semester)
       .in('status', ['draft', 'generated'])
 
-    if (user.campus_id && campusDeptIds.length > 0) {
+    if (campusDeptIds.length > 0) {
       updateQuery = updateQuery.in('department_id', campusDeptIds)
+    } else if (user.role !== 'superadmin') {
+      throw new ForbiddenException('Cannot perform un-scoped timetable publish')
     }
 
     const { data: updatedData, error: updateErr } = await updateQuery.select('id')

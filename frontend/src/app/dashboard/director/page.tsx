@@ -862,7 +862,7 @@ export default function DirectorDashboard() {
                       setAllocationError('')
                     }}
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
                       <option key={s} value={s}>
                         Semester {s}
                       </option>
@@ -961,6 +961,26 @@ export default function DirectorDashboard() {
                         Completed at: <strong>{new Date(allocationRun.completed_at).toLocaleString()}</strong>
                       </div>
                     )}
+                    {allocationRun.status === 'completed' && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '6px',
+                          background: 'rgba(34, 197, 94, 0.08)',
+                          border: '1px solid rgba(34, 197, 94, 0.25)',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                          gap: '0.5rem',
+                          color: '#f8fafc',
+                        }}
+                      >
+                        <div>Total Students: <strong>{allocationRun.total_students ?? 0}</strong></div>
+                        <div>Fully Allocated: <strong style={{ color: '#4ade80' }}>{allocationRun.fully_allocated ?? 0}</strong></div>
+                        <div>Partially Allocated: <strong style={{ color: '#fbbf24' }}>{allocationRun.partially_allocated ?? 0}</strong></div>
+                        <div>Unallocated: <strong style={{ color: '#f87171' }}>{allocationRun.unallocated ?? 0}</strong></div>
+                      </div>
+                    )}
                     {allocationRun.error_message && (
                       <div
                         style={{
@@ -1012,6 +1032,55 @@ export default function DirectorDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Registration Window Protocol Status Banner */}
+              {windowIsOpen ? (
+                <div
+                  style={{
+                    marginTop: '1.25rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '8px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    color: '#fbbf24',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                  <div>
+                    <strong>Registration Window is Currently Open</strong>
+                    <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                      Student submissions are active (Deadline: {currentDeadline ? new Date(currentDeadline).toLocaleString() : 'Not configured'}). Academic protocol requires the registration window to close before course allocation can execute.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    marginTop: '1.25rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '8px',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    color: '#4ade80',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>✓</span>
+                  <div>
+                    <strong>Registration Window is Closed</strong>
+                    <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                      Student preference submissions are frozen and locked. Ready for deterministic course allocation.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Action Button */}
               <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

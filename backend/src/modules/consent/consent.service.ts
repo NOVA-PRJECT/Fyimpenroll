@@ -68,6 +68,15 @@ export class ConsentService {
       );
     }
 
+    // Fast-path cache in app_metadata
+    await this.supabase.admin.auth.admin
+      .updateUserById(user.userId, {
+        app_metadata: {
+          accepted_policy_version: policyVersion,
+        },
+      })
+      .catch(() => {});
+
     await this.auditLogger.log({
       eventType: 'consent_accepted',
       userId: user.userId,

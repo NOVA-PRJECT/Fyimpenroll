@@ -1,4 +1,4 @@
-import { CourseCategory, SlotRule } from '../constants/courseCategories'
+﻿import { CourseCategory, SlotRule } from '../constants/courseCategories'
 import { Semester } from '../constants/semesters'
 
 export type Course = {

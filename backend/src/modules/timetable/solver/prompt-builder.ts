@@ -1,4 +1,4 @@
-import baseConstraints from './constraints.base.json';
+﻿import baseConstraints from './constraints.base.json';
 import type { CourseNode, ParallelGroup, DynamicConstraint } from './types';
 
 export function buildTimetablePrompt(

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+﻿import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { DatabaseModule } from './core/database/database.module'
 import { LoggingModule } from './core/logging/logging.module'

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utility for Indian Standard Time (IST: UTC+5:30) date and time calculations.
  * Cloud servers (Render, Railway, Supabase) run with system time set to UTC.
  */

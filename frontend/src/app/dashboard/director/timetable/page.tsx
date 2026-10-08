@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { downloadBlob } from '@/core/utils/downloadFile';
 import styles from './timetable.module.css';
 
@@ -673,7 +673,8 @@ export default function CampusDirectorTimetablePage() {
     setShowExportModal(false);
 
     if (exportType === 'excel') {
-      const wb = XLSX.utils.book_new();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'FYIMP Academic Portal';
 
       const deptMap = new Map<string, { id: string; name: string; code: string }>();
 
@@ -746,8 +747,8 @@ export default function CampusDirectorTimetablePage() {
           }
         });
 
-        const allWs = XLSX.utils.aoa_to_sheet(allSheetRows);
-        XLSX.utils.book_append_sheet(wb, allWs, getUniqueSheetName('All Departments'));
+        const allWs = wb.addWorksheet(getUniqueSheetName('All Departments'));
+        allSheetRows.forEach((row) => allWs.addRow(row));
       }
 
       deptsToExport.forEach((dept) => {
@@ -775,15 +776,15 @@ export default function CampusDirectorTimetablePage() {
           sheetData.push(row);
         });
 
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
         const sheetName = getUniqueSheetName(dept.code || dept.name);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        const ws = wb.addWorksheet(sheetName);
+        sheetData.forEach((row) => ws.addRow(row));
       });
 
       const selectedDeptObj = deptMap.get(targetDept);
       const fileTag = targetDept === 'all' ? 'All_Departments' : (selectedDeptObj?.code || selectedDeptObj?.name || 'Department');
       const filename = `FYIMP_Timetable_${fileTag}_${academicYear}_Sem${semester}.xlsx`;
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const excelBuffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([excelBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });

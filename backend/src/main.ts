@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core'
+﻿import { NestFactory } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
 import { AppModule } from './app.module'
 // eslint-disable-next-line @typescript-eslint/no-var-requires

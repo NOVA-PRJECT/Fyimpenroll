@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { downloadBlob } from './downloadFile'
 
 export interface StudentExcelRow {
@@ -12,43 +12,51 @@ export interface StudentExcelRow {
   paper_6?: string
 }
 
-export async function downloadStudentsExcel(rows: StudentExcelRow[], semesterLabel: string = 'All_Semesters'): Promise<void> {
-  const formattedData = rows.map((r, index) => ({
-    'Sl. No.': index + 1,
-    'Name': r.name,
-    'Sem': r.sem,
-    'Paper 1': r.paper_1 || '-',
-    'Paper 2': r.paper_2 || '-',
-    'Paper 3': r.paper_3 || '-',
-    'Paper 4': r.paper_4 || '-',
-    'Paper 5': r.paper_5 || '-',
-    'Paper 6': r.paper_6 || '-',
-  }))
+export async function downloadStudentsExcel(
+  rows: StudentExcelRow[],
+  semesterLabel: string = 'All_Semesters',
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'FYIMP Academic Portal'
+  workbook.created = new Date()
 
-  const worksheet = XLSX.utils.json_to_sheet(formattedData)
+  const worksheet = workbook.addWorksheet('Student Papers Roster')
 
-  // Column width formatting
-  worksheet['!cols'] = [
-    { wch: 8 },  // Sl. No.
-    { wch: 26 }, // Name
-    { wch: 8 },  // Sem
-    { wch: 32 }, // Paper 1
-    { wch: 32 }, // Paper 2
-    { wch: 32 }, // Paper 3
-    { wch: 32 }, // Paper 4
-    { wch: 32 }, // Paper 5
-    { wch: 32 }, // Paper 6
+  worksheet.columns = [
+    { header: 'Sl. No.', key: 'sl', width: 10 },
+    { header: 'Name', key: 'name', width: 28 },
+    { header: 'Sem', key: 'sem', width: 10 },
+    { header: 'Paper 1', key: 'paper_1', width: 34 },
+    { header: 'Paper 2', key: 'paper_2', width: 34 },
+    { header: 'Paper 3', key: 'paper_3', width: 34 },
+    { header: 'Paper 4', key: 'paper_4', width: 34 },
+    { header: 'Paper 5', key: 'paper_5', width: 34 },
+    { header: 'Paper 6', key: 'paper_6', width: 34 },
   ]
 
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Papers Roster')
+  // Style header row
+  worksheet.getRow(1).font = { bold: true }
+
+  rows.forEach((r, index) => {
+    worksheet.addRow({
+      sl: index + 1,
+      name: r.name,
+      sem: r.sem,
+      paper_1: r.paper_1 || '-',
+      paper_2: r.paper_2 || '-',
+      paper_3: r.paper_3 || '-',
+      paper_4: r.paper_4 || '-',
+      paper_5: r.paper_5 || '-',
+      paper_6: r.paper_6 || '-',
+    })
+  })
 
   const sanitizedSem = semesterLabel.replace(/\s+/g, '_')
   const dateStr = new Date().toISOString().slice(0, 10)
   const fileName = `Student_Papers_${sanitizedSem}_${dateStr}.xlsx`
 
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-  const blob = new Blob([excelBuffer], {
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
   await downloadBlob(blob, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

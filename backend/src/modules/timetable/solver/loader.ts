@@ -153,7 +153,9 @@ export async function loadGenerationInput(
       slot_3_course_id,
       slot_4_course_id,
       slot_5_course_id,
-      slot_6_course_id
+      slot_6_course_id,
+      slot_7_course_id,
+      slot_8_course_id
     `)
     .eq('academic_year', academicYear)
     .eq('semester', semester);
@@ -179,7 +181,7 @@ export async function loadGenerationInput(
     { registrationCount: rawRegistrations.length }
   );
 
-  // Extract all student-to-course pairs from slots 1..6
+  // Extract all student-to-course pairs from all 8 supported slots (F15)
   const studentCoursePairs: Array<{ studentId: string; courseId: string }> = [];
   const allCourseIds = new Set<string>();
 
@@ -191,6 +193,8 @@ export async function loadGenerationInput(
       reg.slot_4_course_id,
       reg.slot_5_course_id,
       reg.slot_6_course_id,
+      (reg as any).slot_7_course_id,
+      (reg as any).slot_8_course_id,
     ];
     for (const courseId of slots) {
       if (courseId) {

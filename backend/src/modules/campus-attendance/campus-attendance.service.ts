@@ -354,36 +354,64 @@ export class CampusAttendanceService {
    * campus sign-ins, resolving morning and evening status, with urgency sorting.
    */
   async getDepartmentCampusRoster(user: AuthUser, queryDate?: string) {
-    const departmentId = user.department_id;
-    if (!departmentId) {
-      throw new ForbiddenException('User is not associated with any academic department.');
-    }
-
     const istNow = this.getISTDateTime();
     const targetDate = queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : istNow.dateString;
     const isToday = targetDate === istNow.dateString;
 
-    // 1. Fetch department campus info for cutoffs
-    const { data: dept, error: deptError } = await this.supabase.admin
-      .from('departments')
-      .select('id, name, campus_id, campuses(*)')
-      .eq('id', departmentId)
-      .single();
+    let campus: CampusRecord | null = null;
+    let dept: any = null;
+    let studentsQuery = this.supabase.admin
+      .from('students')
+      .select('id, full_name, cap_application_number, current_semester, department_id, campus_id')
+      .order('full_name', { ascending: true });
 
-    if (deptError || !dept) {
-      throw new NotFoundException('Department details not found.');
+    if (user.role === 'hod') {
+      if (!user.department_id) {
+        throw new ForbiddenException('HOD is not associated with any academic department.');
+      }
+      const { data: deptData, error: deptError } = await this.supabase.admin
+        .from('departments')
+        .select('id, name, campus_id, campuses(*)')
+        .eq('id', user.department_id)
+        .single();
+
+      if (deptError || !deptData) {
+        throw new NotFoundException('Department details not found.');
+      }
+      dept = deptData;
+      campus = (dept as any).campuses as CampusRecord;
+      studentsQuery = studentsQuery.eq('department_id', user.department_id);
+    } else if (user.role === 'campus_director') {
+      if (!user.campus_id) {
+        throw new ForbiddenException('Campus Director has no assigned campus affiliation.');
+      }
+      const { data: campusData, error: campusError } = await this.supabase.admin
+        .from('campuses')
+        .select('*')
+        .eq('id', user.campus_id)
+        .single();
+
+      if (campusError || !campusData) {
+        throw new NotFoundException('Campus details not found.');
+      }
+      campus = campusData as CampusRecord;
+      studentsQuery = studentsQuery.eq('campus_id', user.campus_id);
+    } else if (user.role === 'superadmin') {
+      const { data: campusData } = await this.supabase.admin
+        .from('campuses')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      campus = campusData as CampusRecord;
+    } else {
+      throw new ForbiddenException(`Role '${user.role}' is not authorized to view attendance roster.`);
     }
 
-    const campus = (dept as any).campuses as CampusRecord;
     const middaySplitMin = this.timeStringToMinutes(campus?.midday_split_time || '13:30:00');
     const dayEndMin = this.timeStringToMinutes(campus?.day_end_time || '17:00:00');
 
-    // 2. Fetch all department students
-    const { data: students, error: studentsError } = await this.supabase.admin
-      .from('students')
-      .select('id, full_name, cap_application_number, current_semester')
-      .eq('department_id', departmentId)
-      .order('full_name', { ascending: true });
+    // 2. Fetch scoped students
+    const { data: students, error: studentsError } = await studentsQuery;
 
     if (studentsError) {
       throw new InternalServerErrorException(`Failed to fetch students: ${studentsError.message}`);
@@ -482,8 +510,8 @@ export class CampusAttendanceService {
 
     return {
       department: {
-        id: dept.id,
-        name: dept.name,
+        id: dept?.id || null,
+        name: dept?.name || (user.role === 'campus_director' ? 'All Departments' : 'Department'),
         campus_name: campus?.name || 'Main Campus',
       },
       date: targetDate,

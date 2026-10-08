@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConsentController } from './consent.controller';
 import { ConsentService } from './consent.service';
 import { DatabaseModule } from '../../core/database/database.module';

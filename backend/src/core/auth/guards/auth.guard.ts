@@ -1,4 +1,4 @@
-﻿import {
+import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -8,6 +8,7 @@
 } from '@nestjs/common'
 import { SupabaseService } from '../../database/supabase.service'
 import { AuthUser, Role } from '../types'
+import { CURRENT_POLICY_VERSION } from '../../../modules/consent/consent.constants'
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -135,6 +136,12 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('User account not registered in portal')
     }
 
+    // Mandatory initial password change applies ONLY to students and teachers.
+    // Other roles (superadmin, campus_director, hod, teaching_staff) are never forced.
+    if (role !== 'student' && role !== 'teacher') {
+      mustChangePassword = false
+    }
+
     const authUser: AuthUser = {
       userId: user.id,
       email: user.email ?? '',
@@ -151,23 +158,66 @@ export class AuthGuard implements CanActivate {
     const cleanPath = rawUrl.split(/[?#]/)[0]
     const normalizedPath = cleanPath ? cleanPath.replace(/\/+$/, '') : '/'
 
-    const ALLOWED_PWD_PATHS = new Set([
-      '/api/student/change-password',
-      '/api/student/dashboard-summary',
-      '/api/auth/logout',
+    const ALLOWED_RESTRICTED_PATHS = new Set([
+      '/api/auth/profile',
+      '/api/auth/me',
+      '/api/auth/change-password',
+      '/api/auth/sync-password-status',
       '/api/auth/complete-password-reset',
       '/auth/complete-password-reset',
+      '/api/auth/logout',
+      '/api/auth/refresh',
+      '/api/student/change-password',
+      '/api/consent/status',
+      '/api/consent/accept',
     ])
 
-    const isAllowedPwdPath = ALLOWED_PWD_PATHS.has(normalizedPath)
+    const isAllowedRestrictedPath = ALLOWED_RESTRICTED_PATHS.has(normalizedPath)
 
-    if (authUser.must_change_password && !isAllowedPwdPath) {
+    if (authUser.must_change_password && !isAllowedRestrictedPath) {
       throw new ForbiddenException({
         statusCode: 403,
         error: 'Forbidden',
         message: 'Password change is required before accessing other portal features.',
         must_change_password: true,
       })
+    }
+
+    // F12: Versioned consent enforcement on normal protected operations
+    if (!isAllowedRestrictedPath) {
+      const cachedConsentVersion = user.app_metadata?.accepted_policy_version as string | undefined
+      let hasAcceptedCurrentConsent = cachedConsentVersion === CURRENT_POLICY_VERSION
+
+      if (!hasAcceptedCurrentConsent) {
+        const { data: consentRecord } = await this.supabaseService.admin
+          .from('consent_records')
+          .select('policy_version')
+          .eq('user_id', user.id)
+          .eq('policy_version', CURRENT_POLICY_VERSION)
+          .maybeSingle()
+
+        if (consentRecord) {
+          hasAcceptedCurrentConsent = true
+          this.supabaseService.admin.auth.admin
+            .updateUserById(user.id, {
+              app_metadata: {
+                ...(user.app_metadata || {}),
+                accepted_policy_version: CURRENT_POLICY_VERSION,
+              },
+            })
+            .catch(() => {})
+        }
+      }
+
+      if (!hasAcceptedCurrentConsent) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          error: 'Forbidden',
+          message: 'Acceptance of current policy terms is required before accessing portal operations.',
+          consent_required: true,
+          current_policy_version: CURRENT_POLICY_VERSION,
+        })
+      }
     }
 
     request.user = authUser

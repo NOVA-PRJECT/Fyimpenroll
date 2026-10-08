@@ -112,33 +112,56 @@ export async function runGenerationJob(
       loadStats
     );
 
-    let deleteEntriesQuery = dbClient
-      .from('timetable_entries')
-      .delete()
-      .eq('academic_year', academicYear)
-      .eq('semester', semester);
-
+    let deptIds: string[] = [];
     if (campusId) {
-      const { data: depts } = await dbClient
+      const { data: depts, error: deptsErr } = await dbClient
         .from('departments')
         .select('id')
         .eq('campus_id', campusId);
-      const deptIds = (depts || []).map((d) => d.id);
-      if (deptIds.length > 0) {
-        deleteEntriesQuery = deleteEntriesQuery.in('department_id', deptIds);
+
+      if (deptsErr) {
+        throw new Error(`Failed to resolve campus departments: ${deptsErr.message}`);
       }
-    }
-    const { error: deleteErr } = await deleteEntriesQuery;
-    if (deleteErr) {
-      console.error('Warning: Error clearing old timetable entries:', deleteErr);
+      deptIds = (depts || []).map((d: any) => d.id);
+    } else {
+      throw new Error('Cannot execute timetable generation without explicit campusId scope');
     }
 
-    // 5. Clear old unresolved conflicts
-    await dbClient
-      .from('timetable_conflicts')
-      .delete()
-      .eq('academic_year', academicYear)
-      .eq('semester', semester);
+    if (deptIds.length === 0) {
+      // Guard F05: Campus has no registered departments. Never perform an unconstrained global wipe!
+      await reportProgress(
+        85,
+        '⚠️ Campus has no registered departments. Skipping prior schedule entry deletion.',
+        loadStats
+      );
+    } else {
+      const { error: deleteErr } = await dbClient
+        .from('timetable_entries')
+        .delete()
+        .eq('academic_year', academicYear)
+        .eq('semester', semester)
+        .in('department_id', deptIds);
+
+      if (deleteErr) {
+        console.error('Warning: Error clearing old timetable entries:', deleteErr);
+      }
+
+      // 5. Clear old unresolved conflicts scoped to courses belonging to this campus's departments
+      const { data: campusCourses } = await dbClient
+        .from('courses')
+        .select('id')
+        .in('department_id', deptIds);
+
+      const campusCourseIds = (campusCourses || []).map((c: any) => c.id);
+      if (campusCourseIds.length > 0) {
+        await dbClient
+          .from('timetable_conflicts')
+          .delete()
+          .eq('academic_year', academicYear)
+          .eq('semester', semester)
+          .in('course_id', campusCourseIds);
+      }
+    }
 
     // 6. Bulk insert new assignments (90%)
     await reportProgress(

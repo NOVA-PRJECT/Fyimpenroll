@@ -7,7 +7,8 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "test": "nest build && node --test test/**/*.test.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.11",
@@ -22,7 +23,6 @@
     "papaparse": "^5.5.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "xlsx": "^0.18.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

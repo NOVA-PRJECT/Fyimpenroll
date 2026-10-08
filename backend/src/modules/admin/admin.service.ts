@@ -246,8 +246,12 @@ export class AdminService {
       throw new BadRequestException(`Invalid role "${role}". Allowed roles are: ${ALLOWED_ROLES.join(', ')}`)
     }
 
-    if (role === 'hod' && !department_id) {
-      throw new BadRequestException('HOD must be assigned to a department')
+    if (!campus_id) {
+      throw new BadRequestException('Campus ID is required for faculty account creation')
+    }
+
+    if ((role === 'hod' || role === 'teacher') && !department_id) {
+      throw new BadRequestException(`${role === 'hod' ? 'HOD' : 'Teacher'} must be assigned to a department`)
     }
 
     if (role === 'campus_director' && department_id) {

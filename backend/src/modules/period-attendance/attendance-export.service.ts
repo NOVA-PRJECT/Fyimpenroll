@@ -85,7 +85,7 @@ export class AttendanceExportService {
     const enrolledCourseSet = new Set<string>(); // key: `${studentId}_${courseId}`
 
     if (studentIds.length > 0) {
-      const { data: registrations, error: regError } = await this.supabase.admin
+      let { data: registrations, error: regError } = await this.supabase.admin
         .from('student_registrations')
         .select(`
           student_id,
@@ -95,10 +95,31 @@ export class AttendanceExportService {
           slot_4_course_id,
           slot_5_course_id,
           slot_6_course_id,
+          slot_7_course_id,
+          slot_8_course_id,
           selections
         `)
         .eq('semester', semester)
         .in('student_id', studentIds);
+
+      if (regError && (regError.message?.includes('slot_7_course_id') || regError.message?.includes('slot_8_course_id'))) {
+        const fallbackRes = await this.supabase.admin
+          .from('student_registrations')
+          .select(`
+            student_id,
+            slot_1_course_id,
+            slot_2_course_id,
+            slot_3_course_id,
+            slot_4_course_id,
+            slot_5_course_id,
+            slot_6_course_id,
+            selections
+          `)
+          .eq('semester', semester)
+          .in('student_id', studentIds);
+        registrations = fallbackRes.data as any;
+        regError = fallbackRes.error;
+      }
 
       if (regError) {
         throw new InternalServerErrorException(`Failed to fetch registrations: ${regError.message}`);
@@ -106,7 +127,7 @@ export class AttendanceExportService {
 
       for (const reg of registrations || []) {
         const sId = reg.student_id;
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= 8; i++) {
           const cid = (reg as any)[`slot_${i}_course_id`];
           if (cid) {
             enrolledCourseSet.add(`${sId}_${cid}`);

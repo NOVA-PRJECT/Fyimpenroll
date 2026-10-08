@@ -1,4 +1,4 @@
-export const ROLES = {
+﻿export const ROLES = {
   SUPER_ADMIN: 'superadmin',
   CAMPUS_DIRECTOR: 'campus_director',
   HOD: 'hod',

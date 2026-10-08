@@ -1,4 +1,4 @@
-export const COURSE_CATEGORIES = {
+﻿export const COURSE_CATEGORIES = {
   DSC: 'DSC',
   DSE: 'DSE',
   MDC: 'MDC',

@@ -117,28 +117,73 @@ export class CreditLedgerService {
       throw new NotFoundException(`Student record not found for id ${targetStudentId}`)
     }
 
-    // 2. Enforce Role & Relationship Scoping
+    // 2. Enforce Role & Relationship Scoping (F06: Fail-closed on missing affiliation, deny teaching_staff)
     if (user.role === 'student') {
       if (user.userId !== targetStudentId) {
         throw new ForbiddenException('Students are only authorized to view their own credit ledger')
       }
-    } else if (user.role === 'teacher' || user.role === 'hod') {
-      if (user.department_id && student.department_id !== user.department_id) {
-        throw new ForbiddenException('Teachers and HODs may only access students within their department')
-      }
-      if (user.campus_id && student.campus_id !== user.campus_id) {
-        throw new ForbiddenException('Teachers and HODs may only access students within their campus')
-      }
     } else if (user.role === 'teaching_staff') {
-      if (user.campus_id && student.campus_id !== user.campus_id) {
-        throw new ForbiddenException('Teaching staff may only access students affiliated with their campus')
+      throw new ForbiddenException('Teaching staff is roster-only and not authorized to access student credit ledgers')
+    } else if (user.role === 'hod') {
+      if (!user.department_id) {
+        throw new ForbiddenException('HOD has no department affiliation (access denied)')
+      }
+      if (student.department_id !== user.department_id) {
+        throw new ForbiddenException('HODs may only access students within their department')
+      }
+      if (!user.campus_id) {
+        throw new ForbiddenException('HOD has no campus affiliation (access denied)')
+      }
+      if (student.campus_id !== user.campus_id) {
+        throw new ForbiddenException('HODs may only access students within their campus')
       }
     } else if (user.role === 'campus_director') {
-      if (user.campus_id && student.campus_id !== user.campus_id) {
+      if (!user.campus_id) {
+        throw new ForbiddenException('Campus Director has no campus affiliation (access denied)')
+      }
+      if (student.campus_id !== user.campus_id) {
         throw new ForbiddenException('Campus Directors may only access students affiliated with their campus')
       }
+    } else if (user.role === 'teacher') {
+      if (!user.department_id) {
+        throw new ForbiddenException('Teacher has no department affiliation (access denied)')
+      }
+      if (!user.campus_id) {
+        throw new ForbiddenException('Teacher has no campus affiliation (access denied)')
+      }
+      // If student is outside teacher's home department/campus, check for active teaching assignment duty
+      if (student.department_id !== user.department_id || student.campus_id !== user.campus_id) {
+        const { data: assignments } = await this.supabase.admin
+          .from('teacher_course_assignments')
+          .select('course_id')
+          .eq('teacher_id', user.userId)
+
+        const assignedCourseIds = (assignments || []).map((a: any) => a.course_id)
+        let hasSharedCourse = false
+        if (assignedCourseIds.length > 0) {
+          const filterConditions = assignedCourseIds
+            .map((cid: string) => `slot_1_course_id.eq.${cid},slot_2_course_id.eq.${cid},slot_3_course_id.eq.${cid},slot_4_course_id.eq.${cid},slot_5_course_id.eq.${cid},slot_6_course_id.eq.${cid},slot_7_course_id.eq.${cid},slot_8_course_id.eq.${cid}`)
+            .join(',')
+
+          const { data: reg } = await this.supabase.admin
+            .from('student_registrations')
+            .select('id')
+            .eq('student_id', targetStudentId)
+            .or(filterConditions)
+            .limit(1)
+
+          if (reg && reg.length > 0) {
+            hasSharedCourse = true
+          }
+        }
+
+        if (!hasSharedCourse) {
+          throw new ForbiddenException('Teachers may only access credit ledgers for students in their department or actively instructed courses')
+        }
+      }
+    } else if (user.role !== 'superadmin') {
+      throw new ForbiddenException(`Role '${user.role}' is not authorized to access credit ledgers`)
     }
-    // superadmin has full access
 
     // 3. Fetch all registrations for this student across all semesters
     const { data: registrations, error: regError } = await this.supabase.admin
@@ -153,6 +198,8 @@ export class CreditLedgerService {
         slot_4_course_id,
         slot_5_course_id,
         slot_6_course_id,
+        slot_7_course_id,
+        slot_8_course_id,
         total_credits,
         selections
       `)
@@ -163,15 +210,15 @@ export class CreditLedgerService {
       throw new InternalServerErrorException(`Failed to retrieve registration records: ${regError.message}`)
     }
 
-    // 4. Collect registered course IDs across flat slots and selections JSONB
+    // 4. Collect registered course IDs across flat slots (1-8) and selections JSONB
     // Pair each course ID with the semester it was taken in
     const courseSemesterMap = new Map<string, number>()
     const courseIdSet = new Set<string>()
 
     for (const reg of registrations || []) {
       const sem = reg.semester
-      // A. Check flat slot columns
-      for (let i = 1; i <= 6; i++) {
+      // A. Check flat slot columns 1 to 8
+      for (let i = 1; i <= 8; i++) {
         const slotKey = `slot_${i}_course_id` as keyof typeof reg
         const courseId = reg[slotKey] as string | null
         if (courseId) {

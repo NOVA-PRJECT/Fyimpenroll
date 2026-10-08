@@ -1,4 +1,4 @@
-import { Semester } from '../constants/semesters'
+﻿import { Semester } from '../constants/semesters'
 
 export type Student = {
   id: string

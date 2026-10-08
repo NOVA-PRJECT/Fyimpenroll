@@ -44,7 +44,7 @@ export class PeriodAttendanceController {
   }
 
   @Post('submit')
-  @Roles('teacher', 'teaching_staff', 'hod')
+  @Roles('teacher', 'hod')
   async submitAttendance(
     @CurrentUser() user: AuthUser,
     @Body() body: unknown,

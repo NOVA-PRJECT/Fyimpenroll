@@ -1,4 +1,4 @@
-import { CreditLedgerService } from './credit-ledger.service'
+﻿import { CreditLedgerService } from './credit-ledger.service'
 import { SupabaseService } from '../../core/database/supabase.service'
 
 describe('CreditLedgerService', () => {

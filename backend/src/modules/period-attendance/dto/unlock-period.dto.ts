@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const UnlockPeriodSchema = z.object({
   timetable_slot_id: z.string().uuid('Invalid timetable slot ID'),

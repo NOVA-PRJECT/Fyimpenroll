@@ -39,55 +39,77 @@ export class StudentService {
 
     const effectiveCampusId = student.campus_id || user.campus_id
 
-    const [regResWith8, prefRes, settingsRes, allocRunRes] = await Promise.all([
-      this.supabase.admin
-        .from('student_registrations')
-        .select(`
-          id,
-          total_credits,
-          slot_1_course_id,
-          slot_2_course_id,
-          slot_3_course_id,
-          slot_4_course_id,
-          slot_5_course_id,
-          slot_6_course_id,
-          slot_7_course_id,
-          slot_8_course_id,
-          allocation_metadata,
-          selections
-        `)
-        .eq('student_id', user.userId)
+    const { data: settings } = effectiveCampusId
+      ? await this.supabase.admin
+          .from('campus_settings')
+          .select('deadline, min_credits, max_credits, academic_year')
+          .eq('campus_id', effectiveCampusId)
+          .maybeSingle()
+      : { data: null }
+
+    const academicYear = settings?.academic_year || null
+
+    let regQuery = this.supabase.admin
+      .from('student_registrations')
+      .select(`
+        id,
+        total_credits,
+        slot_1_course_id,
+        slot_2_course_id,
+        slot_3_course_id,
+        slot_4_course_id,
+        slot_5_course_id,
+        slot_6_course_id,
+        slot_7_course_id,
+        slot_8_course_id,
+        allocation_metadata,
+        selections
+      `)
+      .eq('student_id', user.userId)
+      .eq('semester', student.current_semester)
+
+    if (academicYear) {
+      regQuery = regQuery.eq('academic_year', academicYear)
+    }
+
+    let prefQuery = this.supabase.admin
+      .from('registration_preferences')
+      .select('id, preferences, allocation_metadata, submitted_at')
+      .eq('student_id', user.userId)
+      .eq('semester', student.current_semester)
+
+    if (academicYear) {
+      prefQuery = prefQuery.eq('academic_year', academicYear)
+    }
+
+    let allocRunPromise: Promise<any> = Promise.resolve({ data: null, error: null })
+    if (effectiveCampusId) {
+      let allocQuery = this.supabase.admin
+        .from('allocation_runs')
+        .select('id, status, completed_at')
+        .eq('campus_id', effectiveCampusId)
         .eq('semester', student.current_semester)
-        .maybeSingle(),
-      this.supabase.admin
-        .from('registration_preferences')
-        .select('id, preferences, allocation_metadata, submitted_at')
-        .eq('student_id', user.userId)
-        .eq('semester', student.current_semester)
-        .maybeSingle(),
-      effectiveCampusId
-        ? this.supabase.admin
-            .from('campus_settings')
-            .select('deadline, min_credits, max_credits, academic_year')
-            .eq('campus_id', effectiveCampusId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      effectiveCampusId
-        ? this.supabase.admin
-            .from('allocation_runs')
-            .select('id, status, completed_at')
-            .eq('campus_id', effectiveCampusId)
-            .eq('semester', student.current_semester)
-            .eq('status', 'completed')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
+        .eq('status', 'completed')
+      if (academicYear) {
+        allocQuery = allocQuery.eq('academic_year', academicYear)
+      }
+      allocRunPromise = Promise.resolve(
+        allocQuery
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      )
+    }
+
+    const [regResWith8, prefRes, allocRunRes] = await Promise.all([
+      regQuery.maybeSingle(),
+      prefQuery.maybeSingle(),
+      allocRunPromise,
     ])
 
     let reg: any = regResWith8.data
     if (regResWith8.error && (regResWith8.error.message?.includes('slot_7_course_id') || regResWith8.error.message?.includes('slot_8_course_id'))) {
-      const { data: fallbackReg } = await this.supabase.admin
+      let fallbackQuery = this.supabase.admin
         .from('student_registrations')
         .select(`
           id,
@@ -103,12 +125,15 @@ export class StudentService {
         `)
         .eq('student_id', user.userId)
         .eq('semester', student.current_semester)
-        .maybeSingle()
+
+      if (academicYear) {
+        fallbackQuery = fallbackQuery.eq('academic_year', academicYear)
+      }
+      const { data: fallbackReg } = await fallbackQuery.maybeSingle()
       reg = fallbackReg
     }
 
     const pref = prefRes.data
-    const settings = settingsRes.data
     const allocationCompleted = !!allocRunRes?.data
     const hasRegistration =
       !!reg &&
@@ -295,21 +320,28 @@ export class StudentService {
       .eq('id', user.userId)
 
     if (flagError) {
-      throw new InternalServerErrorException('Failed to clear user password flag')
+      return {
+        success: false,
+        code: 'SYNC_FAILED',
+        message: 'Password was updated in auth system, but student profile synchronization failed. Please retry synchronization.',
+        canRetrySync: true,
+      }
     }
 
-    // Sign in to get fresh session token
+    // Sign in to get fresh session tokens
     const refreshAuthClient = this.supabase.createAuthClient()
-    const { data: signInData, error: signInError } = await refreshAuthClient.auth.signInWithPassword({
+    const { data: signInData } = await refreshAuthClient.auth.signInWithPassword({
       email: user.email,
       password: newPassword,
     })
 
     const freshToken = signInData?.session?.access_token
+    const freshRefreshToken = signInData?.session?.refresh_token
 
     return {
       success: true,
       token: freshToken,
+      refreshToken: freshRefreshToken,
       message: 'Password changed successfully',
     }
   }

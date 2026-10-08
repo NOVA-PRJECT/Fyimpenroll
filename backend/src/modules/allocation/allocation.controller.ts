@@ -22,7 +22,7 @@ export class AllocationController {
 
   // ──────────────── Prerequisite Rule Engine Endpoints ────────────────
   @Get('config/prerequisites/:courseId')
-  @Roles('campus_director', 'hod')
+  @Roles('hod', 'superadmin')
   async getPrerequisites(
     @Param('courseId') courseId: string,
     @CurrentUser() user: AuthUser,
@@ -31,7 +31,7 @@ export class AllocationController {
   }
 
   @Post('config/prerequisites/:courseId')
-  @Roles('campus_director', 'hod')
+  @Roles('hod', 'superadmin')
   async addPrerequisite(
     @Param('courseId') courseId: string,
     @Body() body: { rule: string; target: string },
@@ -41,7 +41,7 @@ export class AllocationController {
   }
 
   @Delete('config/prerequisites/:ruleId')
-  @Roles('campus_director', 'hod')
+  @Roles('hod', 'superadmin')
   async deletePrerequisite(
     @Param('ruleId') ruleId: string,
     @CurrentUser() user: AuthUser,
@@ -101,9 +101,9 @@ export class AllocationController {
     return this.allocationService.getRemainingSeats(semesterId, user)
   }
 
-  // ──────────────── HOD: Manual Allocation ────────────────
+  // ──────────────── Manual Allocation (HOD / Assigned Class Teacher) ────────────────
   @Post('manual-allocate')
-  @Roles('hod')
+  @Roles('hod', 'teacher', 'superadmin')
   async manualAllocate(
     @Body() body: { student_id: string; slot_key: string; course_id: string },
     @CurrentUser() user: AuthUser,

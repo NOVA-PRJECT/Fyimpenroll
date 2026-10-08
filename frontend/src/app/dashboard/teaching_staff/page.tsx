@@ -190,7 +190,7 @@ export default function TeachingStaffDashboard() {
     courses.forEach(c => {
       if (c.semester) sems.add(c.semester)
     })
-    if (sems.size === 0) return [1, 2, 3, 4, 5, 6, 7, 8]
+    if (sems.size === 0) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     return Array.from(sems).sort((a, b) => a - b)
   }, [courses])
 

@@ -13,7 +13,13 @@ import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
 import { SLOT_RULES } from '../../core/constants/courseCategories'
 import { Pathway, PathwaySlot } from '../../core/types/course.types'
-import { isCourseEligibleForSlot, normalizeCourseCode } from '../../core/utils/slotRules'
+import {
+  isCourseEligibleForSlot,
+  normalizeCourseCode,
+  validatePathwaySlots,
+  evaluateCoursePrerequisites,
+  PrerequisiteRule,
+} from '../../core/utils/slotRules'
 
 @Injectable()
 export class RegistrationsService {
@@ -671,6 +677,9 @@ export class RegistrationsService {
       }
     }
 
+    const studentDept = departmentsData.find((d) => d.id === departmentId)
+    const studentDeptCode = studentDept?.code || null
+
     const settings = settingsRes.data
     const blueprint = blueprintRes.data
 
@@ -704,7 +713,13 @@ export class RegistrationsService {
     const pathway = pathways.find((p) => p.id === pathway_id)
     if (!pathway) throw new BadRequestException('Invalid pathway selected')
 
-    // Fetch existing preferences record to freeze submitted_at
+    // F20, D02: Validate pathway slots for duplicate fixed courses and valid slot configuration
+    const pathwayValidation = validatePathwaySlots(pathway.slots || [])
+    if (!pathwayValidation.valid) {
+      throw new BadRequestException(`Invalid pathway blueprint configuration: ${pathwayValidation.errors.join('; ')}`)
+    }
+
+    // Fetch existing preferences and registration records to preserve original submitted_at (F17)
     const [existingPrefRes, existingRegRes] = await Promise.all([
       this.supabase.admin
         .from('registration_preferences')
@@ -725,14 +740,14 @@ export class RegistrationsService {
     const existingPref = existingPrefRes.data
     const existingReg = existingRegRes.data
 
-    // Step 3 tiebreaker rule: frozen on first submission. Re-ranking preferences never resets this timestamp.
+    // Step 3 tiebreaker rule: frozen on first submission. Re-ranking preferences never resets this timestamp (F17)
     const submittedAt = existingPref?.submitted_at ?? existingReg?.submitted_at ?? new Date().toISOString()
     const allocationMetadata: Record<string, any> = {
       ...(typeof existingPref?.allocation_metadata === 'object' && existingPref?.allocation_metadata ? existingPref.allocation_metadata : {}),
       ...(typeof existingReg?.allocation_metadata === 'object' && existingReg?.allocation_metadata ? existingReg.allocation_metadata : {}),
     }
 
-    // Resolve fixed targets from blueprint
+    // Resolve fixed targets globally by unique course code (F14)
     const fixedTargets: string[] = []
     pathway.slots.forEach((s) => {
       if (
@@ -754,7 +769,7 @@ export class RegistrationsService {
     if (fixedTargets.length > 0) {
       const { data: fixedCourses } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, category')
+        .select('id, course_code, title, credits, department_id, category, semester')
         .in('course_code', fixedTargets)
       if (fixedCourses) {
         for (const c of fixedCourses) {
@@ -775,6 +790,7 @@ export class RegistrationsService {
     const evaluatedCourses: any[] = []
     const fixedCourseAssignments: Record<string, string> = {}
 
+    // F13: Process configured pathway slots (supporting variable component sizes for research/projects)
     pathway.slots.forEach((s, i) => {
       const slotNum = i + 1
       const slotKey = `slot_${slotNum}`
@@ -806,8 +822,34 @@ export class RegistrationsService {
           slotChoices = [{ course_id: courses[i], rank: 1 }]
         }
 
+        // F13: Runtime validation: required compulsory completeness
+        if (!slotChoices || slotChoices.length === 0) {
+          throw new BadRequestException(`Please select course preferences for compulsory Paper ${slotNum} (${s.name || s.rule})`)
+        }
+
         if (slotChoices.length > 3) {
           throw new BadRequestException(`Maximum 3 preferences allowed for ${slotKey}`)
+        }
+
+        // Validate consecutive ranks and distinct courses within slot
+        const ranksInSlot = new Set<number>()
+        const coursesInSlot = new Set<string>()
+        for (const choice of slotChoices) {
+          if (!choice.course_id || typeof choice.course_id !== 'string') {
+            throw new BadRequestException(`Invalid course selected in ${slotKey}`)
+          }
+          if (typeof choice.rank !== 'number' || choice.rank < 1 || choice.rank > 3) {
+            throw new BadRequestException(`Invalid rank ${choice.rank} in ${slotKey}. Ranks must be between 1 and 3.`)
+          }
+          if (ranksInSlot.has(choice.rank)) {
+            throw new BadRequestException(`Duplicate rank ${choice.rank} in ${slotKey}`)
+          }
+          ranksInSlot.add(choice.rank)
+
+          if (coursesInSlot.has(choice.course_id)) {
+            throw new BadRequestException(`Duplicate course chosen across ranks in ${slotKey}`)
+          }
+          coursesInSlot.add(choice.course_id)
         }
 
         unifiedPreferences.push({
@@ -820,7 +862,7 @@ export class RegistrationsService {
       }
     })
 
-    // Optional Slot 7 (Paper 7 - Minor Elective)
+    // Optional Slot 7 (Paper 7 - Additional Minor Elective)
     if (preferences && preferences['slot_7'] && preferences['slot_7'].length > 0) {
       if (preferences['slot_7'].length > 3) {
         throw new BadRequestException('Maximum 3 preferences allowed for slot_7')
@@ -834,7 +876,7 @@ export class RegistrationsService {
       })
     }
 
-    // Optional Slot 8 (Paper 8 - Minor Elective)
+    // Optional Slot 8 (Paper 8 - Additional Minor Elective)
     if (preferences && preferences['slot_8'] && preferences['slot_8'].length > 0) {
       if (preferences['slot_8'].length > 3) {
         throw new BadRequestException('Maximum 3 preferences allowed for slot_8')
@@ -848,7 +890,7 @@ export class RegistrationsService {
       })
     }
 
-    // Collect all elective courses mentioned to validate department restriction
+    // Collect all elective courses mentioned to validate department restriction & prerequisites
     const allElectiveCourseIds = new Set<string>()
     unifiedPreferences.forEach((sItem) => {
       if (!sItem.is_fixed) {
@@ -859,7 +901,7 @@ export class RegistrationsService {
     if (allElectiveCourseIds.size > 0) {
       const { data: electiveCourses, error: elecErr } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, semester, category, tag')
+        .select('id, course_code, title, credits, department_id, semester, category, tag, prerequisite_course_ids')
         .in('id', Array.from(allElectiveCourseIds))
 
       if (elecErr || !electiveCourses) {
@@ -873,7 +915,45 @@ export class RegistrationsService {
         }
       }
 
-      // Validate each elective choice against slot eligibility rules (FND-05)
+      // F19: Fetch prior registrations for prerequisite verification
+      const { data: priorRegs } = await this.supabase.admin
+        .from('student_registrations')
+        .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+        .eq('student_id', user.userId)
+        .lt('semester', currentSemester)
+
+      const priorCourseIds = new Set<string>()
+      for (const pr of priorRegs ?? []) {
+        for (let s = 1; s <= 8; s++) {
+          const cid = (pr as any)[`slot_${s}_course_id`]
+          if (cid) priorCourseIds.add(cid)
+        }
+      }
+
+      const completedCodes = new Set<string>()
+      if (priorCourseIds.size > 0) {
+        const { data: codeData } = await this.supabase.admin
+          .from('courses')
+          .select('id, course_code')
+          .in('id', Array.from(priorCourseIds))
+        for (const cd of codeData ?? []) {
+          completedCodes.add(normalizeCourseCode(cd.course_code))
+        }
+      }
+
+      // Fetch configured prerequisite rules for selected elective courses
+      const { data: rulesData } = await this.supabase.admin
+        .from('course_prerequisite_rules')
+        .select('id, course_id, rule, target')
+        .in('course_id', Array.from(allElectiveCourseIds))
+
+      const rulesByCourse = new Map<string, PrerequisiteRule[]>()
+      for (const r of (rulesData || []) as PrerequisiteRule[]) {
+        if (!rulesByCourse.has(r.course_id)) rulesByCourse.set(r.course_id, [])
+        rulesByCourse.get(r.course_id)!.push(r)
+      }
+
+      // Validate each elective choice against slot eligibility rules & prerequisites (F14, F19)
       for (const sItem of unifiedPreferences) {
         if (sItem.is_fixed) continue
         const slotDef =
@@ -894,7 +974,7 @@ export class RegistrationsService {
           }
 
           if (sItem.slot > 6) {
-            // Hardcoded Minor Rule for Paper 7 and Paper 8:
+            // Minor Rule for Paper 7 and Paper 8:
             // Exclude student's own department; course must match current semester
             if (course.department_id === departmentId) {
               throw new BadRequestException(
@@ -922,10 +1002,26 @@ export class RegistrationsService {
               )
             }
           }
+
+          // Strict prerequisite check (F19)
+          const courseRules = rulesByCourse.get(course.id) || []
+          const prereqEval = evaluateCoursePrerequisites(
+            course,
+            courseRules,
+            { department_code: studentDeptCode, current_semester: currentSemester },
+            completedCodes,
+            priorCourseIds,
+          )
+
+          if (!prereqEval.eligible) {
+            throw new BadRequestException(
+              `Prerequisite requirement not satisfied for ${course.course_code} (${course.title}): ${prereqEval.reason}`,
+            )
+          }
         }
       }
 
-      // Ensure no duplicate courses are chosen as rank 1 or fixed across slots
+      // F20: Ensure no duplicate courses are chosen as rank 1 or fixed across slots
       const chosenRank1Map = new Map<string, number>()
       for (const sItem of unifiedPreferences) {
         const rank1 = sItem.choices.find((c) => c.rank === 1)
@@ -941,7 +1037,6 @@ export class RegistrationsService {
         }
       }
 
-      // Compute total credits based on fixed courses + rank 1 electives
       const rank1ElectiveIds = unifiedPreferences
         .filter((s) => !s.is_fixed)
         .map((s) => s.choices.find((c) => c.rank === 1)?.course_id)
@@ -951,9 +1046,9 @@ export class RegistrationsService {
       evaluatedCourses.push(...rank1Courses)
     }
 
-    // Per user instruction: credit validation for submission is calculated strictly on the first 6 papers
-    let base6Credits = 0
-    let totalCredits = 0
+    // F16, D08: Separate core pathway credits from additional papers 7-8
+    let coreCredits = 0
+    let additionalCredits = 0
 
     for (const sItem of unifiedPreferences) {
       const rank1CourseId = sItem.choices.find((c) => c.rank === 1)?.course_id
@@ -963,47 +1058,29 @@ export class RegistrationsService {
           ? fixedCoursesMap[normalizeCourseCode(pathway.slots[sItem.slot - 1]?.target)] ||
             fixedCoursesMap[pathway.slots[sItem.slot - 1]?.target?.trim()]
           : null) || evaluatedCourses.find((c) => c.id === rank1CourseId)
-      const credits = course?.credits ?? 0
-      totalCredits += credits
-      if (sItem.slot <= 6) {
-        base6Credits += credits
+      const credits = Number(course?.credits) || 0
+
+      if (sItem.slot <= pathway.slots.length) {
+        coreCredits += credits
+      } else {
+        additionalCredits += credits
       }
     }
+
+    const totalCredits = coreCredits + additionalCredits
 
     const minCredits = blueprint.min_credits ?? settings.min_credits ?? 20
     const maxCredits = blueprint.max_credits ?? settings.max_credits ?? 24
 
-    if (base6Credits < minCredits || base6Credits > maxCredits) {
+    if (coreCredits < minCredits || coreCredits > maxCredits) {
       throw new BadRequestException(
-        `Total registered credits for core 6 papers (${base6Credits}) must be between ${minCredits} and ${maxCredits}`,
+        `Total registered credits for core pathway components (${coreCredits}) must be between ${minCredits} and ${maxCredits}`,
       )
     }
 
     const isUpdate = !!(existingPref || existingReg)
 
-    // 1. Save unified preferences to registration_preferences table
-    const prefUpsertPayload = {
-      student_id: user.userId,
-      campus_id: campusId || user.campus_id,
-      semester,
-      academic_year: settings.academic_year,
-      pathway_id,
-      preferences: unifiedPreferences,
-      allocation_metadata: allocationMetadata,
-      submitted_at: submittedAt,
-      updated_at: new Date().toISOString(),
-    }
-
-    const { error: prefErr } = await this.supabase.admin
-      .from('registration_preferences')
-      .upsert(prefUpsertPayload, { onConflict: 'student_id,semester,academic_year' })
-
-    if (prefErr) {
-      this.logger.error(`Failed to save registration preferences: ${prefErr.message}`)
-      throw new InternalServerErrorException('Failed to save course preferences')
-    }
-
-    // 2. Write confirmed fixed slots to student_registrations table (keeping elective slots NULL until allocation runs)
+    // F17: Atomic persistence via RPC submit_student_registration
     const regPayload: Record<string, any> = {
       student_id: user.userId,
       campus_id: campusId || user.campus_id,
@@ -1011,7 +1088,10 @@ export class RegistrationsService {
       academic_year: settings.academic_year,
       pathway_id,
       total_credits: totalCredits,
-      allocation_metadata: allocationMetadata,
+      allocation_metadata: {
+        ...allocationMetadata,
+        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
+      },
       submitted_at: submittedAt,
       slot_1_course_id: fixedCourseAssignments.slot_1 ?? null,
       slot_2_course_id: fixedCourseAssignments.slot_2 ?? null,
@@ -1023,21 +1103,81 @@ export class RegistrationsService {
       slot_8_course_id: fixedCourseAssignments.slot_8 ?? null,
     }
 
-    let { error: regErr } = await this.supabase.admin
-      .from('student_registrations')
-      .upsert(regPayload, { onConflict: 'student_id,semester,academic_year' })
-
-    if (regErr && (regErr.message?.includes('slot_7_course_id') || regErr.message?.includes('slot_8_course_id'))) {
-      const { slot_7_course_id, slot_8_course_id, ...legacyPayload } = regPayload
-      const fallbackRes = await this.supabase.admin
-        .from('student_registrations')
-        .upsert(legacyPayload, { onConflict: 'student_id,semester,academic_year' })
-      regErr = fallbackRes.error
+    const prefPayload = {
+      student_id: user.userId,
+      campus_id: campusId || user.campus_id,
+      semester,
+      academic_year: settings.academic_year,
+      pathway_id,
+      preferences: unifiedPreferences,
+      allocation_metadata: {
+        ...allocationMetadata,
+        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
+      },
+      submitted_at: submittedAt,
+      updated_at: new Date().toISOString(),
     }
 
-    if (regErr) {
-      this.logger.error(`Failed to write confirmed fixed slots to student_registrations: ${regErr.message}`)
-      // Not fatal to preferences, but log error
+    let rpcSuccess = false
+    try {
+      const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('submit_student_registration', {
+        p_student_id: user.userId,
+        p_campus_id: campusId || user.campus_id,
+        p_semester: semester,
+        p_academic_year: settings.academic_year,
+        p_pathway_id: pathway_id,
+        p_preferences: unifiedPreferences,
+        p_allocation_metadata: {
+          ...allocationMetadata,
+          credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
+        },
+        p_fixed_assignments: fixedCourseAssignments,
+        p_total_credits: totalCredits,
+        p_submitted_at: submittedAt,
+      })
+      if (!rpcErr && rpcRes?.success) {
+        rpcSuccess = true
+      }
+    } catch {
+      rpcSuccess = false
+    }
+
+    if (!rpcSuccess) {
+      // Fallback checked transaction:
+      const { error: prefErr } = await this.supabase.admin
+        .from('registration_preferences')
+        .upsert(prefPayload, { onConflict: 'student_id,semester,academic_year' })
+
+      if (prefErr) {
+        this.logger.error(`Failed to save registration preferences: ${prefErr.message}`)
+        throw new InternalServerErrorException('Failed to save course preferences')
+      }
+
+      let { error: regErr } = await this.supabase.admin
+        .from('student_registrations')
+        .upsert(regPayload, { onConflict: 'student_id,semester,academic_year' })
+
+      if (regErr && (regErr.message?.includes('slot_7_course_id') || regErr.message?.includes('slot_8_course_id'))) {
+        const { slot_7_course_id, slot_8_course_id, ...legacyPayload } = regPayload
+        const fallbackRes = await this.supabase.admin
+          .from('student_registrations')
+          .upsert(legacyPayload, { onConflict: 'student_id,semester,academic_year' })
+        regErr = fallbackRes.error
+      }
+
+      if (regErr) {
+        // F17: Companion write failed: do not report success!
+        this.logger.error(`Critical registration companion write failure: ${regErr.message}`)
+        if (!existingPref) {
+          await this.supabase.admin
+            .from('registration_preferences')
+            .delete()
+            .eq('student_id', user.userId)
+            .eq('semester', semester)
+            .eq('academic_year', settings.academic_year)
+        }
+        throw new InternalServerErrorException(`Registration failed: ${regErr.message}`)
+      }
     }
 
     await this.auditLogger.log({
@@ -1049,7 +1189,7 @@ export class RegistrationsService {
         : `submitted course registration preferences for semester ${semester}`,
       resourceType: 'registration',
       status: 'success',
-      metadata: { totalCredits, coursesCount: evaluatedCourses.length, isUpdate },
+      metadata: { totalCredits, coreCredits, additionalCredits, coursesCount: evaluatedCourses.length, isUpdate },
     })
 
     return {
@@ -1241,10 +1381,11 @@ export class RegistrationsService {
     let departmentId = user.department_id
     let currentSemester = user.current_semester
 
+    let deptCode: string | null = null
     if (!campusId || !departmentId || !currentSemester) {
       const { data: student } = await this.supabase.admin
         .from('students')
-        .select('campus_id, department_id, current_semester')
+        .select('campus_id, department_id, current_semester, departments(code)')
         .eq('id', user.userId)
         .single()
 
@@ -1252,7 +1393,15 @@ export class RegistrationsService {
         campusId = campusId || student.campus_id
         departmentId = departmentId || student.department_id
         currentSemester = currentSemester || student.current_semester
+        deptCode = (student.departments as any)?.code || null
       }
+    } else {
+      const { data: dept } = await this.supabase.admin
+        .from('departments')
+        .select('code')
+        .eq('id', departmentId)
+        .maybeSingle()
+      deptCode = dept?.code || null
     }
 
     if (!campusId || !currentSemester) {
@@ -1261,7 +1410,7 @@ export class RegistrationsService {
 
     const { data: settings } = await this.supabase.admin
       .from('campus_settings')
-      .select('academic_year, min_credits, max_credits')
+      .select('deadline, academic_year, min_credits, max_credits')
       .eq('campus_id', campusId)
       .maybeSingle()
 
@@ -1269,20 +1418,26 @@ export class RegistrationsService {
       throw new NotFoundException('Campus registration settings not configured')
     }
 
-    // Step 1: Ensure allocation has completed for this semester and academic year
-    const { data: completedRun } = await this.supabase.admin
-      .from('allocation_runs')
+    // F30: Enforce campus registration window
+    const deadline = settings.deadline ? new Date(settings.deadline) : null
+    if (!deadline || new Date() >= deadline) {
+      throw new ForbiddenException(
+        'Registration window is closed for your campus. Course changes are not permitted after the deadline.',
+      )
+    }
+
+    // F30: Enforce unpublished cohort state (no changes after timetable generation/publication)
+    const { data: publishedEntries } = await this.supabase.admin
+      .from('timetable_entries')
       .select('id')
-      .eq('campus_id', campusId)
       .eq('academic_year', settings.academic_year)
       .eq('semester', currentSemester)
-      .eq('status', 'completed')
+      .eq('status', 'published')
       .limit(1)
-      .maybeSingle()
 
-    if (!completedRun) {
-      throw new BadRequestException(
-        'Course allocation has not yet run for this semester. Direct slot updates are only available after allocation has completed.',
+    if (publishedEntries && publishedEntries.length > 0) {
+      throw new ForbiddenException(
+        'Timetable has been published for this cohort. Registrations are locked and direct course changes are no longer allowed.',
       )
     }
 
@@ -1312,7 +1467,7 @@ export class RegistrationsService {
       }
     }
 
-    // Step 2.5: Enforce 27-hour rolling rate limit (max 3 changes per 27 hours)
+    // Step 2.5: Enforce 27-hour rolling rate limit (max 3 changes per 27 hours) (F31)
     const WINDOW_MS = 27 * 60 * 60 * 1000
     const now = Date.now()
     const history = Array.isArray(allocationMeta.slot_change_history)
@@ -1339,7 +1494,7 @@ export class RegistrationsService {
       )
     }
 
-    // Step 3: Ensure student doesn't choose the same course in multiple slots
+    // Step 3: Ensure student doesn't choose the same course in multiple slots (F20)
     for (let s = 1; s <= 8; s++) {
       const k = `slot_${s}`
       if (k !== slot_key && reg[`${k}_course_id`] === course_id) {
@@ -1350,7 +1505,7 @@ export class RegistrationsService {
     // Step 4: Verify the target course exists and belongs to current semester
     const { data: course, error: cErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, credits, department_id, semester, seat_limit, category')
+      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisite_course_ids')
       .eq('id', course_id)
       .single()
 
@@ -1364,12 +1519,56 @@ export class RegistrationsService {
       )
     }
 
-    // Step 5: Capacity check — count active enrollments across student_registrations
+    // Step 4.5: Enforce strict prerequisite checks (F19)
+    const { data: priorRegs } = await this.supabase.admin
+      .from('student_registrations')
+      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+      .eq('student_id', user.userId)
+      .lt('semester', currentSemester)
+
+    const priorCourseIds = new Set<string>()
+    for (const pr of priorRegs ?? []) {
+      for (let s = 1; s <= 8; s++) {
+        const cid = (pr as any)[`slot_${s}_course_id`]
+        if (cid) priorCourseIds.add(cid)
+      }
+    }
+
+    const completedCodes = new Set<string>()
+    if (priorCourseIds.size > 0) {
+      const { data: codeData } = await this.supabase.admin
+        .from('courses')
+        .select('id, course_code')
+        .in('id', Array.from(priorCourseIds))
+      for (const cd of codeData ?? []) {
+        completedCodes.add(normalizeCourseCode(cd.course_code))
+      }
+    }
+
+    const { data: rulesData } = await this.supabase.admin
+      .from('course_prerequisite_rules')
+      .select('id, course_id, rule, target')
+      .eq('course_id', course_id)
+
+    const prereqEval = evaluateCoursePrerequisites(
+      course,
+      (rulesData || []) as PrerequisiteRule[],
+      { department_code: deptCode, current_semester: currentSemester },
+      completedCodes,
+      priorCourseIds,
+    )
+
+    if (!prereqEval.eligible) {
+      throw new BadRequestException(
+        `Cannot change to course ${course.course_code}: prerequisite requirement not satisfied (${prereqEval.reason})`,
+      )
+    }
+
+    // Step 5: Global capacity check across ALL campuses for active academic year (F21)
     const seatLimit = course.seat_limit ? Number(course.seat_limit) : 60
     const { count: enrolledCount } = await this.supabase.admin
       .from('student_registrations')
       .select('*', { count: 'exact', head: true })
-      .eq('campus_id', campusId)
       .eq('academic_year', settings.academic_year)
       .eq('semester', currentSemester)
       .or(
@@ -1378,11 +1577,29 @@ export class RegistrationsService {
 
     if ((enrolledCount ?? 0) >= seatLimit) {
       throw new ConflictException(
-        `Course ${course.course_code} (${course.title}) has reached maximum capacity (${seatLimit}/${seatLimit} seats). Please select another available course.`,
+        `Course ${course.course_code} (${course.title}) has reached maximum global capacity (${seatLimit}/${seatLimit} seats). Please select another available course.`,
       )
     }
 
-    // Step 6: Recalculate total credits with the new course
+    // Step 5.5: Try atomic RPC execution first (F21, F31)
+    try {
+      const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('execute_student_course_change', {
+        p_student_id: user.userId,
+        p_campus_id: campusId,
+        p_semester: currentSemester,
+        p_academic_year: settings.academic_year,
+        p_slot_key: slot_key,
+        p_new_course_id: course_id,
+        p_client_idempotency_key: (body as any).idempotency_key || null,
+      })
+      if (!rpcErr && rpcRes?.success) {
+        return rpcRes
+      }
+    } catch {
+      // Fallback to checked transaction below
+    }
+
+    // Step 6: Recalculate total credits with the new course (F16)
     const prevCourseId = reg[`${slot_key}_course_id`]
     const assignedCourseIds: string[] = []
     for (let s = 1; s <= 8; s++) {
@@ -1455,7 +1672,7 @@ export class RegistrationsService {
       eventType: AuditEvents.REGISTRATION_SUBMITTED,
       userId: user.userId,
       userRole: user.role,
-      action: `student direct slot update post-allocation for ${slot_key} to course ${course.course_code}`,
+      action: `student direct slot update for ${slot_key} to course ${course.course_code}`,
       resourceType: 'student_registrations',
       resourceId: reg.id,
       status: 'success',

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+﻿import { Module } from '@nestjs/common'
 import { DirectorService } from './director.service'
 import { DirectorController } from './director.controller'
 import { AuthCoreModule } from '../../core/auth/auth-core.module'

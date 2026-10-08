@@ -1,4 +1,4 @@
-// ─── Slot Identity ────────────────────────────────────────────────────────────
+﻿// ─── Slot Identity ────────────────────────────────────────────────────────────
 export type SlotId = string; // uuid from time_slots table
 export const DAYS = [1, 2, 3, 4, 5] as const; // Mon–Fri
 

@@ -98,7 +98,9 @@ export class FacultyService {
           slot_3_course_id,
           slot_4_course_id,
           slot_5_course_id,
-          slot_6_course_id
+          slot_6_course_id,
+          slot_7_course_id,
+          slot_8_course_id
         `)
         .eq('academic_year', academicYear)
 
@@ -112,6 +114,8 @@ export class FacultyService {
             reg.slot_4_course_id,
             reg.slot_5_course_id,
             reg.slot_6_course_id,
+            (reg as any).slot_7_course_id,
+            (reg as any).slot_8_course_id,
           ]
           for (const cid of slots) {
             if (cid && courseIdSet.has(cid)) {
@@ -189,6 +193,8 @@ export class FacultyService {
       'slot_4_course_id',
       'slot_5_course_id',
       'slot_6_course_id',
+      'slot_7_course_id',
+      'slot_8_course_id',
     ]
     const orClause = slotFields.map((field) => `${field}.eq.${courseId}`).join(',')
 
@@ -202,7 +208,9 @@ export class FacultyService {
         slot_3_course_id,
         slot_4_course_id,
         slot_5_course_id,
-        slot_6_course_id
+        slot_6_course_id,
+        slot_7_course_id,
+        slot_8_course_id
       `)
       .eq('academic_year', academicYear)
       .or(orClause)
