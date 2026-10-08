@@ -1,6 +1,9 @@
-﻿/**
- * Post-period grace window in minutes.
- * Attendance marked after this window requires explicit HOD unlock authorization.
- * Configured to 15 minutes per user specification.
+/**
+ * Period Attendance Constants
+ *
+ * NOTE (Plan 07 / F44): Post-period 15-minute grace window and HOD unlock workflows
+ * are officially retired. Authorized teachers can correct retained current-semester
+ * attendance dates at any time without artificial time-of-day locks.
  */
-export const PERIOD_GRACE_MINUTES = 15;
+
+export const ASIA_KOLKATA_TIMEZONE = 'Asia/Kolkata';

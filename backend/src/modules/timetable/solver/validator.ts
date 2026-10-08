@@ -1,20 +1,40 @@
-﻿import type {
+import type {
   AIGeneratorResponse,
   CourseNode,
   ValidationViolation,
   SlotMap,
+  ParallelGroup,
+  TeacherReservation,
 } from './types';
 
 export function validateTimetable(
   response: AIGeneratorResponse,
   courses: CourseNode[],
-  slotMap: SlotMap
+  slotMap: SlotMap,
+  parallelGroups: ParallelGroup[] = [],
+  teacherReservations: TeacherReservation[] = []
 ): ValidationViolation[] {
   const violations: ValidationViolation[] = [];
   const courseMap = new Map(courses.map((c) => [c.courseId, c]));
 
+  // F36: Complete coverage check — ensure every course with contact hours is scheduled
+  for (const course of courses) {
+    if (course.theoryHours > 0 || course.practicalHours > 0) {
+      const assignment = response.assignments.find((a) => a.courseId === course.courseId);
+      if (!assignment || assignment.slots.length === 0) {
+        violations.push({
+          type: 'unplaced_course',
+          courseId: course.courseId,
+          detail: `Course ${course.courseCode} has ${course.theoryHours} theory and ${course.practicalHours} practical hours but was not scheduled.`,
+        });
+      }
+    }
+  }
+
   // Build: studentId → Set of (day-period) strings assigned to them
   const studentSchedule = new Map<string, Set<string>>();
+  // F37: Build teacherId → Set of (day-period) strings assigned to them
+  const teacherSchedule = new Map<string, Set<string>>();
 
   for (const assignment of response.assignments) {
     const course = courseMap.get(assignment.courseId);
@@ -22,9 +42,35 @@ export function validateTimetable(
 
     let theoryCount = 0;
     let practicalCount = 0;
+    const seenSlotsInCourse = new Set<string>();
 
     for (const slot of assignment.slots) {
+      // F36: Domain validation (Days 1-5, Periods 1-6)
+      if (slot.day < 1 || slot.day > 5 || slot.period < 1 || slot.period > 6) {
+        violations.push({
+          type: 'hours_mismatch',
+          courseId: assignment.courseId,
+          day: slot.day,
+          period: slot.period,
+          detail: `Invalid slot Day ${slot.day} Period ${slot.period} outside operational timetable domain (Mon-Fri, P1-P6).`,
+        });
+        continue;
+      }
+
       const key = `${slot.day}-${slot.period}`;
+
+      // F36: Duplicate assignment check in same course
+      if (seenSlotsInCourse.has(key)) {
+        violations.push({
+          type: 'hours_mismatch',
+          courseId: assignment.courseId,
+          day: slot.day,
+          period: slot.period,
+          detail: `Course ${course.courseCode} has duplicate assignment at Day ${slot.day} Period ${slot.period}.`,
+        });
+      } else {
+        seenSlotsInCourse.add(key);
+      }
 
       // Count hours
       if (slot.sessionType === 'theory') theoryCount++;
@@ -64,6 +110,25 @@ export function validateTimetable(
           studentSchedule.get(studentId)!.add(key);
         }
       }
+
+      // F37: Shared Teacher Conflict check (within current timetable)
+      if (course.teacherId) {
+        if (!teacherSchedule.has(course.teacherId)) {
+          teacherSchedule.set(course.teacherId, new Set());
+        }
+        if (teacherSchedule.get(course.teacherId)!.has(key)) {
+          violations.push({
+            type: 'teacher_conflict',
+            courseId: assignment.courseId,
+            teacherId: course.teacherId,
+            day: slot.day,
+            period: slot.period,
+            detail: `Teacher ${course.teacherId} is scheduled for multiple courses at Day ${slot.day} Period ${slot.period} including ${course.courseCode}`,
+          });
+        } else {
+          teacherSchedule.get(course.teacherId)!.add(key);
+        }
+      }
     }
 
     // Hours mismatch check
@@ -82,9 +147,9 @@ export function validateTimetable(
       });
     }
 
-    // Validate lab blocks are valid consecutive pairs
+    // Validate lab blocks are valid consecutive pairs (D03: allow single practical hour if course has odd practical hours)
     const labSlots = assignment.slots.filter((s) => s.isLabBlock);
-    if (labSlots.length % 2 !== 0) {
+    if (course.practicalHours % 2 === 0 && labSlots.length % 2 !== 0) {
       violations.push({
         type: 'invalid_lab_block',
         courseId: assignment.courseId,
@@ -104,7 +169,20 @@ export function validateTimetable(
       for (let i = 0; i < periods.length; i += 2) {
         const pA = periods[i];
         const pB = periods[i + 1];
-        if (pB === undefined || pB !== pA + 1) {
+        if (pB === undefined) {
+          // If odd practical hour (D03), single period is acceptable
+          if (course.practicalHours % 2 !== 0 && periods.length === 1) {
+            continue;
+          }
+          violations.push({
+            type: 'invalid_lab_block',
+            courseId: assignment.courseId,
+            day,
+            detail: `Course ${course.courseCode} lab block on day ${day} has un-paired period: ${pA}`,
+          });
+          continue;
+        }
+        if (pB !== pA + 1) {
           violations.push({
             type: 'invalid_lab_block',
             courseId: assignment.courseId,
@@ -125,9 +203,21 @@ export function validateTimetable(
     }
   }
 
+  // F37: Fixed Teacher Reservations check (against published schedules in other semesters/campuses)
+  for (const res of teacherReservations) {
+    const resKey = `${res.day}-${res.period}`;
+    if (teacherSchedule.has(res.teacherId) && teacherSchedule.get(res.teacherId)!.has(resKey)) {
+      violations.push({
+        type: 'teacher_conflict',
+        teacherId: res.teacherId,
+        day: res.day,
+        period: res.period,
+        detail: `Teacher ${res.teacherId} conflicts with published timetable reservation at Day ${res.day} Period ${res.period} (from semester ${res.sourceSemester || 'other'}, course ${res.sourceCourseId || 'other'}).`,
+      });
+    }
+  }
+
   // ── Parallel Half-Block Overlap Check ──────────────────────────────────────
-  // If Course A runs a 2-hour lab block at (day, pA + pB), another course B for the
-  // same department must not be scheduled for only one of those two periods (leaving students idle).
   for (const assignmentA of response.assignments) {
     const courseA = courseMap.get(assignmentA.courseId);
     if (!courseA) continue;
@@ -173,46 +263,77 @@ export function validateTimetable(
     }
   }
 
-  // ── Campus-Wide Category Synchronization & Category Purity Checks ────────
-  const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC', 'AEC']);
+  // ── Parallel Groups Synchronization & Category Purity Checks (F71) ────────
+  if (parallelGroups.length > 0) {
+    for (const group of parallelGroups) {
+      const grpAssignments = response.assignments.filter((a) =>
+        group.courseIds.includes(a.courseId)
+      );
+      if (grpAssignments.length < 2) continue;
 
-  // 1. Campus-wide category slot consistency (all courses of MDC/VAC/SEC/AEC must share identical slots)
-  const categoryAssignments = new Map<string, Array<{ course: CourseNode; slots: string[] }>>();
+      const refAssignment = grpAssignments[0];
+      const refCourse = courseMap.get(refAssignment.courseId);
+      const refSlotsStr = refAssignment.slots
+        .map((s) => `${s.day}-${s.period}`)
+        .sort()
+        .join(',');
 
-  for (const assignment of response.assignments) {
-    const course = courseMap.get(assignment.courseId);
-    if (!course) continue;
-    const cat = (course.category || '').toUpperCase().trim();
-    if (!CAMPUS_WIDE_CATEGORIES.has(cat)) continue;
+      for (let i = 1; i < grpAssignments.length; i++) {
+        const curr = grpAssignments[i];
+        const currCourse = courseMap.get(curr.courseId);
+        const currSlotsStr = curr.slots
+          .map((s) => `${s.day}-${s.period}`)
+          .sort()
+          .join(',');
 
-    // Use key combining category and total session hours to compare matching structures
-    const key = `${cat}:T${course.theoryHours}:P${course.practicalHours}`;
-    if (!categoryAssignments.has(key)) categoryAssignments.set(key, []);
+        if (currSlotsStr !== refSlotsStr) {
+          violations.push({
+            type: 'category_slot_mismatch',
+            courseId: curr.courseId,
+            detail: `Parallel basket [${group.category || 'Group'}] synchronization mismatch: Course ${currCourse?.courseCode ?? curr.courseId} slots [${currSlotsStr}] do not match basket reference [${refSlotsStr}] of course ${refCourse?.courseCode ?? refAssignment.courseId}. Courses in the same parallel basket must share identical slots.`,
+          });
+        }
+      }
+    }
+  } else {
+    // Fallback: Campus-wide category slot consistency (only for groups of courses that share category and have zero student overlap)
+    const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC']);
+    const categoryAssignments = new Map<string, Array<{ course: CourseNode; slots: string[] }>>();
 
-    const slotKeys = assignment.slots.map((s) => `${s.day}-${s.period}`).sort();
-    categoryAssignments.get(key)!.push({ course, slots: slotKeys });
-  }
+    for (const assignment of response.assignments) {
+      const course = courseMap.get(assignment.courseId);
+      if (!course) continue;
+      const cat = (course.category || '').toUpperCase().trim();
+      if (!CAMPUS_WIDE_CATEGORIES.has(cat)) continue;
 
-  for (const [key, group] of categoryAssignments) {
-    if (group.length < 2) continue;
-    const [cat] = key.split(':');
-    const reference = group[0];
-    const refSlotsStr = reference.slots.join(',');
+      const key = `${cat}:T${course.theoryHours}:P${course.practicalHours}`;
+      if (!categoryAssignments.has(key)) categoryAssignments.set(key, []);
 
-    for (let i = 1; i < group.length; i++) {
-      const current = group[i];
-      const curSlotsStr = current.slots.join(',');
-      if (curSlotsStr !== refSlotsStr) {
-        violations.push({
-          type: 'category_slot_mismatch',
-          courseId: current.course.courseId,
-          detail: `Campus-wide [${cat}] synchronization mismatch: Course ${current.course.courseCode} slots [${current.slots.join(', ')}] do not match standard ${cat} slots [${reference.slots.join(', ')}] used by ${reference.course.courseCode}. All ${cat} courses must share identical slots campus-wide.`,
-        });
+      const slotKeys = assignment.slots.map((s) => `${s.day}-${s.period}`).sort();
+      categoryAssignments.get(key)!.push({ course, slots: slotKeys });
+    }
+
+    for (const [key, group] of categoryAssignments) {
+      if (group.length < 2) continue;
+      const [cat] = key.split(':');
+      const reference = group[0];
+      const refSlotsStr = reference.slots.join(',');
+
+      for (let i = 1; i < group.length; i++) {
+        const current = group[i];
+        const curSlotsStr = current.slots.join(',');
+        if (curSlotsStr !== refSlotsStr) {
+          violations.push({
+            type: 'category_slot_mismatch',
+            courseId: current.course.courseId,
+            detail: `Campus-wide [${cat}] synchronization mismatch: Course ${current.course.courseCode} slots [${current.slots.join(', ')}] do not match standard ${cat} slots [${reference.slots.join(', ')}] used by ${reference.course.courseCode}.`,
+          });
+        }
       }
     }
   }
 
-  // 2. Category Purity in Parallel Slots: Ensure courses running at the same slot for the same cohort have identical category
+  // Category Purity in Parallel Slots: Ensure courses running at the same slot for the same cohort have identical category
   const slotCohortCategory = new Map<string, { category: string; courseCode: string }>();
   for (const assignment of response.assignments) {
     const course = courseMap.get(assignment.courseId);
@@ -220,7 +341,6 @@ export function validateTimetable(
     const cat = (course.category || '').toUpperCase().trim();
 
     for (const slot of assignment.slots) {
-      // Cohort key: day-period + departmentId
       const cohortKey = `${slot.day}-${slot.period}:${course.departmentId}`;
       if (slotCohortCategory.has(cohortKey)) {
         const existing = slotCohortCategory.get(cohortKey)!;

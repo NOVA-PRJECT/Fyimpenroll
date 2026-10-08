@@ -17,7 +17,20 @@ import { AuthorizationPolicy } from '../../core/auth/authorization-policy'
 import { runGenerationJob } from './solver/job'
 import { getRedisClient } from './solver/redisClient'
 
-const CONSTRAINTS_PATH = path.join(__dirname, 'solver/constraints.base.json')
+function resolveConstraintsPath(): string {
+  const direct = path.join(__dirname, 'solver/constraints.base.json')
+  if (fs.existsSync(direct)) return direct
+
+  const candidates = [
+    path.resolve(__dirname, '../../../../src/modules/timetable/solver/constraints.base.json'),
+    path.resolve(process.cwd(), 'src/modules/timetable/solver/constraints.base.json'),
+    path.resolve(process.cwd(), 'backend/src/modules/timetable/solver/constraints.base.json'),
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  return direct
+}
 
 @Injectable()
 export class TimetableService {
@@ -28,9 +41,10 @@ export class TimetableService {
   ) {}
 
   private readConstraintsFile() {
+    const filePath = resolveConstraintsPath()
     try {
-      if (fs.existsSync(CONSTRAINTS_PATH)) {
-        return JSON.parse(fs.readFileSync(CONSTRAINTS_PATH, 'utf8'))
+      if (fs.existsSync(filePath)) {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'))
       }
     } catch (err: any) {
       this.serverLogger.error('Error reading constraints file', err?.stack || String(err))
@@ -43,22 +57,55 @@ export class TimetableService {
     }
   }
 
-  // ──────────────── Constraints ────────────────
-  async getConstraints(semester: string | undefined) {
+  // ──────────────── Constraints (F39) ────────────────
+  async getConstraints(semester: string | undefined, user?: AuthUser) {
     const raw = this.readConstraintsFile()
-    const semKey = semester ? String(semester) : null
-    const semSpecific = semKey && raw.semester_constraints?.[semKey] ? raw.semester_constraints[semKey] : null
+    let campusOverrides: Record<string, any> = {}
 
-    const universalHard = raw.hard_constraints || []
-    const universalSoft = raw.soft_constraints || []
+    if (user?.campus_id) {
+      const { data: settings } = await this.supabase.admin
+        .from('campus_settings')
+        .select('timetable_constraints')
+        .eq('campus_id', user.campus_id)
+        .maybeSingle()
+
+      if (settings?.timetable_constraints) {
+        campusOverrides = settings.timetable_constraints
+      }
+    }
+
+    // Deep merge campus overrides over raw baseline (F39)
+    const merged = {
+      ...raw,
+      ...campusOverrides,
+      schedule: { ...(raw.schedule || {}), ...(campusOverrides.schedule || {}) },
+      semester_constraints: {
+        ...(raw.semester_constraints || {}),
+        ...(campusOverrides.semester_constraints || {}),
+      },
+    }
+
+    const semKey = semester ? String(semester) : null
+    const semSpecific = semKey && merged.semester_constraints?.[semKey] ? merged.semester_constraints[semKey] : null
+
+    const universalHard = Array.from(new Set([
+      ...(raw.hard_constraints || []),
+      ...(campusOverrides.hard_constraints || []),
+      ...(campusOverrides.universal_hard_constraints || []),
+    ]))
+    const universalSoft = Array.from(new Set([
+      ...(raw.soft_constraints || []),
+      ...(campusOverrides.soft_constraints || []),
+      ...(campusOverrides.universal_soft_constraints || []),
+    ]))
     const semHard = semSpecific?.hard_constraints || []
     const semSoft = semSpecific?.soft_constraints || []
 
     return {
-      schedule: raw.schedule,
+      schedule: merged.schedule,
       universal_hard_constraints: universalHard,
       universal_soft_constraints: universalSoft,
-      semester_constraints: raw.semester_constraints || {},
+      semester_constraints: merged.semester_constraints || {},
       hard_constraints: [...universalHard, ...semHard],
       soft_constraints: [...universalSoft, ...semSoft],
       selected_semester_hard: semHard,
@@ -66,7 +113,7 @@ export class TimetableService {
     }
   }
 
-  async updateConstraints(body: any) {
+  async updateConstraints(body: any, user?: AuthUser) {
     const ConstraintItemSchema = z.string().trim().min(1).max(500)
     const SemesterConstraintObjSchema = z.object({
       hard_constraints: z.array(ConstraintItemSchema).max(100).optional(),
@@ -75,6 +122,7 @@ export class TimetableService {
 
     const ConstraintsSchema = z.object({
       reset: z.boolean().optional(),
+      campus_id: z.string().uuid().optional(),
       schedule: z.record(z.any()).optional(),
       universal_hard_constraints: z.array(ConstraintItemSchema).max(100).optional(),
       hard_constraints: z.array(ConstraintItemSchema).max(100).optional(),
@@ -88,27 +136,49 @@ export class TimetableService {
       throw new BadRequestException('Invalid constraints payload schema')
     }
 
-    const current = this.readConstraintsFile()
-    const updated = {
-      schedule: parsed.data.schedule || current.schedule,
-      hard_constraints: Array.isArray(parsed.data.universal_hard_constraints)
-        ? parsed.data.universal_hard_constraints
-        : Array.isArray(parsed.data.hard_constraints)
-        ? parsed.data.hard_constraints
-        : current.hard_constraints,
-      soft_constraints: Array.isArray(parsed.data.universal_soft_constraints)
-        ? parsed.data.universal_soft_constraints
-        : Array.isArray(parsed.data.soft_constraints)
-        ? parsed.data.soft_constraints
-        : current.soft_constraints,
-      semester_constraints: parsed.data.semester_constraints || current.semester_constraints,
+    const targetCampusId = user?.campus_id || parsed.data.campus_id
+
+    const updatedOverrides = {
+      schedule: parsed.data.schedule,
+      hard_constraints: parsed.data.universal_hard_constraints || parsed.data.hard_constraints,
+      soft_constraints: parsed.data.universal_soft_constraints || parsed.data.soft_constraints,
+      semester_constraints: parsed.data.semester_constraints,
     }
 
-    try {
-      fs.writeFileSync(CONSTRAINTS_PATH, JSON.stringify(updated, null, 2), 'utf8')
-      return { success: true, message: 'Constraints updated successfully', constraints: updated }
-    } catch (err: any) {
-      throw new InternalServerErrorException(`Failed to save constraints: ${err.message}`)
+    if (targetCampusId) {
+      // F39: Save to campus_settings for durable persistence across Render redeploys
+      const { error: saveErr } = await this.supabase.admin
+        .from('campus_settings')
+        .update({
+          timetable_constraints: updatedOverrides,
+        })
+        .eq('campus_id', targetCampusId)
+
+      if (saveErr) {
+        throw new InternalServerErrorException(`Failed to persist campus constraints: ${saveErr.message}`)
+      }
+
+      return {
+        success: true,
+        message: 'Campus constraints updated and persisted durably (F39)',
+        constraints: updatedOverrides,
+        campusId: targetCampusId,
+      }
+    } else {
+      // Superadmin updating university baseline file
+      try {
+        const current = this.readConstraintsFile()
+        const full = {
+          schedule: parsed.data.schedule || current.schedule,
+          hard_constraints: parsed.data.universal_hard_constraints || parsed.data.hard_constraints || current.hard_constraints,
+          soft_constraints: parsed.data.universal_soft_constraints || parsed.data.soft_constraints || current.soft_constraints,
+          semester_constraints: parsed.data.semester_constraints || current.semester_constraints,
+        }
+        fs.writeFileSync(resolveConstraintsPath(), JSON.stringify(full, null, 2), 'utf8')
+        return { success: true, message: 'University baseline constraints updated successfully', constraints: full }
+      } catch (err: any) {
+        throw new InternalServerErrorException(`Failed to save baseline constraints: ${err.message}`)
+      }
     }
   }
 
@@ -322,11 +392,11 @@ export class TimetableService {
     }
   }
 
-  // ──────────────── Generate ────────────────
+  // ──────────────── Generate (F33, F41, F42) ────────────────
   async generate(academicYear: string, semester: number, dynamicConstraints: any[] | undefined, user: AuthUser) {
     let settingsQuery = this.supabase.admin
       .from('campus_settings')
-      .select('deadline, academic_year')
+      .select('deadline, academic_year, timetable_constraints')
 
     if (user.campus_id) {
       settingsQuery = settingsQuery.eq('campus_id', user.campus_id)
@@ -334,18 +404,70 @@ export class TimetableService {
 
     const { data: campusSettings } = await settingsQuery.maybeSingle()
 
+    // Guard F41: Closed registration window precondition
     if (campusSettings?.deadline) {
       const deadline = new Date(campusSettings.deadline)
       if (new Date() < deadline) {
         throw new BadRequestException(
-          `Registration window is still open until ${deadline.toLocaleString('en-IN')}. Please close registrations before generating timetable.`,
+          `Registration window is still open until ${deadline.toLocaleString('en-IN')}. Please close registrations before generating timetable (F41).`,
         )
+      }
+    } else {
+      throw new BadRequestException(
+        'Campus registration window deadline is not configured. Registrations must be closed before generation (F41).',
+      )
+    }
+
+    // Guard F41: Completed course allocation precondition (Plan 05)
+    let allocQuery = this.supabase.admin
+      .from('allocation_runs')
+      .select('id, status')
+      .eq('academic_year', academicYear)
+      .eq('semester', semester)
+      .eq('status', 'completed')
+
+    if (user.campus_id) {
+      allocQuery = allocQuery.eq('campus_id', user.campus_id)
+    }
+
+    const { data: completedAllocationRuns } = await allocQuery
+    if (!completedAllocationRuns || completedAllocationRuns.length === 0) {
+      throw new BadRequestException(
+        `Timetable generation requires a completed course allocation run for ${academicYear} Semester ${semester} (Plan 05 / F41). Complete allocation before scheduling.`,
+      )
+    }
+
+    // Guard F33: Immutable publication check — never regenerate if published timetable exists
+    let pubCheckQuery = this.supabase.admin
+      .from('timetable_entries')
+      .select('id')
+      .eq('academic_year', academicYear)
+      .eq('semester', semester)
+      .eq('status', 'published')
+      .limit(1)
+
+    if (user.campus_id) {
+      const { data: depts } = await this.supabase.admin
+        .from('departments')
+        .select('id')
+        .eq('campus_id', user.campus_id)
+      const deptIds = (depts || []).map((d: any) => d.id)
+      if (deptIds.length > 0) {
+        pubCheckQuery = pubCheckQuery.in('department_id', deptIds)
       }
     }
 
+    const { data: publishedEntries } = await pubCheckQuery
+    if (publishedEntries && publishedEntries.length > 0) {
+      throw new BadRequestException(
+        `Cannot regenerate timetable: A published timetable already exists for ${academicYear} Semester ${semester}. Published timetables are strictly immutable (F33).`,
+      )
+    }
+
+    // F42: Check for existing job and handle stale worker recovery
     let jobQuery = this.supabase.admin
       .from('timetable_generation_jobs')
-      .select('id, status')
+      .select('id, status, updated_at, created_at')
       .eq('academic_year', academicYear)
       .eq('semester', semester)
       .in('status', ['queued', 'running'])
@@ -356,7 +478,21 @@ export class TimetableService {
 
     const { data: existingJob } = await jobQuery.maybeSingle()
     if (existingJob) {
-      throw new BadRequestException('A timetable generation job is already running for this semester.')
+      const lastActive = new Date(existingJob.updated_at || existingJob.created_at).getTime()
+      const now = Date.now()
+      const isExpired = now - lastActive > 10 * 60 * 1000 // 10 minutes lease timeout
+      if (isExpired) {
+        await this.supabase.admin
+          .from('timetable_generation_jobs')
+          .update({
+            status: 'failed',
+            error_message: 'Previous worker lease expired due to inactivity or backend restart (F42 recovery).',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', existingJob.id)
+      } else {
+        throw new BadRequestException('A timetable generation job is currently running for this semester.')
+      }
     }
 
     const { data: newJob, error: insertError } = await this.supabase.admin
@@ -379,7 +515,7 @@ export class TimetableService {
 
     const redis = getRedisClient()
 
-    // Run the background generation job
+    // Run the background generation job using local OR-Tools CP-SAT solver
     runGenerationJob(
       newJob.id,
       academicYear,
@@ -389,6 +525,7 @@ export class TimetableService {
       redis,
       user.campus_id ?? undefined,
       dynamicConstraints || [],
+      campusSettings?.timetable_constraints || undefined,
     ).catch(async (err: any) => {
       this.serverLogger.error(
         `Background generation job error for job ${newJob.id}`,
@@ -425,9 +562,99 @@ export class TimetableService {
       success: true,
       jobId: newJob.id,
       status: 'queued',
-      message: 'Timetable generation job initiated',
+      message: 'Timetable generation job initiated with OR-Tools CP-SAT solver',
       academicYear,
       semester,
+    }
+  }
+
+  // ──────────────── Teacher Substitution (F33, F37) ────────────────
+  async substituteTeacher(entryId: string, newTeacherId: string, user: AuthUser) {
+    const { data: entry, error: entryErr } = await this.supabase.admin
+      .from('timetable_entries')
+      .select(`
+        id,
+        academic_year,
+        semester,
+        department_id,
+        course_id,
+        time_slot_id,
+        status,
+        teacher_id,
+        time_slots (
+          id,
+          day_of_week,
+          period_number
+        ),
+        departments (
+          id,
+          campus_id
+        )
+      `)
+      .eq('id', entryId)
+      .single()
+
+    if (entryErr || !entry) {
+      throw new NotFoundException(`Timetable entry ${entryId} not found`)
+    }
+
+    if (user.role === 'campus_director' && (entry as any).departments?.campus_id !== user.campus_id) {
+      throw new ForbiddenException('Campus directors can only assign teachers to entries within their own campus')
+    }
+    if (user.role === 'hod' && entry.department_id !== user.department_id) {
+      throw new ForbiddenException('HODs can only assign teachers to entries within their own department')
+    }
+
+    const slot = (entry as any).time_slots
+
+    // F37: Global Teacher Clash Check across all campuses and semesters for this academic year
+    if (newTeacherId) {
+      const { data: conflicts, error: clashErr } = await this.supabase.admin
+        .from('timetable_entries')
+        .select('id, course_id, academic_year, semester, department_id, status')
+        .eq('teacher_id', newTeacherId)
+        .eq('academic_year', entry.academic_year)
+        .eq('time_slot_id', entry.time_slot_id)
+        .neq('id', entryId)
+
+      if (clashErr) {
+        this.serverLogger.warn(`[substituteTeacher clashErr]: ${clashErr.message}`)
+      }
+
+      if (conflicts && conflicts.length > 0) {
+        throw new BadRequestException(
+          `Teacher ${newTeacherId} already has a scheduled class at Day ${slot?.day_of_week} Period ${slot?.period_number} in Semester ${conflicts[0].semester} (F37 shared-teacher clash).`,
+        )
+      }
+    }
+
+    // F33: Update teacher_id in place, preserving entry identity, class identity and attendance
+    const { error: updateErr } = await this.supabase.admin
+      .from('timetable_entries')
+      .update({
+        teacher_id: newTeacherId || null,
+      })
+      .eq('id', entryId)
+
+    if (updateErr) {
+      throw new InternalServerErrorException(`Failed to update assigned teacher: ${updateErr.message}`)
+    }
+
+    await this.auditLogger.log({
+      eventType: AuditEvents.TIMETABLE_GENERATED,
+      userId: user.userId,
+      userRole: user.role,
+      action: `assigned teacher ${newTeacherId} to timetable entry ${entryId} (F33/F37)`,
+      resourceType: 'timetable',
+      status: 'success',
+      metadata: { entryId, newTeacherId, academicYear: entry.academic_year, semester: entry.semester },
+    })
+
+    return {
+      success: true,
+      message: 'Teacher assigned successfully without modifying timetable session structure',
+      entryId,
+      teacherId: newTeacherId,
     }
   }
 

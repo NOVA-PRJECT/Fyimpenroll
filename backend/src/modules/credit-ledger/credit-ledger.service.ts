@@ -8,12 +8,18 @@ import {
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuthUser } from '../../core/auth/types'
 import {
+  ADVISORY_MATRIX_VERSION,
+  ADVISORY_CREDIT_DISCLAIMER,
+  UNRESOLVED_REQUIREMENT_NOTE,
   CATEGORY_REQUIREMENTS,
   LEVEL_BAND_REQUIREMENTS,
+  ADVISORY_DEGREE_EXIT_TARGETS,
   DEGREE_EXIT_THRESHOLDS,
+  LevelBandKey,
+  parseKuCourseCode,
 } from './credit-ledger.constants'
 
-export type LevelBandKey = '100s' | '200s' | '300s' | '400s' | '500s' | 'Other'
+export { LevelBandKey }
 
 export interface RegisteredCourseItem {
   id: string
@@ -23,6 +29,7 @@ export interface RegisteredCourseItem {
   category: string
   normalizedCategory: string
   levelBand: LevelBandKey
+  isAdditional?: boolean
   departmentId: string
   departmentName: string
   semester: number
@@ -35,21 +42,11 @@ export class CreditLedgerService {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
-   * Extracts the numeric portion of the course code and derives the level band
-   * based on its first digit (KU-FYIMP Regulation 2024 Section 13.2).
+   * Extracts the academic level band by parsing course code components explicitly (F51).
+   * Does NOT inspect leading digit of semester prefix.
    */
-  deriveLevelBand(courseCode: string): LevelBandKey {
-    if (!courseCode) return 'Other'
-    const digits = courseCode.replace(/\D/g, '')
-    if (!digits) return 'Other'
-
-    const firstDigit = digits[0]
-    if (firstDigit === '1') return '100s'
-    if (firstDigit === '2') return '200s'
-    if (firstDigit === '3') return '300s'
-    if (firstDigit === '4') return '400s'
-    if (firstDigit === '5') return '500s'
-    return 'Other'
+  deriveLevelBand(courseCode: string, explicitLevel?: string | null): LevelBandKey {
+    return parseKuCourseCode(courseCode, explicitLevel).derivedLevelBand
   }
 
   /**
@@ -93,7 +90,7 @@ export class CreditLedgerService {
   }
 
   /**
-   * Computes the complete credit ledger for a student with access scoping.
+   * Computes the complete registered-credit ledger for a student with access scoping (F50, F51, F52).
    */
   async getCreditLedger(targetStudentId: string, user: AuthUser) {
     // 1. Fetch target student profile
@@ -211,25 +208,43 @@ export class CreditLedgerService {
     }
 
     // 4. Collect registered course IDs across flat slots (1-8) and selections JSONB
-    // Pair each course ID with the semester it was taken in
+    // Pair each course ID with semester, core vs additional flag, and registration-time credit snapshots (F50)
     const courseSemesterMap = new Map<string, number>()
     const courseIdSet = new Set<string>()
+    const coreCourseIdSet = new Set<string>()
+    const additionalCourseIdSet = new Set<string>()
+    const creditSnapshotMap = new Map<string, number>()
 
     for (const reg of registrations || []) {
       const sem = reg.semester
-      // A. Check flat slot columns 1 to 8
-      for (let i = 1; i <= 8; i++) {
+
+      // Slots 1 to 6 are Core slots
+      for (let i = 1; i <= 6; i++) {
         const slotKey = `slot_${i}_course_id` as keyof typeof reg
         const courseId = reg[slotKey] as string | null
         if (courseId) {
           courseIdSet.add(courseId)
+          coreCourseIdSet.add(courseId)
           if (!courseSemesterMap.has(courseId)) {
             courseSemesterMap.set(courseId, sem)
           }
         }
       }
 
-      // B. Check selections JSONB (array or { courses: [...] })
+      // Slots 7 and 8 are Additional / Elective papers
+      for (let i = 7; i <= 8; i++) {
+        const slotKey = `slot_${i}_course_id` as keyof typeof reg
+        const courseId = reg[slotKey] as string | null
+        if (courseId) {
+          courseIdSet.add(courseId)
+          additionalCourseIdSet.add(courseId)
+          if (!courseSemesterMap.has(courseId)) {
+            courseSemesterMap.set(courseId, sem)
+          }
+        }
+      }
+
+      // Selections JSONB (preserves registration-time credit snapshots and slot numbers)
       const rawSelections = (reg as any).selections
       const selectedList = Array.isArray(rawSelections)
         ? rawSelections
@@ -243,6 +258,17 @@ export class CreditLedgerService {
           courseIdSet.add(cid)
           if (!courseSemesterMap.has(cid)) {
             courseSemesterMap.set(cid, sem)
+          }
+
+          if (typeof item === 'object') {
+            if (item.credits != null && !isNaN(Number(item.credits))) {
+              creditSnapshotMap.set(cid, Number(item.credits))
+            }
+            if (item.slot != null && Number(item.slot) >= 7) {
+              additionalCourseIdSet.add(cid)
+            } else if (item.slot != null && Number(item.slot) <= 6) {
+              coreCourseIdSet.add(cid)
+            }
           }
         }
       }
@@ -261,6 +287,7 @@ export class CreditLedgerService {
           title,
           credits,
           category,
+          academic_level,
           department_id,
           departments ( id, name )
         `)
@@ -272,29 +299,43 @@ export class CreditLedgerService {
       courseRecords = courses || []
     }
 
-    // 6. Build the registered courses list
+    // 6. Build the registered courses list with parsed levels and core/additional tags (F50, F51)
     const registeredCourses: RegisteredCourseItem[] = courseRecords.map((c) => {
-      const levelBand = this.deriveLevelBand(c.course_code)
+      const levelBand = this.deriveLevelBand(c.course_code, c.academic_level)
       const normalizedCategory = this.normalizeCategory(c.category, c.course_code, c.title)
       const sem = courseSemesterMap.get(c.id) || 1
       const deptName = (c.departments as any)?.name || 'General'
+
+      // Use registration-time credit snapshot if present, otherwise fall back to catalog value (F50)
+      const snapshotCredits = creditSnapshotMap.get(c.id)
+      const credits = (snapshotCredits != null && !isNaN(snapshotCredits)) ? snapshotCredits : (Number(c.credits) || 0)
+      const isAdditional = additionalCourseIdSet.has(c.id) && !coreCourseIdSet.has(c.id)
 
       return {
         id: c.id,
         courseCode: c.course_code,
         title: c.title,
-        credits: Number(c.credits) || 0,
+        credits,
         category: c.category || 'General',
         normalizedCategory,
         levelBand,
+        isAdditional,
         departmentId: c.department_id,
         departmentName: deptName,
         semester: sem,
       }
     })
 
-    // 7. Aggregate Total Credits
-    const totalCredits = registeredCourses.reduce((acc, c) => acc + c.credits, 0)
+    // 7. Aggregate Total, Core and Additional Registered Credits (F50)
+    const coreCredits = registeredCourses
+      .filter((c) => !c.isAdditional)
+      .reduce((acc, c) => acc + c.credits, 0)
+
+    const additionalCredits = registeredCourses
+      .filter((c) => c.isAdditional)
+      .reduce((acc, c) => acc + c.credits, 0)
+
+    const totalCredits = coreCredits + additionalCredits
 
     // 8. Aggregate Category Breakdown
     const catCreditsMap = new Map<string, number>()
@@ -306,44 +347,72 @@ export class CreditLedgerService {
     const categoryKeys = Object.keys(CATEGORY_REQUIREMENTS) as (keyof typeof CATEGORY_REQUIREMENTS)[]
     const categories = categoryKeys.map((catKey) => {
       const req = CATEGORY_REQUIREMENTS[catKey]
-      const earned = catCreditsMap.get(catKey) || 0
-      const shortfall3Year = Math.max(0, req.min3Year - earned)
-      const shortfall4Year = Math.max(0, req.min4Year - earned)
+      const registered = catCreditsMap.get(catKey) || 0
+      const shortfall3Year = Math.max(0, req.min3Year - registered)
+      const shortfall4Year = Math.max(0, req.min4Year - registered)
       return {
         category: catKey,
         title: req.name,
-        earned,
+        registeredCredits: registered,
+        earned: registered, // Backward-compatible alias
         min3Year: req.min3Year,
         min4Year: req.min4Year,
         shortfall3Year,
         shortfall4Year,
-        isMet3Year: (req.min3Year as number) <= 0 || earned >= req.min3Year,
-        isMet4Year: (req.min4Year as number) <= 0 || earned >= req.min4Year,
+        isMet3Year: (req.min3Year as number) <= 0 || registered >= req.min3Year,
+        isMet4Year: (req.min4Year as number) <= 0 || registered >= req.min4Year,
+        advisoryStatus: registered >= req.min3Year ? 'meets_benchmark' : 'in_progress',
       }
     })
 
-    // 9. Aggregate Level Band Breakdown
+    // 9. Aggregate Level Band Breakdown (F51: includes 100s, 200s, 300s, 400s, 500s, Unknown)
     const bandCreditsMap = new Map<string, number>()
     for (const c of registeredCourses) {
       const current = bandCreditsMap.get(c.levelBand) || 0
       bandCreditsMap.set(c.levelBand, current + c.credits)
     }
 
-    const levelBands = (Object.keys(LEVEL_BAND_REQUIREMENTS) as (keyof typeof LEVEL_BAND_REQUIREMENTS)[]).map(
+    const levelBands: Array<{
+      band: LevelBandKey
+      title: string
+      registeredCredits: number
+      earned: number
+      minimum: number
+      shortfall: number
+      isMet: boolean
+      advisoryStatus: string
+    }> = (Object.keys(LEVEL_BAND_REQUIREMENTS) as (keyof typeof LEVEL_BAND_REQUIREMENTS)[]).map(
       (bandKey) => {
         const req = LEVEL_BAND_REQUIREMENTS[bandKey]
-        const earned = bandCreditsMap.get(bandKey) || 0
-        const shortfall = Math.max(0, req.min - earned)
+        const registered = bandCreditsMap.get(bandKey) || 0
+        const shortfall = Math.max(0, req.min - registered)
         return {
           band: bandKey,
           title: req.name,
-          earned,
+          registeredCredits: registered,
+          earned: registered, // Backward-compatible alias
           minimum: req.min,
           shortfall,
-          isMet: earned >= req.min,
+          isMet: registered >= req.min,
+          advisoryStatus: registered >= req.min ? 'meets_benchmark' : 'in_progress',
         }
       }
     )
+
+    // Include Unknown level band if any courses were unclassified
+    const unknownCredits = bandCreditsMap.get('Unknown') || 0
+    if (unknownCredits > 0) {
+      levelBands.push({
+        band: 'Unknown' as any,
+        title: 'Unclassified / Non-Standard Level',
+        registeredCredits: unknownCredits,
+        earned: unknownCredits,
+        minimum: 0,
+        shortfall: 0,
+        isMet: true,
+        advisoryStatus: 'meets_benchmark',
+      })
+    }
 
     // 10. Aggregate Department Distribution
     const deptMap = new Map<string, { departmentId: string; departmentName: string; earned: number; count: number }>()
@@ -365,47 +434,47 @@ export class CreditLedgerService {
 
     const byDepartment = Array.from(deptMap.values()).sort((a, b) => b.earned - a.earned)
 
-    // 11. Exit Eligibility Computation
-    // 3-Year Exit
+    // 11. Advisory Exit Benchmark Progress (F50, F52: Advisory, not certification)
+    // 3-Year Exit Benchmark
     const unmetCat3Year: string[] = []
     for (const cat of categories) {
       if (cat.min3Year > 0 && !cat.isMet3Year) {
-        unmetCat3Year.push(`${cat.category} (${cat.shortfall3Year} credits short)`)
+        unmetCat3Year.push(`${cat.category} (${cat.shortfall3Year} credits to benchmark)`)
       }
     }
     const unmetBands3Year: string[] = []
     for (const band of levelBands) {
       if (['100s', '200s', '300s'].includes(band.band) && !band.isMet) {
-        unmetBands3Year.push(`${band.band} (${band.shortfall} credits short)`)
+        unmetBands3Year.push(`${band.band} (${band.shortfall} credits to benchmark)`)
       }
     }
-    const totalShortfall3Year = Math.max(0, DEGREE_EXIT_THRESHOLDS.THREE_YEAR_UG.creditsRequired - totalCredits)
+    const totalShortfall3Year = Math.max(0, ADVISORY_DEGREE_EXIT_TARGETS.THREE_YEAR_UG.targetCredits - totalCredits)
     const eligible3Year = totalShortfall3Year === 0 && unmetCat3Year.length === 0 && unmetBands3Year.length === 0
 
-    // 4-Year Exit
+    // 4-Year Exit Benchmark
     const unmetCat4Year: string[] = []
     for (const cat of categories) {
       if (cat.min4Year > 0 && !cat.isMet4Year) {
-        unmetCat4Year.push(`${cat.category} (${cat.shortfall4Year} credits short)`)
+        unmetCat4Year.push(`${cat.category} (${cat.shortfall4Year} credits to benchmark)`)
       }
     }
     const unmetBands4Year: string[] = []
     for (const band of levelBands) {
       if (['100s', '200s', '300s', '400s'].includes(band.band) && !band.isMet) {
-        unmetBands4Year.push(`${band.band} (${band.shortfall} credits short)`)
+        unmetBands4Year.push(`${band.band} (${band.shortfall} credits to benchmark)`)
       }
     }
-    const totalShortfall4Year = Math.max(0, DEGREE_EXIT_THRESHOLDS.FOUR_YEAR_HONOURS.creditsRequired - totalCredits)
+    const totalShortfall4Year = Math.max(0, ADVISORY_DEGREE_EXIT_TARGETS.FOUR_YEAR_HONOURS.targetCredits - totalCredits)
     const eligible4Year = totalShortfall4Year === 0 && unmetCat4Year.length === 0 && unmetBands4Year.length === 0
 
-    // 5-Year Integrated PG Exit
+    // 5-Year Integrated PG Exit Benchmark
     const unmetCat5Year = [...unmetCat4Year]
     const unmetBands5Year = [...unmetBands4Year]
     const band500 = levelBands.find((b) => b.band === '500s')
     if (band500 && !band500.isMet) {
-      unmetBands5Year.push(`500s (${band500.shortfall} credits short)`)
+      unmetBands5Year.push(`500s (${band500.shortfall} credits to benchmark)`)
     }
-    const totalShortfall5Year = Math.max(0, DEGREE_EXIT_THRESHOLDS.FIVE_YEAR_INTEGRATED_PG.creditsRequired - totalCredits)
+    const totalShortfall5Year = Math.max(0, ADVISORY_DEGREE_EXIT_TARGETS.FIVE_YEAR_INTEGRATED_PG.targetCredits - totalCredits)
     const eligible5Year = totalShortfall5Year === 0 && unmetCat5Year.length === 0 && unmetBands5Year.length === 0
 
     return {
@@ -419,58 +488,76 @@ export class CreditLedgerService {
         departmentCode: (student.departments as any)?.code || '',
         campusName: (student.campuses as any)?.name || 'Unknown',
       },
+      advisoryMatrixVersion: ADVISORY_MATRIX_VERSION,
+      disclaimer: ADVISORY_CREDIT_DISCLAIMER,
+      unresolvedRequirementNote: UNRESOLVED_REQUIREMENT_NOTE,
       totalCredits,
+      totalRegisteredCredits: totalCredits,
+      coreCredits,
+      additionalCredits,
       categories,
       levelBands,
       byDepartment,
       exitEligibility: {
         threeYear: {
-          title: DEGREE_EXIT_THRESHOLDS.THREE_YEAR_UG.title,
+          title: ADVISORY_DEGREE_EXIT_TARGETS.THREE_YEAR_UG.title,
           eligible: eligible3Year,
+          advisoryEligible: eligible3Year,
           totalCredits,
-          requiredCredits: DEGREE_EXIT_THRESHOLDS.THREE_YEAR_UG.creditsRequired,
+          registeredCredits: totalCredits,
+          requiredCredits: ADVISORY_DEGREE_EXIT_TARGETS.THREE_YEAR_UG.targetCredits,
+          targetCredits: ADVISORY_DEGREE_EXIT_TARGETS.THREE_YEAR_UG.targetCredits,
           totalShortfall: totalShortfall3Year,
           unmetCategories: unmetCat3Year,
           unmetBands: unmetBands3Year,
           primaryShortfall: totalShortfall3Year > 0
-            ? `${totalShortfall3Year} credits short`
+            ? `${totalShortfall3Year} credits to benchmark`
             : unmetCat3Year.length > 0
               ? unmetCat3Year[0]
               : unmetBands3Year.length > 0
                 ? unmetBands3Year[0]
-                : 'Eligible for 3-Year UG Exit',
+                : 'Meets 3-Year UG Credit Benchmark (Advisory)',
+          statusNote: 'Advisory assessment only. Final degree award requires University examination clearance.',
         },
         fourYear: {
-          title: DEGREE_EXIT_THRESHOLDS.FOUR_YEAR_HONOURS.title,
+          title: ADVISORY_DEGREE_EXIT_TARGETS.FOUR_YEAR_HONOURS.title,
           eligible: eligible4Year,
+          advisoryEligible: eligible4Year,
           totalCredits,
-          requiredCredits: DEGREE_EXIT_THRESHOLDS.FOUR_YEAR_HONOURS.creditsRequired,
+          registeredCredits: totalCredits,
+          requiredCredits: ADVISORY_DEGREE_EXIT_TARGETS.FOUR_YEAR_HONOURS.targetCredits,
+          targetCredits: ADVISORY_DEGREE_EXIT_TARGETS.FOUR_YEAR_HONOURS.targetCredits,
           totalShortfall: totalShortfall4Year,
           unmetCategories: unmetCat4Year,
           unmetBands: unmetBands4Year,
           primaryShortfall: totalShortfall4Year > 0
-            ? `${totalShortfall4Year} credits short`
+            ? `${totalShortfall4Year} credits to benchmark`
             : unmetCat4Year.length > 0
               ? unmetCat4Year[0]
               : unmetBands4Year.length > 0
                 ? unmetBands4Year[0]
-                : 'Eligible for 4-Year Honours Exit',
+                : 'Meets 4-Year Honours Credit Benchmark (Advisory)',
+          statusNote: 'Advisory assessment only. Final degree award requires University examination clearance.',
         },
         fiveYear: {
-          title: DEGREE_EXIT_THRESHOLDS.FIVE_YEAR_INTEGRATED_PG.title,
+          title: ADVISORY_DEGREE_EXIT_TARGETS.FIVE_YEAR_INTEGRATED_PG.title,
           eligible: eligible5Year,
+          advisoryEligible: eligible5Year,
           totalCredits,
-          requiredCredits: DEGREE_EXIT_THRESHOLDS.FIVE_YEAR_INTEGRATED_PG.creditsRequired,
+          registeredCredits: totalCredits,
+          requiredCredits: ADVISORY_DEGREE_EXIT_TARGETS.FIVE_YEAR_INTEGRATED_PG.targetCredits,
+          targetCredits: ADVISORY_DEGREE_EXIT_TARGETS.FIVE_YEAR_INTEGRATED_PG.targetCredits,
           totalShortfall: totalShortfall5Year,
           unmetCategories: unmetCat5Year,
           unmetBands: unmetBands5Year,
           primaryShortfall: totalShortfall5Year > 0
-            ? `${totalShortfall5Year} credits short`
+            ? `${totalShortfall5Year} credits to benchmark`
             : unmetCat5Year.length > 0
               ? unmetCat5Year[0]
               : unmetBands5Year.length > 0
                 ? unmetBands5Year[0]
-                : 'Eligible for 5-Year Integrated PG Exit',
+                : 'Meets 5-Year Integrated PG Credit Benchmark (Advisory)',
+          statusNote: 'Advisory assessment only. Final degree award requires University examination clearance.',
         },
       },
       registeredCourses,

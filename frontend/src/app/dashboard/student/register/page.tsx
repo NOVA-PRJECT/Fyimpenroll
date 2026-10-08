@@ -409,20 +409,25 @@ export default function RegisterPage() {
     setPageState('loading_slots')
     setError('')
 
-    const response = await fetch(
-      `/api/registrations/pathway-slots?pathway_id=${encodeURIComponent(pathwayId)}`,
-    )
-    const data = await response.json()
+    try {
+      const response = await fetch(
+        `/api/registrations/pathway-slots?pathway_id=${encodeURIComponent(pathwayId)}`,
+      )
+      const data = await response.json().catch(() => ({}))
 
-    if (!response.ok) {
-      setError(data.error ?? 'Failed to load pathway courses.')
+      if (!response.ok) {
+        setError(data.error ?? data.message ?? 'Failed to load pathway courses.')
+        setPageState('pathway_picker')
+        return
+      }
+
+      const slots = data.data?.slots as BlueprintSlot[]
+      setResolvedSlots(slots || [])
+      setPageState('ready')
+    } catch (err: any) {
+      setError(err?.message || 'Network error while loading pathway courses. Please try again.')
       setPageState('pathway_picker')
-      return
     }
-
-    const slots = data.data.slots as BlueprintSlot[]
-    setResolvedSlots(slots)
-    setPageState('ready')
   }
 
   // Build active slots list: base blueprint slots (1-6) + optional minor slots (7, 8)
@@ -654,38 +659,56 @@ export default function RegisterPage() {
     setPageState('submitting')
     setError('')
 
-    const response = await fetch('/api/registrations/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        semester: Number(studentInfo?.current_semester || 1),
-        pathway_id: selectedPathwayId,
-        preferences: preferencesPayload,
-      }),
-    })
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sub-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
-    const data = await response.json()
+    try {
+      const response = await fetch('/api/registrations/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          semester: Number(studentInfo?.current_semester || 1),
+          pathway_id: selectedPathwayId,
+          preferences: preferencesPayload,
+        }),
+      })
 
-    if (!response.ok) {
-      const errMsg = data.message || data.error || 'Submission failed. Please try again.'
-      setError(errMsg)
-      setPageState('ready')
-      return
-    }
+      const data = await response.json().catch(() => ({}))
 
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.removeItem('fyimp_student_summary')
-      } catch {
-        // Ignore storage error
+      if (!response.ok) {
+        const errMsg = data.message || data.error || `Submission failed (HTTP ${response.status}). Please try again.`
+        setError(errMsg)
+        if (response.status === 403 && (errMsg.toLowerCase().includes('closed') || errMsg.toLowerCase().includes('window'))) {
+          setWindowIsOpen(false)
+          setPageState('closed')
+        } else {
+          setPageState('ready')
+        }
+        return
       }
-    }
 
-    setSuccessMsg(data.message || 'Course preferences successfully saved!')
-    setPageState('submitted')
-    setTimeout(() => {
-      router.push('/dashboard/student')
-    }, 1500)
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('fyimp_student_summary')
+        } catch {
+          // Ignore storage error
+        }
+      }
+
+      setSuccessMsg(data.message || 'Course preferences successfully saved!')
+      setPageState('submitted')
+      setTimeout(() => {
+        router.push('/dashboard/student')
+      }, 1500)
+    } catch (err: any) {
+      const msg = err?.message || 'Network connection failed. Your course preferences have been preserved. Please check your connection and click Submit again.'
+      setError(msg)
+      setPageState('ready')
+    }
   }
 
   async function handleLogout() {

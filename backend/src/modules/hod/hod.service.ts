@@ -872,34 +872,53 @@ export class HodService {
     }
 
     const courseTitleMap = new Map<string, string>()
+    const courseCreditsMap = new Map<string, number>()
     if (allCourseIds.size > 0) {
       const { data: courseList } = await this.supabase.admin
         .from('courses')
-        .select('id, title, course_code')
+        .select('id, title, course_code, credits')
         .in('id', Array.from(allCourseIds))
       for (const c of courseList ?? []) {
         courseTitleMap.set(c.id, `${c.title} (${c.course_code})`)
+        courseCreditsMap.set(c.id, Number(c.credits) || 0)
       }
     }
 
     const rows = (registrations ?? []).map((reg: any) => {
       const student = reg.students
       const papers: string[] = []
-      for (let i = 1; i <= 6; i++) {
+      let coreCredits = 0
+      let additionalCredits = 0
+
+      for (let i = 1; i <= 8; i++) {
         const cid = reg[`slot_${i}_course_id`]
         if (cid && courseTitleMap.has(cid)) {
           papers.push(courseTitleMap.get(cid)!)
+          const cr = courseCreditsMap.get(cid) || 0
+          if (i <= 6) coreCredits += cr
+          else additionalCredits += cr
+        } else {
+          papers.push('')
         }
       }
-      if (papers.length === 0) {
+
+      // If flat slots were empty, check selections JSONB
+      if (papers.every((p) => !p)) {
         const rawSel = reg.selections
         const list = Array.isArray(rawSel) ? rawSel : Array.isArray(rawSel?.courses) ? rawSel.courses : []
-        for (const item of list) {
+        list.forEach((item: any, idx: number) => {
           const cid = typeof item === 'string' ? item : item?.id || item?.course_id
           const title = item?.title || (cid ? courseTitleMap.get(cid) : '')
-          if (title) papers.push(title)
-        }
+          if (idx < 8) {
+            papers[idx] = title || ''
+            const cr = Number(item?.credits) || (cid ? courseCreditsMap.get(cid) : 0) || 0
+            if (idx < 6) coreCredits += cr
+            else additionalCredits += cr
+          }
+        })
       }
+
+      const totalCredits = Number(reg.total_credits) || (coreCredits + additionalCredits)
 
       return {
         name: student?.full_name ?? '—',
@@ -910,6 +929,11 @@ export class HodService {
         paper_4: papers[3] ?? '',
         paper_5: papers[4] ?? '',
         paper_6: papers[5] ?? '',
+        paper_7: papers[6] ?? '',
+        paper_8: papers[7] ?? '',
+        core_credits: coreCredits,
+        additional_credits: additionalCredits,
+        total_credits: totalCredits,
       }
     })
 

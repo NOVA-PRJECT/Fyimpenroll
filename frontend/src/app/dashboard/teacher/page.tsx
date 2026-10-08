@@ -58,6 +58,9 @@ interface PeriodSlot {
   total_enrolled: number
   present_count: number
   absent_count: number
+  is_lab_block?: boolean
+  session_type?: string
+  adjacent_practical_slot_id?: string | null
 }
 
 interface WeeklyTimetableEntry {
@@ -243,6 +246,8 @@ export default function TeacherDashboard() {
   const [absentStudentIds, setAbsentStudentIds] = useState<Set<string>>(new Set())
   const [submittingAttendance, setSubmittingAttendance] = useState(false)
   const [markingError, setMarkingError] = useState('')
+  const [lastMarkedAt, setLastMarkedAt] = useState<string | null>(null)
+  const [copyingPractical, setCopyingPractical] = useState<string | null>(null)
 
   // Tab 2: Assigned Papers & Rosters State
   const [assignedCourses, setAssignedCourses] = useState<Course[]>([])
@@ -361,20 +366,31 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Open Marking Modal for a slot
+  // Open Marking Modal for a slot (F47, F48: Loads persisted marks for scheduleDate)
   async function handleOpenMarkingModal(slot: PeriodSlot) {
     setActiveSlotForMarking(slot)
     setMarkingError('')
     setLoadingMarkingRoster(true)
     setAbsentStudentIds(new Set())
+    setLastMarkedAt(null)
 
     try {
-      const res = await fetch(`/api/faculty/attendance?course_id=${slot.course_id}`)
+      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`)
       const data = await res.json()
       if (res.ok && data.students) {
         setMarkingRoster(data.students)
+        setLastMarkedAt(data.last_marked_at || null)
+
+        // Preserve already marked absent students (F47)
+        const absents = new Set<string>()
+        for (const s of data.students) {
+          if (s.status === 'absent') {
+            absents.add(s.id)
+          }
+        }
+        setAbsentStudentIds(absents)
       } else {
-        setMarkingError(data.error || 'Failed to load enrolled students.')
+        setMarkingError(data.message || data.error || 'Failed to load enrolled students.')
       }
     } catch {
       setMarkingError('Network error while loading roster.')
@@ -404,7 +420,7 @@ export default function TeacherDashboard() {
     setAbsentStudentIds(new Set(markingRoster.map(s => s.id)))
   }
 
-  // Submit Period Attendance
+  // Submit Period Attendance (F48: Send explicit scheduleDate & lastMarkedAt for conflict check)
   async function handleSubmitAttendance() {
     if (!activeSlotForMarking) return
     setSubmittingAttendance(true)
@@ -416,18 +432,22 @@ export default function TeacherDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timetable_slot_id: activeSlotForMarking.timetable_slot_id,
+          attendance_date: scheduleDate,
           absent_student_ids: Array.from(absentStudentIds),
+          last_marked_at: lastMarkedAt || undefined,
           client_timestamp: new Date().toISOString(),
         }),
       })
 
       const result = await res.json()
       if (res.ok) {
-        setGlobalSuccess(`✓ Period ${activeSlotForMarking.period_number} attendance submitted successfully!`)
+        setGlobalSuccess(`✓ Period ${activeSlotForMarking.period_number} attendance for ${scheduleDate} saved successfully!`)
         setActiveSlotForMarking(null)
         // Refresh schedule to update marked badge and counts
         await fetchTeacherSchedule(scheduleDate)
         setTimeout(() => setGlobalSuccess(''), 4000)
+      } else if (res.status === 409) {
+        setMarkingError(result.message || 'Concurrent edit detected. Another teacher modified this record.')
       } else {
         setMarkingError(result.message || 'Failed to submit period attendance.')
       }
@@ -435,6 +455,58 @@ export default function TeacherDashboard() {
       setMarkingError('Network error while submitting attendance.')
     } finally {
       setSubmittingAttendance(false)
+    }
+  }
+
+  // Copy Practical Attendance to Next Period (F49)
+  async function handleCopyPractical(period: PeriodSlot) {
+    if (!period.adjacent_practical_slot_id) return
+    setCopyingPractical(period.timetable_slot_id)
+    try {
+      let res = await fetch('/api/attendance/period/copy-to-next-period', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_slot_id: period.timetable_slot_id,
+          target_slot_id: period.adjacent_practical_slot_id,
+          attendance_date: scheduleDate,
+          overwrite: false,
+        }),
+      })
+
+      if (res.status === 409) {
+        const confirmed = window.confirm(
+          `Next practical period already has attendance marks recorded for ${scheduleDate}. Overwrite existing marks?`
+        )
+        if (confirmed) {
+          res = await fetch('/api/attendance/period/copy-to-next-period', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source_slot_id: period.timetable_slot_id,
+              target_slot_id: period.adjacent_practical_slot_id,
+              attendance_date: scheduleDate,
+              overwrite: true,
+            }),
+          })
+        } else {
+          setCopyingPractical(null)
+          return
+        }
+      }
+
+      const data = await res.json()
+      if (res.ok) {
+        setGlobalSuccess(`✓ Practical attendance copied to Period ${period.period_number + 1} for ${scheduleDate}!`)
+        await fetchTeacherSchedule(scheduleDate)
+        setTimeout(() => setGlobalSuccess(''), 4000)
+      } else {
+        setGlobalError(data.message || 'Failed to copy practical attendance.')
+      }
+    } catch {
+      setGlobalError('Network error while copying practical attendance.')
+    } finally {
+      setCopyingPractical(null)
     }
   }
 
@@ -744,17 +816,37 @@ export default function TeacherDashboard() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        className={`${styles.markAttendanceBtn} ${
-                          period.is_marked
-                            ? styles.markAttendanceBtnMarked
-                            : styles.markAttendanceBtnPending
-                        }`}
-                        onClick={() => handleOpenMarkingModal(period)}
-                      >
-                        {period.is_marked ? '✏️ Update Attendance' : '📝 Mark Attendance Now'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className={`${styles.markAttendanceBtn} ${
+                            period.is_marked
+                              ? styles.markAttendanceBtnMarked
+                              : styles.markAttendanceBtnPending
+                          }`}
+                          onClick={() => handleOpenMarkingModal(period)}
+                        >
+                          {period.is_marked ? '✏️ Update Attendance' : '📝 Mark Attendance Now'}
+                        </button>
+
+                        {period.is_marked && period.adjacent_practical_slot_id && (
+                          <button
+                            type="button"
+                            className={styles.markAttendanceBtn}
+                            style={{
+                              background: '#f0fdf4',
+                              color: '#166534',
+                              border: '1px solid #86efac',
+                            }}
+                            onClick={() => handleCopyPractical(period)}
+                            disabled={copyingPractical === period.timetable_slot_id}
+                          >
+                            {copyingPractical === period.timetable_slot_id
+                              ? 'Copying...'
+                              : `📋 Copy to P${period.period_number + 1}`}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

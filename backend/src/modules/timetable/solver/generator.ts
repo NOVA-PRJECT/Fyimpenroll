@@ -1,7 +1,7 @@
-﻿// generator.ts is now a thin wrapper.
-// All logic lives in ai-generator.ts, validator.ts, and prompt-builder.ts.
+// generator.ts exports the local OR-Tools CP-SAT solver and validator interfaces (Plan 06)
 
-export { runAIGeneration } from './ai-generator';
-export { validateTimetable } from './validator';
+export { runOrtoolsSolver } from './ortools-runner';
+export type { OrtoolsInputPayload, OrtoolsSolverResult, OrtoolsAssignment } from './ortools-runner';
+export { validateTimetable, violationsToText } from './validator';
+export { detectParallelGroups, loadGenerationInput } from './loader';
 export { buildTimetablePrompt } from './prompt-builder';
-export { detectParallelGroups } from './loader';

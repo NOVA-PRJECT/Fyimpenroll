@@ -6,6 +6,7 @@ import styles from './credit-ledger.module.css'
 interface CategoryItem {
   category: string
   title: string
+  registeredCredits?: number
   earned: number
   min3Year: number
   min4Year: number
@@ -13,15 +14,18 @@ interface CategoryItem {
   shortfall4Year: number
   isMet3Year: boolean
   isMet4Year: boolean
+  advisoryStatus?: string
 }
 
 interface LevelBandItem {
   band: string
   title: string
+  registeredCredits?: number
   earned: number
   minimum: number
   shortfall: number
   isMet: boolean
+  advisoryStatus?: string
 }
 
 interface DeptItem {
@@ -34,12 +38,15 @@ interface DeptItem {
 interface ExitMilestone {
   title: string
   eligible: boolean
+  advisoryEligible?: boolean
   totalCredits: number
   requiredCredits: number
+  targetCredits?: number
   totalShortfall: number
   unmetCategories: string[]
   unmetBands: string[]
   primaryShortfall: string
+  statusNote?: string
 }
 
 interface CreditLedgerData {
@@ -53,7 +60,13 @@ interface CreditLedgerData {
     departmentCode: string
     campusName: string
   }
+  advisoryMatrixVersion?: string
+  disclaimer?: string
+  unresolvedRequirementNote?: string
   totalCredits: number
+  totalRegisteredCredits?: number
+  coreCredits?: number
+  additionalCredits?: number
   categories: CategoryItem[]
   levelBands: LevelBandItem[]
   byDepartment: DeptItem[]
@@ -70,6 +83,7 @@ interface CreditLedgerData {
     category: string
     normalizedCategory: string
     levelBand: string
+    isAdditional?: boolean
     departmentName: string
     semester: number
   }>
@@ -144,7 +158,7 @@ export default function CreditLedgerView({
       <div className={styles.container}>
         <div className={styles.loadingContainer}>
           <div className={styles.spinner} />
-          <p>Calculating degree credit ledger from KU-FYIMP regulations...</p>
+          <p>Calculating registered-credit ledger from Kannur University FYIMP regulations...</p>
         </div>
       </div>
     )
@@ -163,31 +177,93 @@ export default function CreditLedgerView({
     )
   }
 
-  const { totalCredits, categories, levelBands, byDepartment, registeredCourses } = data
+  const {
+    totalCredits,
+    coreCredits = totalCredits,
+    additionalCredits = 0,
+    categories,
+    levelBands,
+    byDepartment,
+    registeredCourses,
+    advisoryMatrixVersion = 'KU-FYIMP-2024-V1-ADVISORY',
+    disclaimer,
+    unresolvedRequirementNote,
+  } = data
+
+  const exportUrl = (fmt: 'csv' | 'xlsx') =>
+    `/api/export/credit-ledger/${studentId || 'me'}?format=${fmt}`
 
   return (
     <div className={styles.container}>
       <main className={styles.contentWrapper}>
-        {/* Unified Top Header Card (Merged Top Bar and Overview) */}
+        {/* Top Header Card (F50 Advisory Labeling) */}
         <section className={styles.ledgerHeaderCard}>
           <div className={styles.ledgerHeaderLeft}>
-            <h1 className={styles.ledgerHeaderTitle}>KU-FYIMP Credit Accumulation Ledger</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <h1 className={styles.ledgerHeaderTitle}>KU-FYIMP Registered-Credit Ledger</h1>
+              <span style={{ fontSize: '0.75rem', background: '#dbeafe', color: '#1e40af', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                {advisoryMatrixVersion}
+              </span>
+            </div>
             <p className={styles.ledgerHeaderSub}>
-              Curricular progress evaluated against Calicut University FYIMP Regulation 2024
+              Advisory academic planning ledger evaluated against Kannur University FYIMP Regulation 2024
             </p>
+            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+              <a
+                href={exportUrl('csv')}
+                download
+                className={styles.backBtn}
+                style={{ textDecoration: 'none', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+              >
+                📥 Export CSV
+              </a>
+              <a
+                href={exportUrl('xlsx')}
+                download
+                className={styles.backBtn}
+                style={{ textDecoration: 'none', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+              >
+                📊 Export Excel
+              </a>
+            </div>
           </div>
           <div className={styles.totalCreditsBox}>
-            <div className={styles.totalCreditsLabel}>Total Credits Earned</div>
+            <div className={styles.totalCreditsLabel}>Total Registered Credits</div>
             <div className={styles.totalCreditsValue}>{totalCredits}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+              Core: {coreCredits} cr | Addl: {additionalCredits} cr
+            </div>
           </div>
         </section>
+
+        {/* Advisory Disclaimer Box (F50, F52) */}
+        {disclaimer && (
+          <div style={{
+            background: '#fffbeb',
+            border: '1px solid #fef3c7',
+            borderLeft: '4px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1.25rem',
+            fontSize: '0.85rem',
+            color: '#92400e',
+            lineHeight: 1.45,
+          }}>
+            <strong>Advisory Notice:</strong> {disclaimer}
+            {unresolvedRequirementNote && (
+              <div style={{ marginTop: '0.4rem', color: '#78350f', fontSize: '0.8rem' }}>
+                ℹ️ {unresolvedRequirementNote}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Section 2: Curricular Category Breakdown (Circular Progress Loaders) */}
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
-              <h2 className={styles.sectionTitle}>Curricular Category Breakdown</h2>
-              <p className={styles.sectionSub}>Credits earned across curricular categories with regulation targets</p>
+              <h2 className={styles.sectionTitle}>Curricular Category Breakdown (Advisory Benchmarks)</h2>
+              <p className={styles.sectionSub}>Credits registered across curricular categories with regulation benchmark targets</p>
             </div>
           </div>
 
@@ -247,7 +323,7 @@ export default function CreditLedgerView({
                       </svg>
                       <div className={styles.circleCenter}>
                         <span className={styles.circleCreditNum}>{cat.earned}</span>
-                        <span className={styles.circleCreditUnit}>Credits</span>
+                        <span className={styles.circleCreditUnit}>Reg. Cr</span>
                       </div>
                     </div>
 
@@ -264,12 +340,12 @@ export default function CreditLedgerView({
           </div>
         </section>
 
-        {/* Section 3: Level Band Breakdown Table */}
+        {/* Section 3: Level Band Breakdown Table (F51 Parsed Levels) */}
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
               <h2 className={styles.sectionTitle}>Course Level Band Distribution</h2>
-              <p className={styles.sectionSub}>Derived from course code numeric prefixes (Section 13.2)</p>
+              <p className={styles.sectionSub}>Derived from course code serial components and catalog specifications (F51)</p>
             </div>
           </div>
 
@@ -278,18 +354,18 @@ export default function CreditLedgerView({
               <thead>
                 <tr>
                   <th>Level Band</th>
-                  <th>Prefix Rule</th>
-                  <th>Earned Credits</th>
+                  <th>Level Description</th>
+                  <th>Registered Credits</th>
                 </tr>
               </thead>
               <tbody>
                 {levelBands.map((band) => (
                   <tr key={band.band}>
                     <td>
-                      <strong>{band.title}</strong> ({band.band})
+                      <strong>{band.band}</strong>
                     </td>
                     <td>
-                      <code>First digit: {band.band.charAt(0)}</code>
+                      <span>{band.title}</span>
                     </td>
                     <td>
                       <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{band.earned} Credits</strong>
@@ -305,7 +381,7 @@ export default function CreditLedgerView({
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
-              <h2 className={styles.sectionTitle}>Credits Earned by Academic Department</h2>
+              <h2 className={styles.sectionTitle}>Registered Credits by Academic Department</h2>
               <p className={styles.sectionSub}>Departmental credit distribution from registered coursework</p>
             </div>
           </div>
@@ -343,12 +419,12 @@ export default function CreditLedgerView({
           )}
         </section>
 
-        {/* Section 6: Registered Papers Audit Grid */}
+        {/* Section 5: Registered Papers Audit Grid */}
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
               <h2 className={styles.sectionTitle}>Registered Courses Audit Log</h2>
-              <p className={styles.sectionSub}>Complete inventory of papers evaluated for this credit ledger</p>
+              <p className={styles.sectionSub}>Complete inventory of papers evaluated for this registered-credit ledger</p>
             </div>
           </div>
 
@@ -360,6 +436,8 @@ export default function CreditLedgerView({
                   <th>Code</th>
                   <th>Course Title</th>
                   <th>Category</th>
+                  <th>Level</th>
+                  <th>Track</th>
                   <th>Department</th>
                   <th>Credits</th>
                 </tr>
@@ -375,6 +453,16 @@ export default function CreditLedgerView({
                     </td>
                     <td>{c.title}</td>
                     <td>{c.normalizedCategory}</td>
+                    <td>
+                      <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                        {c.levelBand}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '0.75rem', color: c.isAdditional ? '#b45309' : '#047857' }}>
+                        {c.isAdditional ? 'Additional' : 'Core'}
+                      </span>
+                    </td>
                     <td>{c.departmentName}</td>
                     <td>
                       <strong>{c.credits}</strong>

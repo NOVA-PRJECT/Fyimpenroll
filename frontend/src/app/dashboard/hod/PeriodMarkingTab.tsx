@@ -1,24 +1,16 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Clock,
-  Calendar,
+  Search,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  Unlock,
+  HelpCircle,
   RefreshCw,
-  Search,
-  Filter,
-  User,
-  Users,
-  ChevronRight,
-  ShieldAlert,
   FileSpreadsheet,
+  Calendar,
 } from 'lucide-react'
-import { downloadBlob } from '@/core/utils/downloadFile'
-import styles from './hod-dashboard.module.css'
 
 interface DepartmentSlot {
   id: string
@@ -27,29 +19,27 @@ interface DepartmentSlot {
   course_title: string
   semester: number
   session_type: string
+  is_lab_block: boolean
   day_of_week: number
   period_number: number
   start_time: string
   end_time: string
+  attendance_date?: string
   is_marked: boolean
   present_count: number
   absent_count: number
-  is_unlocked: boolean
-  unlocked_at: string | null
-  unlock_reason: string | null
 }
 
-interface RosterStudent {
+interface StudentRosterItem {
   id: string
   full_name: string
   cap_application_number: string | null
-  email: string
+  current_semester: number
   status: 'present' | 'absent' | 'unmarked'
   marked_at: string | null
-  is_late_entry: boolean
 }
 
-interface SlotRosterData {
+interface SlotRosterResponse {
   slot: {
     id: string
     course_id: string
@@ -59,88 +49,54 @@ interface SlotRosterData {
     start_time: string
     end_time: string
   }
+  attendance_date: string
   summary: {
     total_enrolled: number
     present_count: number
     absent_count: number
+    unmarked_count: number
     is_marked: boolean
   }
-  students: RosterStudent[]
+  students: StudentRosterItem[]
 }
 
 const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+function getTodayIST(): string {
+  const now = new Date()
+  const istOffset = 5.5 * 60 * 60 * 1000
+  const istDate = new Date(now.getTime() + istOffset)
+  const y = istDate.getUTCFullYear()
+  const m = String(istDate.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(istDate.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export default function PeriodMarkingTab() {
   const [slots, setSlots] = useState<DepartmentSlot[]>([])
-  const [loadingSlots, setLoadingSlots] = useState(true)
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+
+  // Filters
   const [semesterFilter, setSemesterFilter] = useState<number | 'all'>('all')
   const [dayFilter, setDayFilter] = useState<number | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [attendanceDate, setAttendanceDate] = useState<string>(getTodayIST())
+
+  // Roster view state
+  const [rosterData, setRosterData] = useState<SlotRosterResponse | null>(null)
+  const [loadingRoster, setLoadingRoster] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'absent' | 'unmarked'>('all')
+
+  // Export State
+  const [exporting, setExporting] = useState(false)
+
+  // Banners
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Selected slot for roster inspection
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
-  const [rosterData, setRosterData] = useState<SlotRosterData | null>(null)
-  const [loadingRoster, setLoadingRoster] = useState(false)
-  const [studentSearch, setStudentSearch] = useState('')
-
-  // Unlock Modal
-  const [unlockSlotTarget, setUnlockSlotTarget] = useState<DepartmentSlot | null>(null)
-  const [unlockReason, setUnlockReason] = useState('')
-  const [unlocking, setUnlocking] = useState(false)
-
-  // Statement Export
-  const [exporting, setExporting] = useState(false)
-
-  const handleExportStatement = async () => {
-    const sem = semesterFilter === 'all' ? 1 : semesterFilter
-    setExporting(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/attendance/export/statement?semesterId=${sem}`, {
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setError(err.message || 'Failed to export attendance statement.')
-        return
-      }
-
-      // Guard: if the server returned HTML or JSON instead of XLSX, it's an error
-      const contentType = res.headers.get('content-type') || ''
-      if (
-        !contentType.includes('spreadsheetml') &&
-        !contentType.includes('octet-stream') &&
-        !contentType.includes('openxmlformats')
-      ) {
-        const text = await res.text()
-        setError(`Export failed: server returned unexpected content (${contentType || 'no type'}). ${text.slice(0, 200)}`)
-        return
-      }
-
-      const blob = await res.blob()
-      const contentDisposition = res.headers.get('content-disposition')
-      let filename = `Attendance_Statement_Sem_${sem}.xlsx`
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^";]+)"?/)
-        if (match && match[1]) {
-          filename = match[1]
-        }
-      }
-      if (!filename.toLowerCase().endsWith('.xlsx')) {
-        filename += '.xlsx'
-      }
-
-      await downloadBlob(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    } catch (err: any) {
-      setError(err.message || 'Network error exporting attendance statement.')
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  // ── Fetch Department Timetable Slots ──
+  // ── Fetch Slots (F46: Scoped to attendanceDate) ──
   const fetchSlots = useCallback(async () => {
     setLoadingSlots(true)
     setError('')
@@ -148,117 +104,119 @@ export default function PeriodMarkingTab() {
       const params = new URLSearchParams()
       if (semesterFilter !== 'all') params.append('semester', String(semesterFilter))
       if (dayFilter !== 'all') params.append('dayOfWeek', String(dayFilter))
+      if (attendanceDate) params.append('date', attendanceDate)
 
       const res = await fetch(`/api/attendance/period/slots?${params.toString()}`)
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message || 'Failed to load department slots.')
-        setLoadingSlots(false)
+        setError(data.message || 'Failed to fetch department timetable slots.')
         return
       }
       setSlots(data || [])
-      // Auto-select first slot if none selected
-      if (data && data.length > 0 && !selectedSlotId) {
-        setSelectedSlotId(data[0].id)
+      // If selected slot is no longer in list, deselect
+      if (selectedSlotId && !(data || []).some((s: DepartmentSlot) => s.id === selectedSlotId)) {
+        setSelectedSlotId(null)
+        setRosterData(null)
       }
     } catch (err: any) {
-      setError(err.message || 'Network error fetching slots.')
+      setError(err.message || 'Network error while fetching slots.')
     } finally {
       setLoadingSlots(false)
     }
-  }, [semesterFilter, dayFilter, selectedSlotId])
+  }, [semesterFilter, dayFilter, attendanceDate, selectedSlotId])
 
   useEffect(() => {
     fetchSlots()
   }, [fetchSlots])
 
-  // ── Fetch Roster for Selected Slot ──
+  // ── Fetch Roster for Selected Slot (F46) ──
   const fetchRoster = useCallback(async (slotId: string) => {
     setLoadingRoster(true)
     setError('')
     try {
-      const res = await fetch(`/api/attendance/period/roster?slotId=${slotId}`)
+      const res = await fetch(`/api/attendance/period/roster?slotId=${slotId}&date=${attendanceDate}`)
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message || 'Failed to load roster.')
-        setLoadingRoster(false)
+        setError(data.message || 'Failed to fetch student attendance roster.')
         return
       }
       setRosterData(data)
     } catch (err: any) {
-      setError(err.message || 'Network error loading roster.')
+      setError(err.message || 'Network error while fetching roster.')
     } finally {
       setLoadingRoster(false)
     }
-  }, [])
+  }, [attendanceDate])
 
   useEffect(() => {
     if (selectedSlotId) {
       fetchRoster(selectedSlotId)
+    } else {
+      setRosterData(null)
     }
   }, [selectedSlotId, fetchRoster])
 
-  // Filtered Slots
-  const filteredSlots = useMemo(() => {
-    return slots.filter((s) => {
-      if (!searchQuery.trim()) return true
-      const q = searchQuery.toLowerCase()
-      return (
-        s.course_code.toLowerCase().includes(q) ||
-        s.course_title.toLowerCase().includes(q) ||
-        `period ${s.period_number}`.includes(q)
-      )
-    })
-  }, [slots, searchQuery])
-
-  // Filtered Students in Roster
-  const filteredStudents = useMemo(() => {
-    if (!rosterData?.students) return []
-    if (!studentSearch.trim()) return rosterData.students
-    const q = studentSearch.toLowerCase()
-    return rosterData.students.filter(
-      (st) =>
-        st.full_name.toLowerCase().includes(q) ||
-        (st.cap_application_number && st.cap_application_number.toLowerCase().includes(q)) ||
-        st.email.toLowerCase().includes(q)
-    )
-  }, [rosterData, studentSearch])
-
-  // ── Unlock Period Submission ──
-  async function handleConfirmUnlock() {
-    if (!unlockSlotTarget || !unlockReason.trim()) return
-    setUnlocking(true)
+  // ── Export Statement ──
+  async function handleExportStatement() {
+    setExporting(true)
     setError('')
     try {
-      const res = await fetch('/api/attendance/period/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timetable_slot_id: unlockSlotTarget.id,
-          reason: unlockReason.trim(),
-        }),
-      })
-      const data = await res.json()
+      const sem = semesterFilter === 'all' ? 1 : semesterFilter
+      const res = await fetch(`/api/attendance/period/export/statement?semesterId=${sem}`)
       if (!res.ok) {
-        setError(data.message || 'Failed to unlock period slot.')
+        const data = await res.json().catch(() => ({}))
+        setError(data.message || 'Failed to export attendance statement.')
         return
       }
-      setSuccess(`Period ${unlockSlotTarget.period_number} unlocked for late submission!`)
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Attendance_Statement_Sem_${sem}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setSuccess('Attendance statement downloaded successfully!')
       setTimeout(() => setSuccess(''), 4000)
-      setUnlockSlotTarget(null)
-      setUnlockReason('')
-      await fetchSlots()
-      if (selectedSlotId === unlockSlotTarget.id) {
-        await fetchRoster(selectedSlotId)
-      }
     } catch (err: any) {
-      setError(err.message || 'Network error.')
+      setError(err.message || 'Network error during statement export.')
     } finally {
-      setUnlocking(false)
+      setExporting(false)
     }
   }
 
-  // Selected slot object
+  // Filtered slots list
+  const filteredSlots = useMemo(() => {
+    return slots.filter((s) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matches =
+          s.course_code.toLowerCase().includes(q) ||
+          s.course_title.toLowerCase().includes(q) ||
+          `period ${s.period_number}`.includes(q)
+        if (!matches) return false
+      }
+      return true
+    })
+  }, [slots, searchQuery])
+
+  // Filtered students list in roster
+  const filteredStudents = useMemo(() => {
+    if (!rosterData) return []
+    return rosterData.students.filter((st) => {
+      if (statusFilter !== 'all' && st.status !== statusFilter) return false
+      if (studentSearch.trim()) {
+        const q = studentSearch.toLowerCase()
+        const matches =
+          st.full_name.toLowerCase().includes(q) ||
+          (st.cap_application_number && st.cap_application_number.toLowerCase().includes(q))
+        if (!matches) return false
+      }
+      return true
+    })
+  }, [rosterData, statusFilter, studentSearch])
+
   const activeSlot = slots.find((s) => s.id === selectedSlotId)
 
   return (
@@ -282,7 +240,7 @@ export default function PeriodMarkingTab() {
             <Clock size={20} color="#c9a227" /> Period Attendance Monitoring
           </h2>
           <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0' }}>
-            Monitor real-time lecture period attendance, track student rosters, and authorize late-entry unlocks (15-min grace window).
+            Monitor real-time lecture period attendance and track dated student rosters for your department.
           </p>
         </div>
 
@@ -319,9 +277,9 @@ export default function PeriodMarkingTab() {
             <span style={{ color: '#15803d' }}>Marked: </span>
             <strong style={{ color: '#166534' }}>{slots.filter((s) => s.is_marked).length}</strong>
           </div>
-          <div style={{ padding: '6px 14px', borderRadius: '8px', background: '#faf5ff', border: '1px solid #e9d5ff', fontSize: '12px' }}>
-            <span style={{ color: '#7e22ce' }}>Unlocked: </span>
-            <strong style={{ color: '#6b21a8' }}>{slots.filter((s) => s.is_unlocked).length}</strong>
+          <div style={{ padding: '6px 14px', borderRadius: '8px', background: '#fffbeb', border: '1px solid #fde68a', fontSize: '12px' }}>
+            <span style={{ color: '#b45309' }}>Pending: </span>
+            <strong style={{ color: '#92400e' }}>{slots.filter((s) => !s.is_marked).length}</strong>
           </div>
         </div>
       </div>
@@ -364,8 +322,19 @@ export default function PeriodMarkingTab() {
             </button>
           </div>
 
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* Filters: Date Picker, Semester, Day */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: '140px' }}>
+              <Calendar size={14} color="#64748b" />
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+                style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', width: '100%' }}
+                title="Select academic date to inspect attendance marks"
+              />
+            </div>
+
             <select
               value={semesterFilter}
               onChange={(e) => setSemesterFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
@@ -456,41 +425,10 @@ export default function PeriodMarkingTab() {
                           </span>
                         ) : (
                           <span style={{ fontSize: '10px', background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            Pending / Unmarked
-                          </span>
-                        )}
-
-                        {slot.is_unlocked && (
-                          <span style={{ fontSize: '10px', background: '#f3e8ff', color: '#7e22ce', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            🔓 Late Unlocked
+                            ⏳ Pending / Unmarked
                           </span>
                         )}
                       </div>
-
-                      {/* Unlock button if not marked or if HOD wants to allow late entry */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setUnlockSlotTarget(slot)
-                          setUnlockReason('')
-                        }}
-                        title="Authorize late marking unlock"
-                        style={{
-                          background: slot.is_unlocked ? '#f3e8ff' : '#f1f5f9',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '3px 6px',
-                          color: slot.is_unlocked ? '#7e22ce' : '#475569',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <Unlock size={11} /> {slot.is_unlocked ? 'Re-unlock' : 'Unlock'}
-                      </button>
                     </div>
                   </div>
                 )
@@ -514,31 +452,9 @@ export default function PeriodMarkingTab() {
                       {activeSlot.course_title}
                     </h3>
                     <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
-                      {DAY_NAMES[activeSlot.day_of_week]} • {activeSlot.start_time?.slice(0, 5)} - {activeSlot.end_time?.slice(0, 5)} • Sem {activeSlot.semester}
+                      {DAY_NAMES[activeSlot.day_of_week]} • {activeSlot.start_time?.slice(0, 5)} - {activeSlot.end_time?.slice(0, 5)} • Sem {activeSlot.semester} • Date: {attendanceDate}
                     </p>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      setUnlockSlotTarget(activeSlot)
-                      setUnlockReason('')
-                    }}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '6px 10px',
-                      color: '#002147',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <Unlock size={14} color="#7e22ce" /> Authorize Late Entry
-                  </button>
                 </div>
 
                 {/* Status and Statistics Strip */}
@@ -553,87 +469,83 @@ export default function PeriodMarkingTab() {
                       <strong style={{ color: '#166534' }}>{rosterData.summary.present_count}</strong>
                     </div>
                     <div style={{ background: '#fef2f2', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', fontSize: '11px' }}>
-                      <span style={{ color: '#dc2626' }}>Absent: </span>
+                      <span style={{ color: '#b91c1c' }}>Absent: </span>
                       <strong style={{ color: '#991b1b' }}>{rosterData.summary.absent_count}</strong>
                     </div>
-                    <div style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '11px' }}>
-                      <span style={{ color: '#64748b' }}>Turnout: </span>
-                      <strong>
-                        {rosterData.summary.total_enrolled > 0
-                          ? Math.round((rosterData.summary.present_count / rosterData.summary.total_enrolled) * 100)
-                          : 0}
-                        %
-                      </strong>
+                    <div style={{ background: '#fefce8', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fef08a', fontSize: '11px' }}>
+                      <span style={{ color: '#a16207' }}>Unmarked: </span>
+                      <strong style={{ color: '#854d0e' }}>{rosterData.summary.unmarked_count}</strong>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Roster Search Bar */}
-              <div style={{ position: 'relative' }}>
-                <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '9px' }} />
-                <input
-                  type="text"
-                  placeholder="Filter roster by student name or CAP number..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px 6px 30px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '12px',
-                    boxSizing: 'border-box',
-                  }}
-                />
+              {/* Roster Controls: Search & Status Filter */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '9px' }} />
+                  <input
+                    type="text"
+                    placeholder="Search enrolled students..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px 6px 30px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="present">Present Only</option>
+                  <option value="absent">Absent Only</option>
+                  <option value="unmarked">Unmarked Only</option>
+                </select>
               </div>
 
-              {/* Student Table */}
-              <div style={{ maxHeight: '460px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              {/* Students Table */}
+              <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
                 {loadingRoster ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>Loading student roster...</div>
                 ) : filteredStudents.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>No students found for this lecture.</div>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>No students found matching filter.</div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                        <th style={{ padding: '8px 10px' }}>#</th>
-                        <th style={{ padding: '8px 10px' }}>Student Name</th>
-                        <th style={{ padding: '8px 10px' }}>CAP / ID</th>
-                        <th style={{ padding: '8px 10px' }}>Status</th>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                        <th style={{ padding: '8px', color: '#475569' }}>#</th>
+                        <th style={{ padding: '8px', color: '#475569' }}>Student Name</th>
+                        <th style={{ padding: '8px', color: '#475569' }}>CAP / ID</th>
+                        <th style={{ padding: '8px', color: '#475569' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStudents.map((st, idx) => (
                         <tr key={st.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px 10px', color: '#94a3b8' }}>{idx + 1}</td>
-                          <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
-                            {st.full_name}
-                            <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 400 }}>{st.email}</div>
-                          </td>
-                          <td style={{ padding: '8px 10px', color: '#475569', fontFamily: 'monospace' }}>
-                            {st.cap_application_number || '—'}
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>
-                            {st.status === 'present' && (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, fontSize: '11px' }}>
-                                <CheckCircle2 size={12} /> Present
+                          <td style={{ padding: '8px', color: '#64748b' }}>{idx + 1}</td>
+                          <td style={{ padding: '8px', fontWeight: 600, color: '#1e293b' }}>{st.full_name}</td>
+                          <td style={{ padding: '8px', color: '#64748b' }}>{st.cap_application_number || '—'}</td>
+                          <td style={{ padding: '8px' }}>
+                            {st.status === 'present' ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803d', fontWeight: 600 }}>
+                                <CheckCircle2 size={13} /> Present
                               </span>
-                            )}
-                            {st.status === 'absent' && (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#dc2626', background: '#fee2e2', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, fontSize: '11px' }}>
-                                <XCircle size={12} /> Absent
+                            ) : st.status === 'absent' ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b91c1c', fontWeight: 600 }}>
+                                <XCircle size={13} /> Absent
                               </span>
-                            )}
-                            {st.status === 'unmarked' && (
-                              <span style={{ color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}>
-                                Unmarked
-                              </span>
-                            )}
-                            {st.is_late_entry && (
-                              <span style={{ marginLeft: '4px', fontSize: '9px', background: '#f3e8ff', color: '#7e22ce', padding: '1px 4px', borderRadius: '3px' }}>
-                                Late
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontWeight: 500 }}>
+                                <HelpCircle size={13} /> Unmarked
                               </span>
                             )}
                           </td>
@@ -645,58 +557,13 @@ export default function PeriodMarkingTab() {
               </div>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontSize: '13px' }}>
-              Select a timetable slot from the left to view roster attendance.
+            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8', fontSize: '13px' }}>
+              <Clock size={32} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+              <div>Select a timetable slot from the left to inspect student attendance for {attendanceDate}.</div>
             </div>
           )}
         </div>
       </div>
-
-      {/* ── Unlock Late-Entry Period Modal ── */}
-      {unlockSlotTarget && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h3 className={styles.modalTitle}>Authorize Late Attendance Unlock</h3>
-            <p className={styles.modalSubtitle}>
-              Unlocking slot <strong>{unlockSlotTarget.course_code} (Period {unlockSlotTarget.period_number})</strong> will permit the faculty member to mark or update attendance past the 15-minute grace window.
-            </p>
-
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0', fontSize: '12px' }}>
-              <div><strong>Course:</strong> {unlockSlotTarget.course_title}</div>
-              <div><strong>Scheduled:</strong> {DAY_NAMES[unlockSlotTarget.day_of_week]} {unlockSlotTarget.start_time?.slice(0, 5)} - {unlockSlotTarget.end_time?.slice(0, 5)}</div>
-            </div>
-
-            <div className={styles.field}>
-              <label className={styles.label}>Reason for Unlock Authorization *</label>
-              <textarea
-                className={styles.input}
-                rows={3}
-                placeholder="e.g., Campus power outage during period, lab session overrun, medical justification"
-                value={unlockReason}
-                onChange={(e) => setUnlockReason(e.target.value)}
-                style={{ resize: 'vertical' }}
-              />
-            </div>
-
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalCancelBtn}
-                onClick={() => setUnlockSlotTarget(null)}
-                disabled={unlocking}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.modalConfirmBtn}
-                onClick={handleConfirmUnlock}
-                disabled={!unlockReason.trim() || unlocking}
-              >
-                {unlocking ? 'Authorizing...' : 'Authorize Unlock →'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
@@ -30,7 +30,7 @@ export class DirectorService {
 
     const { data: campus } = await this.supabase.admin
       .from('campuses')
-      .select('name')
+      .select('name, center_latitude, center_longitude, radius_meters')
       .eq('id', faculty.campus_id)
       .single()
 
@@ -38,13 +38,25 @@ export class DirectorService {
       .from('campus_settings')
       .select('deadline, min_credits, max_credits, academic_year, last_promoted_at')
       .eq('campus_id', faculty.campus_id)
-      .single()
+      .maybeSingle()
+
+    // Determine operational setup status (F54)
+    let setupStatus: 'ready' | 'incomplete_geofence' | 'incomplete_registration_window' | 'uninitialized' = 'ready'
+    if (!settings) {
+      setupStatus = 'uninitialized'
+    } else if (campus?.center_latitude == null || campus?.center_longitude == null) {
+      setupStatus = 'incomplete_geofence'
+    } else if (!settings.academic_year || !settings.deadline) {
+      setupStatus = 'incomplete_registration_window'
+    }
 
     return {
       directorName: faculty.full_name,
       campusId: faculty.campus_id,
       campusName: campus?.name ?? 'Unknown',
       settings: settings ?? null,
+      setup_status: setupStatus,
+      is_ready: setupStatus === 'ready',
     }
   }
 
@@ -70,13 +82,21 @@ export class DirectorService {
       throw new BadRequestException('No settings provided to update')
     }
 
-    const { error } = await this.supabase.admin
+    // F54: Verify that a row was actually affected; never silently succeed on 0 rows
+    const { data: updated, error } = await this.supabase.admin
       .from('campus_settings')
       .update(updatePayload)
       .eq('campus_id', campusId)
+      .select('id')
 
     if (error) {
-      throw new InternalServerErrorException('Failed to update campus settings')
+      throw new InternalServerErrorException(`Failed to update campus settings: ${error.message}`)
+    }
+
+    if (!updated || updated.length === 0) {
+      throw new NotFoundException(
+        `Campus settings record not found for campus ${campusId} (F54: cannot update non-existent settings row)`
+      )
     }
 
     await this.auditLogger.log({

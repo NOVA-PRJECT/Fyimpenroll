@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -22,17 +22,31 @@ import { RateLimit } from '../../core/security/rate-limit.decorator'
 export class TimetableController {
   constructor(private readonly timetableService: TimetableService) {}
 
-  // ──────────────── Constraints ────────────────
+  // ──────────────── Constraints (F39) ────────────────
   @Get('constraints')
   @Roles('superadmin', 'campus_director', 'hod')
-  async getConstraints(@Query('semester') semester: string | undefined) {
-    return this.timetableService.getConstraints(semester)
+  async getConstraints(
+    @Query('semester') semester: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.timetableService.getConstraints(semester, user)
   }
 
   @Put('constraints')
   @Roles('superadmin', 'campus_director')
-  async updateConstraints(@Body() body: any) {
-    return this.timetableService.updateConstraints(body)
+  async updateConstraints(@Body() body: any, @CurrentUser() user: AuthUser) {
+    return this.timetableService.updateConstraints(body, user)
+  }
+
+  // ──────────────── Teacher Substitution (F33, F37) ────────────────
+  @Put('entries/:id/teacher')
+  @Roles('superadmin', 'campus_director', 'hod')
+  async substituteTeacher(
+    @Param('id') id: string,
+    @Body() body: { teacherId: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.timetableService.substituteTeacher(id, body.teacherId, user)
   }
 
   // ──────────────── Entries ────────────────

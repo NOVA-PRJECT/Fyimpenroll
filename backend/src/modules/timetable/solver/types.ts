@@ -1,4 +1,4 @@
-﻿// ─── Slot Identity ────────────────────────────────────────────────────────────
+// ─── Slot Identity ────────────────────────────────────────────────────────────
 export type SlotId = string; // uuid from time_slots table
 export const DAYS = [1, 2, 3, 4, 5] as const; // Mon–Fri
 
@@ -14,8 +14,19 @@ export interface CourseNode {
   practicalHours: number;
   isCrossDept: boolean;
   studentIds: Set<string>;
+  teacherId?: string;
   // Human-readable conflict summary: "Conflicts with CS302 (12 students), PHY201 (3 students)"
   conflictSummary: string;
+}
+
+// ─── Teacher Reservations (F37) ──────────────────────────────────────────────
+export interface TeacherReservation {
+  teacherId: string;
+  day: number; // 1-5
+  period: number; // 1-6
+  sourceCourseId?: string;
+  sourceCampusId?: string;
+  sourceSemester?: number;
 }
 
 // ─── Parallel Groups ──────────────────────────────────────────────────────────
@@ -81,15 +92,18 @@ export interface GenerationResult {
 export interface ValidationViolation {
   type:
     | 'student_conflict'
+    | 'teacher_conflict'
     | 'hours_mismatch'
     | 'invalid_lab_block'
     | 'lunch_overlap'
     | 'hours_exceeded'
     | 'half_block_overlap'
     | 'category_slot_mismatch'
-    | 'mixed_category_conflict';
+    | 'mixed_category_conflict'
+    | 'unplaced_course';
   courseId?: string;
   studentId?: string;
+  teacherId?: string;
   day?: number;
   period?: number;
   detail: string;

@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,28 +8,110 @@
   <title>FYIMP Portal — UI concept</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <div class="app" id="app" data-role="student">
     <section class="auth-screen" id="loginScreen">
-      <header class="auth-header"><a class="brand" href="#"><span class="brand-mark">F<span>+</span></span><span><b>FYIMP</b><small>Kannur University</small></span></a><span class="auth-header-note">Four Year Integrated Masters Programme</span></header>
+      <header class="auth-header"><a class="brand" href="#"><span
+            class="brand-mark">F<span>+</span></span><span><b>FYIMP</b><small>Kannur University</small></span></a><span
+          class="auth-header-note">Four Year Integrated Masters Programme</span></header>
       <div class="auth-layout">
-        <div class="auth-aside"><div class="auth-orbit orbit-one"></div><div class="auth-orbit orbit-two"></div><div class="auth-aside-content"><span class="auth-kicker">KANNUR UNIVERSITY</span><h1>Your academic journey,<br><em>all in one place.</em></h1><p>A connected space for students, faculty, and campus teams to keep learning moving forward.</p><div class="auth-aside-foot"><span class="seal">KU</span><span><b>FYIMP Registration Portal</b><small>Official academic workspace</small></span></div></div></div>
-        <div class="auth-main"><div class="login-card"><div class="login-heading"><span class="login-icon">↗</span><p class="eyebrow">WELCOME BACK</p><h2>Sign in to your account</h2><p>Use your university account to continue.</p></div><div class="auth-error" id="loginError" hidden>Please enter a valid email and password.</div><form id="loginForm"><div class="field"><label for="loginEmail">Email address</label><input id="loginEmail" type="email" autocomplete="username" placeholder="name@kannuruniv.ac.in" required></div><div class="field"><div class="field-label-row"><label for="loginPassword">Password</label><button type="button" class="auth-link" id="forgotPassword">Forgot password?</button></div><div class="password-field"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter your password" required><button type="button" class="password-toggle" id="togglePassword" aria-label="Show password">Show</button></div></div><label class="check-row terms-check"><input id="acceptTerms" type="checkbox"> I accept the <a href="#" data-auth-message="Terms of Use preview">Terms of Use</a> and acknowledge the <a href="#" data-auth-message="Privacy Policy preview">Privacy Policy</a>.</label><button class="btn btn-primary login-submit" type="submit">Sign in <span>→</span></button></form><div class="demo-divider"><span></span><b>OR TRY A DEMO ACCOUNT</b><span></span></div><p class="demo-hint">Choose a sample identity to sign in. First sign-in continues through a consent screen before the role workspace. Demo password: <code>Demo@2026</code>.</p><div class="demo-accounts" id="demoAccounts"></div><p class="support-note">Need help? <a href="mailto:itcentre@kannuruniversity.ac.in">Contact the IT helpdesk</a></p></div></div>
-      </div><footer class="auth-footer"><span>© Kannur University · FYIMP Portal</span><span>Secure academic access</span></footer>
+        <div class="auth-aside">
+          <div class="auth-orbit orbit-one"></div>
+          <div class="auth-orbit orbit-two"></div>
+          <div class="auth-aside-content"><span class="auth-kicker">KANNUR UNIVERSITY</span>
+            <h1>Your academic journey,<br><em>all in one place.</em></h1>
+            <p>A connected space for students, faculty, and campus teams to keep learning moving forward.</p>
+            <div class="auth-aside-foot"><span class="seal">KU</span><span><b>FYIMP Registration
+                  Portal</b><small>Official academic workspace</small></span></div>
+          </div>
+        </div>
+        <div class="auth-main">
+          <div class="login-card">
+            <div class="login-heading"><span class="login-icon">↗</span>
+              <p class="eyebrow">WELCOME BACK</p>
+              <h2>Sign in to your account</h2>
+              <p>Use your university account to continue.</p>
+            </div>
+            <div class="auth-error" id="loginError" hidden>Please enter a valid email and password.</div>
+            <form id="loginForm">
+              <div class="field"><label for="loginEmail">Email address</label><input id="loginEmail" type="email"
+                  autocomplete="username" placeholder="name@kannuruniv.ac.in" required></div>
+              <div class="field">
+                <div class="field-label-row"><label for="loginPassword">Password</label><button type="button"
+                    class="auth-link" id="forgotPassword">Forgot password?</button></div>
+                <div class="password-field"><input id="loginPassword" type="password" autocomplete="current-password"
+                    placeholder="Enter your password" required><button type="button" class="password-toggle"
+                    id="togglePassword" aria-label="Show password">Show</button></div>
+              </div><label class="check-row terms-check"><input id="acceptTerms" type="checkbox"> I accept the <a
+                  href="#" data-auth-message="Terms of Use preview">Terms of Use</a> and acknowledge the <a href="#"
+                  data-auth-message="Privacy Policy preview">Privacy Policy</a>.</label><button
+                class="btn btn-primary login-submit" type="submit">Sign in <span>→</span></button>
+            </form>
+            <div class="demo-divider"><span></span><b>OR TRY A DEMO ACCOUNT</b><span></span></div>
+            <p class="demo-hint">Choose a sample identity to sign in. First sign-in continues through a consent screen
+              before the role workspace. Demo password: <code>Demo@2026</code>.</p>
+            <div class="demo-accounts" id="demoAccounts"></div>
+            <p class="support-note">Need help? <a href="mailto:itcentre@kannuruniversity.ac.in">Contact the IT
+                helpdesk</a></p>
+          </div>
+        </div>
+      </div>
+      <footer class="auth-footer"><span>© Kannur University · FYIMP Portal</span><span>Secure academic access</span>
+      </footer>
     </section>
-    <section class="auth-screen consent-screen" id="consentScreen" hidden><div class="consent-card"><span class="login-icon">✓</span><p class="eyebrow">BEFORE YOU CONTINUE</p><h1>Review and accept</h1><p class="consent-copy">Please review the portal terms and privacy information before continuing to your workspace.</p><div class="consent-document"><b>Privacy and responsible use</b><p>Your account provides access to academic records and portal features based on your assigned role. Keep your sign-in details private and use student and faculty information only for university activities.</p><p>The portal may record sign-in, registration, attendance, and account activity to support academic operations and security.</p><a href="#" data-auth-message="Terms of Use preview">Read Terms of Use ↗</a><a href="#" data-auth-message="Privacy Policy preview">Read Privacy Policy ↗</a></div><label class="check-row consent-check"><input id="acceptConsent" type="checkbox"> I have read and accept the Terms of Use and Privacy Policy.</label><div class="consent-actions"><button class="btn btn-secondary" id="backToLogin">Back to sign in</button><button class="btn btn-primary" id="acceptConsentButton" disabled>Accept and continue →</button></div><small class="consent-identity" id="consentIdentity"></small></div></section>
+    <section class="auth-screen consent-screen" id="consentScreen" hidden>
+      <div class="consent-card"><span class="login-icon">✓</span>
+        <p class="eyebrow">BEFORE YOU CONTINUE</p>
+        <h1>Review and accept</h1>
+        <p class="consent-copy">Please review the portal terms and privacy information before continuing to your
+          workspace.</p>
+        <div class="consent-document"><b>Privacy and responsible use</b>
+          <p>Your account provides access to academic records and portal features based on your assigned role. Keep your
+            sign-in details private and use student and faculty information only for university activities.</p>
+          <p>The portal may record sign-in, registration, attendance, and account activity to support academic
+            operations and security.</p><a href="#" data-auth-message="Terms of Use preview">Read Terms of Use ↗</a><a
+            href="#" data-auth-message="Privacy Policy preview">Read Privacy Policy ↗</a>
+        </div><label class="check-row consent-check"><input id="acceptConsent" type="checkbox"> I have read and accept
+          the Terms of Use and Privacy Policy.</label>
+        <div class="consent-actions"><button class="btn btn-secondary" id="backToLogin">Back to sign in</button><button
+            class="btn btn-primary" id="acceptConsentButton" disabled>Accept and continue →</button></div><small
+          class="consent-identity" id="consentIdentity"></small>
+      </div>
+    </section>
     <div class="main-shell">
-      <header class="topbar"><a class="brand" href="#" aria-label="FYIMP Portal"><img class="university-logo" src="../frontend/public/knrunilogo.png" alt="Kannur University logo"><span><b>FYIMP Portal</b><small>Kannur University</small></span></a><div class="identity"><span class="avatar" id="avatar">AS</span><span class="identity-copy"><b id="userName">Aarav Suresh</b><small><span id="userRole">Student</span><span class="identity-sep">·</span><span id="userContext">Semester 3 · Computer Science</span></small></span></div><button class="logout-button" id="profileButton">Sign out <span>↗</span></button></header>
+      <header class="topbar"><a class="brand" href="#" aria-label="FYIMP Portal"><img class="university-logo"
+            src="../frontend/public/knrunilogo.png" alt="Kannur University logo"><span><b>FYIMP Portal</b><small>Kannur
+              University</small></span></a>
+        <div class="identity"><span class="avatar" id="avatar">AS</span><span class="identity-copy"><b
+              id="userName">Aarav Suresh</b><small><span id="userRole">Student</span><span
+                class="identity-sep">·</span><span id="userContext">Semester 3 · Computer Science</span></small></span>
+        </div><button class="logout-button" id="profileButton">Sign out <span>↗</span></button>
+      </header>
       <nav class="role-nav" id="nav" aria-label="Workspace navigation"></nav>
       <main class="content" id="content"></main>
-      <footer class="footer"><span>FYIMP Portal <span class="footer-dot">·</span> Kannur University</span><span>UI concept <span class="footer-dot">·</span> Sample data only</span></footer>
+      <footer class="footer"><span>FYIMP Portal <span class="footer-dot">·</span> Kannur University</span><span>UI
+          concept <span class="footer-dot">·</span> Sample data only</span></footer>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" id="modalClose" aria-label="Close">×</button><div class="modal-kicker">FYIMP PORTAL</div><h2 id="modalTitle">Create new item</h2><p id="modalDescription">Enter the details below to continue.</p><div id="modalFields"></div><div class="modal-actions"><button class="btn btn-quiet" id="modalCancel">Cancel</button><button class="btn btn-primary" id="modalConfirm">Save changes <span>→</span></button></div></section></div>
+    <div class="modal-backdrop" id="modalBackdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close"
+          id="modalClose" aria-label="Close">×</button>
+        <div class="modal-kicker">FYIMP PORTAL</div>
+        <h2 id="modalTitle">Create new item</h2>
+        <p id="modalDescription">Enter the details below to continue.</p>
+        <div id="modalFields"></div>
+        <div class="modal-actions"><button class="btn btn-quiet" id="modalCancel">Cancel</button><button
+            class="btn btn-primary" id="modalConfirm">Save changes <span>→</span></button></div>
+      </section>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
+
 </html>

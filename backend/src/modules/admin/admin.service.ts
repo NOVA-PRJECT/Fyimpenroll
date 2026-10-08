@@ -32,7 +32,7 @@ export class AdminService {
     const { data: createdCampus, error } = await this.supabase.admin
       .from('campuses')
       .insert({ name, code: code.toUpperCase() })
-      .select('id')
+      .select('id, name, code')
       .single()
 
     if (error) {
@@ -42,6 +42,44 @@ export class AdminService {
       throw new InternalServerErrorException('Failed to add campus')
     }
 
+    // Ensure campus_settings exists as fallback even if trigger was bypassed (F54)
+    await this.supabase.admin
+      .from('campus_settings')
+      .upsert(
+        {
+          campus_id: createdCampus.id,
+          academic_year: '2025-26',
+          min_credits: 18,
+          max_credits: 26,
+        },
+        { onConflict: 'campus_id' },
+      )
+
+    // Inspect setup status
+    const { data: settings } = await this.supabase.admin
+      .from('campus_settings')
+      .select('latitude, longitude, geofence_radius, registration_start, registration_end')
+      .eq('campus_id', createdCampus.id)
+      .maybeSingle()
+
+    const hasGeofence = !!(
+      settings &&
+      settings.latitude != null &&
+      settings.longitude != null &&
+      settings.geofence_radius != null
+    )
+    const hasRegWindow = !!(
+      settings &&
+      settings.registration_start &&
+      settings.registration_end
+    )
+    const isReady = hasGeofence && hasRegWindow
+    const setupStatus = isReady
+      ? 'ready'
+      : !hasGeofence
+      ? 'incomplete_geofence'
+      : 'incomplete_registration_window'
+
     await this.auditLogger.log({
       eventType: AuditEvents.CAMPUS_CREATED,
       userId: user.userId,
@@ -50,9 +88,19 @@ export class AdminService {
       resourceType: 'campus',
       resourceId: createdCampus?.id,
       status: 'success',
+      metadata: {
+        setup_status: setupStatus,
+        is_ready: isReady,
+      },
     })
 
-    return { success: true, message: 'Campus added successfully' }
+    return {
+      success: true,
+      message: 'Campus added successfully',
+      campus_id: createdCampus.id,
+      setup_status: setupStatus,
+      is_ready: isReady,
+    }
   }
 
   async updateCampus(id: string, name: string, code: string, user: AuthUser) {
@@ -99,9 +147,15 @@ export class AdminService {
     ]
 
     if (allUserIds.length > 0) {
-      await Promise.allSettled(
+      const deleteResults = await Promise.allSettled(
         allUserIds.map((id) => this.supabase.admin.auth.admin.deleteUser(id)),
       )
+      const failedDeletions = deleteResults.filter((r) => r.status === 'rejected')
+      if (failedDeletions.length > 0) {
+        this.serverLogger.warn(
+          `deleteCampus: ${failedDeletions.length} user auth deletions failed out of ${allUserIds.length}`,
+        )
+      }
     }
 
     await this.auditLogger.log({
@@ -420,57 +474,56 @@ export class AdminService {
   }
 
   // ──────────────── Promote Students ────────────────
-  async promoteStudents(director: AuthUser) {
+  async promoteStudents(director: AuthUser, idempotencyKey?: string) {
     const campusId = director.campus_id
     if (!campusId) throw new BadRequestException('Campus assignment missing for director')
 
-    const { data: settings } = await this.supabase.admin
-      .from('campus_settings')
-      .select('last_promoted_at')
-      .eq('campus_id', campusId)
-      .single()
+    const key = idempotencyKey || `prom_${campusId}_${Date.now()}`
 
-    if (settings?.last_promoted_at) {
-      const lastPromoted = new Date(settings.last_promoted_at)
-      const ninetyDaysAgo = new Date()
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-      if (lastPromoted > ninetyDaysAgo) {
-        throw new BadRequestException(
-          `Promotion is locked: students were already promoted on ${lastPromoted.toLocaleDateString('en-IN')}. A minimum of 90 days must pass before the next promotion.`,
-        )
+    // 1. Execute atomic promotion RPC (F56, F55)
+    const { data: rpcResult, error: rpcError } = await this.supabase.admin.rpc(
+      'promote_campus_students_atomic',
+      {
+        p_campus_id: campusId,
+        p_director_id: director.userId,
+        p_idempotency_key: key,
+      },
+    )
+
+    if (rpcError) {
+      if (
+        rpcError.message?.includes('A minimum of 90 days must pass') ||
+        rpcError.message?.includes('Promotion is locked')
+      ) {
+        throw new BadRequestException(rpcError.message)
       }
-    }
-
-    const { data: nearMaxStudents } = await this.supabase.admin
-      .from('students')
-      .select('id, current_semester')
-      .eq('campus_id', campusId)
-      .eq('current_semester', 10)
-
-    const { data: promotedCount, error } = await this.supabase.admin.rpc('promote_campus_students', {
-      p_campus_id: campusId,
-    })
-
-    if (error) throw new InternalServerErrorException('Failed to promote students')
-
-    await this.supabase.admin
-      .from('campus_settings')
-      .update({ last_promoted_at: new Date().toISOString() })
-      .eq('campus_id', campusId)
-
-    if (nearMaxStudents && nearMaxStudents.length > 0) {
-      await Promise.allSettled(
-        nearMaxStudents.map((s) => this.supabase.admin.auth.admin.deleteUser(s.id)),
+      if (rpcError.message?.includes('Campus settings record not found')) {
+        throw new NotFoundException(rpcError.message)
+      }
+      this.serverLogger.error(
+        'promote_campus_students_atomic failed',
+        rpcError.message || JSON.stringify(rpcError),
       )
+      throw new InternalServerErrorException(rpcError.message || 'Failed to promote students')
     }
 
-    // Extract the promoted count from the RPC result.
-    // The function returns: jsonb_build_object('success', true, 'promoted_count', v_count)
-    const finalCount = typeof promotedCount === 'number'
-      ? promotedCount
-      : (typeof promotedCount === 'object' && promotedCount !== null)
-      ? (Number((promotedCount as any).promoted_count) || 0)
-      : (Number(promotedCount) || 0)
+    const promotedCount = Number(rpcResult?.promoted_count) || 0
+    const graduatingIds: string[] = Array.isArray(rpcResult?.graduating_student_ids)
+      ? rpcResult.graduating_student_ids
+      : []
+
+    // 2. Perform explicit graduation cleanup for semester-10 cohort (F55)
+    let graduationResult = {
+      total_candidates: graduatingIds.length,
+      graduated_count: 0,
+      failed_count: 0,
+      failed_student_ids: [] as string[],
+      errors: [] as { student_id: string; error: string }[],
+    }
+
+    if (graduatingIds.length > 0) {
+      graduationResult = await this.graduateStudents(campusId, graduatingIds, director)
+    }
 
     await this.auditLogger.log({
       eventType: AuditEvents.STUDENT_PROMOTED,
@@ -479,18 +532,176 @@ export class AdminService {
       action: `promoted students for campus ${campusId}`,
       resourceType: 'campus',
       resourceId: campusId,
-      status: 'success',
+      status: graduationResult.failed_count === 0 ? 'success' : 'failure',
       metadata: {
-        promoted_count: finalCount,
-        graduated_count: nearMaxStudents?.length ?? 0,
+        promoted_count: promotedCount,
+        graduated_count: graduationResult.graduated_count,
+        failed_graduations: graduationResult.failed_student_ids,
+        idempotency_key: key,
       },
     })
 
     return {
+      success: graduationResult.failed_count === 0,
+      promoted_count: promotedCount,
+      graduated_count: graduationResult.graduated_count,
+      failed_graduations: graduationResult.failed_student_ids,
+      message: `${promotedCount} students promoted to next semester${
+        graduationResult.graduated_count > 0 ? `, ${graduationResult.graduated_count} graduated` : ''
+      }${graduationResult.failed_count > 0 ? ` (${graduationResult.failed_count} graduation cleanup retries needed)` : ''}`,
+      graduation_details: graduationResult,
+    }
+  }
+
+  // ──────────────── Graduate Students (F55 Explicit & Recoverable) ────────────────
+  async graduateStudents(campusId: string, studentIds: string[], user: AuthUser) {
+    if (!studentIds || studentIds.length === 0) {
+      return {
+        success: true,
+        total_candidates: 0,
+        graduated_count: 0,
+        failed_count: 0,
+        failed_student_ids: [],
+        errors: [],
+      }
+    }
+
+    // Verify candidates belong to this campus and are in semester 10
+    const { data: candidateStudents, error: fetchError } = await this.supabase.admin
+      .from('students')
+      .select('id, current_semester, campus_id')
+      .in('id', studentIds)
+      .eq('campus_id', campusId)
+
+    if (fetchError) {
+      throw new InternalServerErrorException('Failed to fetch candidate graduating students')
+    }
+
+    const validStudents = (candidateStudents ?? []).filter((s) => s.current_semester === 10)
+    const validIds = validStudents.map((s) => s.id)
+
+    if (validIds.length === 0) {
+      return {
+        success: true,
+        total_candidates: 0,
+        graduated_count: 0,
+        failed_count: 0,
+        failed_student_ids: [],
+        errors: [],
+      }
+    }
+
+    // External Auth deletion cannot participate in PostgreSQL transaction atomicity.
+    // Concurrently de-auth candidates and inspect Promise.allSettled outcomes.
+    const authResults = await Promise.allSettled(
+      validIds.map((id) => this.supabase.admin.auth.admin.deleteUser(id)),
+    )
+
+    const successfulDeAuthIds: string[] = []
+    const failedStudentIds: string[] = []
+    const errors: { student_id: string; error: string }[] = []
+
+    authResults.forEach((res, idx) => {
+      const studentId = validIds[idx]
+      const isSuccess =
+        res.status === 'fulfilled' &&
+        (!res.value.error || res.value.error.message?.toLowerCase().includes('user not found'))
+
+      if (isSuccess) {
+        successfulDeAuthIds.push(studentId)
+      } else {
+        const errorMsg =
+          res.status === 'rejected'
+            ? String(res.reason?.message || res.reason)
+            : res.value?.error?.message || 'Auth deletion failed'
+        failedStudentIds.push(studentId)
+        errors.push({ student_id: studentId, error: errorMsg })
+      }
+    })
+
+    // Delete successfully de-authed students from DB records
+    let deletedDbCount = 0
+    if (successfulDeAuthIds.length > 0) {
+      const { error: dbDeleteError, count } = await this.supabase.admin
+        .from('students')
+        .delete({ count: 'exact' })
+        .in('id', successfulDeAuthIds)
+
+      if (dbDeleteError) {
+        this.serverLogger.error(
+          'Failed to delete graduating students from DB after Auth deletion',
+          dbDeleteError.message || JSON.stringify(dbDeleteError),
+        )
+      } else {
+        deletedDbCount = count ?? successfulDeAuthIds.length
+      }
+    }
+
+    await this.auditLogger.log({
+      eventType: AuditEvents.CAMPUS_UPDATED,
+      userId: user.userId,
+      userRole: user.role,
+      action: `graduated students for campus ${campusId}`,
+      resourceType: 'campus',
+      resourceId: campusId,
+      status: failedStudentIds.length === 0 ? 'success' : 'failure',
+      metadata: {
+        total_candidates: validIds.length,
+        graduated_count: deletedDbCount,
+        failed_count: failedStudentIds.length,
+        failed_student_ids: failedStudentIds,
+      },
+    })
+
+    return {
+      success: failedStudentIds.length === 0,
+      total_candidates: validIds.length,
+      graduated_count: deletedDbCount,
+      failed_count: failedStudentIds.length,
+      failed_student_ids: failedStudentIds,
+      errors,
+    }
+  }
+
+  // ──────────────── Concluded-Semester Attendance Retention Purge ────────────────
+  async cleanupConcludedSemesterAttendance(
+    campusId: string,
+    academicYear: string,
+    semester: number,
+    user: AuthUser,
+  ) {
+    if (user.role === 'campus_director' && user.campus_id && user.campus_id !== campusId) {
+      throw new BadRequestException('Directors can only clean up attendance for their own campus')
+    }
+
+    const { data: result, error } = await this.supabase.admin.rpc(
+      'cleanup_concluded_semester_attendance',
+      {
+        p_campus_id: campusId,
+        p_academic_year: academicYear,
+        p_semester: semester,
+      },
+    )
+
+    if (error) {
+      throw new InternalServerErrorException(error.message || 'Failed to cleanup concluded attendance')
+    }
+
+    await this.auditLogger.log({
+      eventType: AuditEvents.CAMPUS_UPDATED,
+      userId: user.userId,
+      userRole: user.role,
+      action: `cleaned up concluded semester attendance for campus ${campusId}, ${academicYear} S${semester}`,
+      resourceType: 'campus',
+      resourceId: campusId,
+      status: 'success',
+      metadata: result,
+    })
+
+    return {
       success: true,
-      promoted_count: finalCount,
-      graduated_count: nearMaxStudents?.length ?? 0,
-      message: `${finalCount} students promoted to next semester`,
+      message: `Cleaned up attendance for concluded semester ${semester} (${academicYear})`,
+      ...result,
     }
   }
 

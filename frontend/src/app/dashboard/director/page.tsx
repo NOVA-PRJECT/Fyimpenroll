@@ -1,11 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './director-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
+import {
+  utcIsoToKolkataInput,
+  kolkataInputToUtcIso,
+  formatKolkataDisplay,
+  ASIA_KOLKATA_OFFSET_MS,
+} from '@/core/utils/dateTime'
 
 export default function DirectorDashboard() {
   useBfcacheGuard()
@@ -56,8 +62,47 @@ export default function DirectorDashboard() {
   // Derived window status
   const windowIsOpen = currentDeadline !== null && new Date() < new Date(currentDeadline)
 
+  function invalidateDirectorCache() {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('fyimp_director_settings_cache')
+      } catch {}
+    }
+  }
+
+  const loadSettingsData = useCallback(async (isBackground = false) => {
+    try {
+      const response = await fetch('/api/director/settings')
+      if (!response.ok) {
+        if (!isBackground) router.push('/login')
+        return
+      }
+      const data = await response.json()
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(data))
+      }
+
+      setDirectorName(data.directorName || '')
+      setCampusId(data.campusId || '')
+      setCampusName(data.campusName || '')
+
+      if (data.settings) {
+        setCurrentDeadline(data.settings.deadline)
+        setDeadline(utcIsoToKolkataInput(data.settings.deadline))
+        setMinCredits(data.settings.min_credits ?? 18)
+        setMaxCredits(data.settings.max_credits ?? 26)
+        setLastPromotedAt(data.settings.last_promoted_at ?? null)
+      }
+    } catch {
+      // In background refresh, ignore transient network drops
+    } finally {
+      setLoadingDirector(false)
+    }
+  }, [router])
+
   useEffect(() => {
-    // Check sessionStorage cache first to avoid re-fetching on navigation back
+    // Check sessionStorage cache for instant render, but revalidate in background (F59)
     const cached = typeof window !== 'undefined' ? sessionStorage.getItem('fyimp_director_settings_cache') : null
     if (cached) {
       try {
@@ -68,51 +113,22 @@ export default function DirectorDashboard() {
 
         if (data.settings) {
           setCurrentDeadline(data.settings.deadline)
-          setDeadline(
-            data.settings.deadline
-              ? new Date(data.settings.deadline).toISOString().slice(0, 16)
-              : ''
-          )
+          setDeadline(utcIsoToKolkataInput(data.settings.deadline))
           setMinCredits(data.settings.min_credits ?? 18)
           setMaxCredits(data.settings.max_credits ?? 26)
           setLastPromotedAt(data.settings.last_promoted_at ?? null)
         }
         setLoadingDirector(false)
-        return
-      } catch {
-        // Fall back to fetch if parse fails
-      }
+      } catch {}
     }
 
-    async function loadData() {
-      const response = await fetch('/api/director/settings')
-      const data = await response.json()
-      if (!response.ok) { router.push('/login'); return }
+    loadSettingsData()
 
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(data))
-      }
-
-      setDirectorName(data.directorName)
-      setCampusId(data.campusId)
-      setCampusName(data.campusName)
-
-      if (data.settings) {
-        setCurrentDeadline(data.settings.deadline)
-        setDeadline(
-          data.settings.deadline
-            ? new Date(data.settings.deadline).toISOString().slice(0, 16)
-            : ''
-        )
-        setMinCredits(data.settings.min_credits ?? 18)
-        setMaxCredits(data.settings.max_credits ?? 26)
-        setLastPromotedAt(data.settings.last_promoted_at ?? null)
-      }
-
-      setLoadingDirector(false)
-    }
-    loadData()
-  }, [])
+    // Refresh settings on tab focus or reconnect (F59)
+    const onFocus = () => { loadSettingsData(true) }
+    window.addEventListener('focus', onFocus)
+    return () => { window.removeEventListener('focus', onFocus) }
+  }, [loadSettingsData])
 
   // Academic year helper
   function getAcademicYear(): string {
@@ -160,10 +176,13 @@ export default function DirectorDashboard() {
   }, [activeTab, allocationSemester, allocationAcademicYear, allocationRun?.status])
 
   function handleSetPreset(days: number) {
-    const target = new Date()
-    target.setDate(target.getDate() + days)
-    target.setHours(23, 59, 0, 0)
-    setDeadline(target.toISOString().slice(0, 16))
+    const nowUtcMs = Date.now()
+    const kolkataNow = new Date(nowUtcMs + ASIA_KOLKATA_OFFSET_MS)
+    kolkataNow.setUTCDate(kolkataNow.getUTCDate() + days)
+    const y = kolkataNow.getUTCFullYear()
+    const m = String(kolkataNow.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(kolkataNow.getUTCDate()).padStart(2, '0')
+    setDeadline(`${y}-${m}-${d}T23:59`)
   }
 
   async function handleRunAllocation(forceRerun: boolean = false) {
@@ -240,16 +259,16 @@ export default function DirectorDashboard() {
     }
   }
 
-  // Save window settings
+  // Save window settings (F58, F59, F60)
   async function handleSaveWindow() {
     if (!deadline) {
       setWindowError('Please set a deadline')
       return
     }
 
-    const deadlineDate = new Date(deadline)
-    if (isNaN(deadlineDate.getTime())) {
-      setWindowError('Invalid deadline date')
+    const utcIso = kolkataInputToUtcIso(deadline)
+    if (!utcIso) {
+      setWindowError('Invalid deadline date format')
       return
     }
 
@@ -257,37 +276,31 @@ export default function DirectorDashboard() {
     setWindowError('')
     setWindowSuccess('')
 
-    const response = await fetch('/api/director/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deadline: deadlineDate.toISOString(),
-      }),
-    })
+    try {
+      const response = await fetch('/api/director/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deadline: utcIso,
+        }),
+      })
 
-    const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
-    if (!response.ok) {
-      const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to update settings.'
-      setWindowError(msg)
-      setSavingWindow(false)
-      return
-    }
-
-    setCurrentDeadline(deadlineDate.toISOString())
-    setWindowSuccess(data.message)
-    setSavingWindow(false)
-
-    // Update cached settings
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('fyimp_director_settings_cache')
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          parsed.settings = { ...(parsed.settings || {}), deadline: deadlineDate.toISOString() }
-          sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(parsed))
-        } catch {}
+      if (!response.ok) {
+        const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to update settings.'
+        setWindowError(msg)
+        return
       }
+
+      setCurrentDeadline(utcIso)
+      setDeadline(utcIsoToKolkataInput(utcIso))
+      setWindowSuccess(data.message || 'Registration window updated successfully.')
+      invalidateDirectorCache()
+    } catch (err: any) {
+      setWindowError(err?.message || 'Network error: could not connect to server. Your input has been preserved; please retry.')
+    } finally {
+      setSavingWindow(false)
     }
   }
 
@@ -302,70 +315,64 @@ export default function DirectorDashboard() {
     setWindowError('')
     setWindowSuccess('')
 
-    const response = await fetch('/api/director/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deadline: nowIso }),
-    })
+    try {
+      const response = await fetch('/api/director/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deadline: nowIso }),
+      })
 
-    const data = await response.json()
-    if (!response.ok) {
-      const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to close registration window.'
-      setWindowError(msg)
-      setSavingWindow(false)
-      return
-    }
-
-    setCurrentDeadline(nowIso)
-    setDeadline(nowIso.slice(0, 16))
-    setWindowSuccess('Registration window closed successfully. Timetable generation is now unlocked.')
-    setSavingWindow(false)
-
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('fyimp_director_settings_cache')
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          parsed.settings = { ...(parsed.settings || {}), deadline: nowIso }
-          sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(parsed))
-        } catch {}
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to close registration window.'
+        setWindowError(msg)
+        return
       }
+
+      setCurrentDeadline(nowIso)
+      setDeadline(utcIsoToKolkataInput(nowIso))
+      setWindowSuccess('Registration window closed successfully. Timetable generation is now unlocked.')
+      invalidateDirectorCache()
+    } catch (err: any) {
+      setWindowError(err?.message || 'Network error: could not close registration window. Please retry.')
+    } finally {
+      setSavingWindow(false)
     }
   }
 
-  // Promote students
+  // Promote students (F60)
   async function handlePromoteStudents() {
     setPromoting(true)
     setPromoteError('')
     setPromoteSuccess('')
 
-    const response = await fetch('/api/admin/campus/promote-students', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
+    try {
+      const response = await fetch('/api/admin/campus/promote-students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
 
-    const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
-    if (!response.ok) {
-      const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to promote students.'
-      setPromoteError(msg)
+      if (!response.ok) {
+        const msg = (typeof data.message === 'string' ? data.message : data.message?.error) || data.error || 'Failed to promote students.'
+        setPromoteError(msg)
+        return
+      }
+
+      const nowIso = new Date().toISOString()
+      const countDisplay = typeof data.promoted_count === 'number' ? data.promoted_count : ''
+      const rawMsg = typeof data.message === 'string' && !data.message.includes('[object')
+        ? data.message
+        : `${countDisplay ? `${countDisplay} ` : ''}Students promoted to next semester successfully.`
+      setPromoteSuccess(`${rawMsg}${data.graduated_count > 0 ? ` (${data.graduated_count} students graduated and removed)` : ''}`)
+      setLastPromotedAt(nowIso)
+      invalidateDirectorCache()
+    } catch (err: any) {
+      setPromoteError(err?.message || 'Network error during promotion. Please check connection and retry.')
+    } finally {
       setPromoting(false)
       setPromoteStep(0)
-      return
-    }
-
-    const nowIso = new Date().toISOString()
-    const countDisplay = typeof data.promoted_count === 'number' ? data.promoted_count : ''
-    const rawMsg = typeof data.message === 'string' && !data.message.includes('[object')
-      ? data.message
-      : `${countDisplay ? `${countDisplay} ` : ''}Students promoted to next semester successfully.`
-    setPromoteSuccess(`${rawMsg}${data.graduated_count > 0 ? ` (${data.graduated_count} students graduated and removed)` : ''}`)
-    setLastPromotedAt(nowIso)
-    setPromoting(false)
-    setPromoteStep(0)
-
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('fyimp_director_settings_cache')
     }
   }
 
@@ -485,13 +492,13 @@ export default function DirectorDashboard() {
                 {windowIsOpen ? (
                   <>
                     <span className={styles.statusDot} />
-                    🟢 Registration Window OPEN — closes {new Date(currentDeadline!).toLocaleString('en-IN')}
+                    🟢 Registration Window OPEN — closes {formatKolkataDisplay(currentDeadline)}
                   </>
                 ) : (
                   <>
                     ⛔ Registration Window CLOSED
                     {currentDeadline
-                      ? ` — deadline was ${new Date(currentDeadline).toLocaleString('en-IN')}`
+                      ? ` — deadline was ${formatKolkataDisplay(currentDeadline)}`
                       : ' — no deadline set yet'}
                   </>
                 )}
@@ -501,7 +508,12 @@ export default function DirectorDashboard() {
 
                 <div className={styles.field}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className={styles.label}>Registration Deadline</label>
+                    <label className={styles.label}>
+                      Registration Deadline
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: '#64748b', fontWeight: 'normal' }}>
+                        (Asia/Kolkata IST, UTC+05:30)
+                      </span>
+                    </label>
                     <div style={{ display: 'flex', gap: '0.35rem' }}>
                       <button
                         type="button"
@@ -533,7 +545,7 @@ export default function DirectorDashboard() {
                     onChange={e => setDeadline(e.target.value)}
                   />
                   <p className={styles.fieldHint}>
-                    Students will be able to select and submit their ranked elective choices until this deadline.
+                    Students will be able to select and submit their ranked elective choices until this deadline (Indian Standard Time).
                   </p>
                 </div>
 

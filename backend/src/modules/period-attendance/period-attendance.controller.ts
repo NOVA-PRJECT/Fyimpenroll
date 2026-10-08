@@ -18,7 +18,7 @@ import { AuthUser } from '../../core/auth/types';
 import { PeriodAttendanceService } from './period-attendance.service';
 import { AttendanceExportService } from './attendance-export.service';
 import { SubmitAttendanceSchema } from './dto/submit-attendance.dto';
-import { UnlockPeriodSchema } from './dto/unlock-period.dto';
+import { CopyPracticalSchema } from './dto/copy-practical.dto';
 
 @Controller('api/attendance/period')
 @UseGuards(AuthGuard, RolesGuard)
@@ -43,6 +43,22 @@ export class PeriodAttendanceController {
     return this.periodService.getTeacherSchedule(user, date);
   }
 
+  @Get('slot-marks')
+  @Roles('teacher', 'hod', 'superadmin')
+  async getSlotMarks(
+    @CurrentUser() user: AuthUser,
+    @Query('slotId') slotId: string,
+    @Query('date') date: string
+  ) {
+    if (!slotId) {
+      throw new BadRequestException('slotId query parameter is required');
+    }
+    if (!date) {
+      throw new BadRequestException('date query parameter is required (YYYY-MM-DD)');
+    }
+    return this.periodService.getSlotMarks(user, slotId, date);
+  }
+
   @Post('submit')
   @Roles('teacher', 'hod')
   async submitAttendance(
@@ -61,41 +77,38 @@ export class PeriodAttendanceController {
       parsed.data.timetable_slot_id,
       parsed.data.absent_student_ids,
       ip,
-      parsed.data.client_timestamp
+      parsed.data.attendance_date,
+      parsed.data.last_marked_at
     );
   }
 
-  @Post('unlock')
-  @Roles('hod', 'superadmin')
-  async unlockPeriod(
+  @Post('copy-to-next-period')
+  @Roles('teacher', 'hod')
+  async copyPracticalAttendance(
     @CurrentUser() user: AuthUser,
     @Body() body: unknown,
     @Req() req: Request
   ) {
-    const parsed = UnlockPeriodSchema.safeParse(body);
+    const parsed = CopyPracticalSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues[0]?.message || 'Invalid payload');
     }
 
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
-    return this.periodService.unlockPeriod(
-      user,
-      parsed.data.timetable_slot_id,
-      parsed.data.reason,
-      ip
-    );
+    return this.periodService.copyPracticalAttendance(user, parsed.data, ip);
   }
 
   @Get('roster')
   @Roles('hod', 'superadmin')
   async getSlotRosterForHod(
     @CurrentUser() user: AuthUser,
-    @Query('slotId') slotId: string
+    @Query('slotId') slotId: string,
+    @Query('date') date?: string
   ) {
     if (!slotId) {
       throw new BadRequestException('slotId query parameter is required');
     }
-    return this.periodService.getSlotRosterForHod(user, slotId);
+    return this.periodService.getSlotRosterForHod(user, slotId, date);
   }
 
   @Get('slots')
@@ -103,12 +116,14 @@ export class PeriodAttendanceController {
   async getDepartmentSlots(
     @CurrentUser() user: AuthUser,
     @Query('semester') semester?: string,
-    @Query('dayOfWeek') dayOfWeek?: string
+    @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('date') date?: string
   ) {
     return this.periodService.getDepartmentSlots(
       user,
       semester ? parseInt(semester, 10) : undefined,
-      dayOfWeek ? parseInt(dayOfWeek, 10) : undefined
+      dayOfWeek ? parseInt(dayOfWeek, 10) : undefined,
+      date
     );
   }
 
@@ -127,10 +142,10 @@ export class PeriodAttendanceController {
       departmentId
     );
 
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`)
-    res.setHeader('Content-Length', buffer.length)
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Length', buffer.length);
     return res.end(buffer);
   }
 }

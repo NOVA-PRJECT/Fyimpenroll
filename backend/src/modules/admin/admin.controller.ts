@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   Body,
   Controller,
@@ -181,8 +181,55 @@ export class AdminController {
   // ──────────────── Promote Students ────────────────
   @Post('campus/promote-students')
   @Roles('campus_director')
-  async promoteStudents(@CurrentUser() user: AuthUser) {
-    return this.adminService.promoteStudents(user)
+  async promoteStudents(
+    @CurrentUser() user: AuthUser,
+    @Body() body?: { idempotency_key?: string },
+  ) {
+    return this.adminService.promoteStudents(user, body?.idempotency_key)
+  }
+
+  // ──────────────── Graduate Students (F55 Retryable Cleanup) ────────────────
+  @Post('campus/graduate-students')
+  @Roles('campus_director', 'superadmin')
+  async graduateStudents(
+    @Body() body: { campus_id?: string; student_ids: string[] },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const campusId = body.campus_id || user.campus_id
+    if (!campusId) {
+      throw new BadRequestException('Campus ID is required')
+    }
+    if (user.role === 'campus_director' && user.campus_id && user.campus_id !== campusId) {
+      throw new ForbiddenException('Directors can only graduate students for their own campus')
+    }
+    return this.adminService.graduateStudents(campusId, body.student_ids ?? [], user)
+  }
+
+  // ──────────────── Concluded Attendance Cleanup (Retention Purge) ────────────────
+  @Post('campus/concluded-attendance-cleanup')
+  @Roles('campus_director', 'superadmin')
+  async cleanupConcludedAttendance(
+    @Body()
+    body: {
+      campus_id?: string
+      academic_year: string
+      semester: number
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const campusId = body.campus_id || user.campus_id
+    if (!campusId) {
+      throw new BadRequestException('Campus ID is required')
+    }
+    if (!body.academic_year || typeof body.semester !== 'number') {
+      throw new BadRequestException('academic_year and semester are required')
+    }
+    return this.adminService.cleanupConcludedSemesterAttendance(
+      campusId,
+      body.academic_year,
+      body.semester,
+      user,
+    )
   }
 
   // ──────────────── System & Audit Logs ────────────────

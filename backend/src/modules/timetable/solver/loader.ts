@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CourseNode, ParallelGroup, SlotId, SlotLookup, SlotMap } from './types';
+import { CourseNode, ParallelGroup, SlotId, SlotLookup, SlotMap, TeacherReservation } from './types';
 
 /**
  * Build human-readable conflict summary in plain English for each course.
@@ -35,10 +35,13 @@ const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC', 'AEC']);
  * by category and matching session hour structures.
  * For department-specific categories (DSC, DSE), courses are grouped by student department.
  * Category purity is strictly enforced: courses with different categories are NEVER mixed.
+ * F71: Separates AEC-1 and AEC-2 compulsory parallel baskets (and any other multi-basket
+ * categories) so that mutually disjoint options can run in parallel without student collisions.
  */
 export function detectParallelGroups(
   courses: CourseNode[],
-  studentDeptMap: Map<string, string> = new Map()
+  studentDeptMap: Map<string, string> = new Map(),
+  courseSlotMap?: Map<string, Set<number>>
 ): ParallelGroup[] {
   const parallelGroups: ParallelGroup[] = [];
 
@@ -80,37 +83,65 @@ export function detectParallelGroups(
   }
 
   for (const [key, bucket] of buckets) {
-    // Need at least 2 courses to form a parallel group
     if (bucket.length < 2) continue;
     const parts = key.split(':');
     const scopeOrDept = parts[0];
     const category = parts[1];
     const isCampusWide = scopeOrDept === 'campus';
 
-    // Check if ALL pairs in this bucket have zero student overlap.
-    let allZeroOverlap = true;
+    // Partition bucket into disjoint baskets with zero student overlap (F71)
+    // E.g., for AEC, separating English AEC-1 from Second Language AEC-2
+    const zeroOverlapBaskets: CourseNode[][] = [];
+    const sortedBucket = [...bucket].sort((a, b) => a.courseCode.localeCompare(b.courseCode));
 
-    outer:
-    for (let i = 0; i < bucket.length; i++) {
-      for (let j = i + 1; j < bucket.length; j++) {
-        for (const studentId of bucket[i].studentIds) {
-          if (bucket[j].studentIds.has(studentId)) {
-            allZeroOverlap = false;
-            break outer;
+    for (const course of sortedBucket) {
+      let placed = false;
+      for (const b of zeroOverlapBaskets) {
+        const hasOverlap = b.some((bCourse) => {
+          for (const sId of course.studentIds) {
+            if (bCourse.studentIds.has(sId)) return true;
+          }
+          return false;
+        });
+
+        let slotConflict = false;
+        if (courseSlotMap && courseSlotMap.has(course.courseId)) {
+          const cSlots = courseSlotMap.get(course.courseId)!;
+          for (const bCourse of b) {
+            if (courseSlotMap.has(bCourse.courseId)) {
+              const bSlots = courseSlotMap.get(bCourse.courseId)!;
+              const sharesSlot = [...cSlots].some((s) => bSlots.has(s));
+              if (!sharesSlot) {
+                slotConflict = true;
+                break;
+              }
+            }
           }
         }
+
+        if (!hasOverlap && !slotConflict) {
+          b.push(course);
+          placed = true;
+          break;
+        }
+      }
+
+      if (!placed) {
+        zeroOverlapBaskets.push([course]);
       }
     }
 
-    if (allZeroOverlap) {
-      parallelGroups.push({
-        groupId: crypto.randomUUID(), // runtime only — never stored in DB
-        departmentId: isCampusWide ? 'CAMPUS_WIDE' : scopeOrDept,
-        category,
-        isCampusWide,
-        courseIds: bucket.map((c) => c.courseId),
-        courseCodes: bucket.map((c) => c.courseCode),
-      });
+    for (const b of zeroOverlapBaskets) {
+      if (b.length >= 2) {
+        parallelGroups.push({
+          groupId: crypto.randomUUID(), // runtime only — never stored in DB
+          departmentId: isCampusWide ? 'CAMPUS_WIDE' : scopeOrDept,
+          category,
+          isCampusWide,
+          courseIds: b.map((c) => c.courseId),
+          courseCodes: b.map((c) => c.courseCode),
+        });
+      }
     }
   }
 
@@ -129,6 +160,8 @@ export async function loadGenerationInput(
   slotLookup: SlotLookup;
   studentDeptMap: Map<string, string>;
   parallelGroups: ParallelGroup[];
+  teacherReservations: TeacherReservation[];
+  preflightDiagnostics: string[];
   stats: {
     registrationCount: number;
     studentCount: number;
@@ -184,6 +217,7 @@ export async function loadGenerationInput(
   // Extract all student-to-course pairs from all 8 supported slots (F15)
   const studentCoursePairs: Array<{ studentId: string; courseId: string }> = [];
   const allCourseIds = new Set<string>();
+  const courseSlotMap = new Map<string, Set<number>>();
 
   for (const reg of rawRegistrations) {
     const slots = [
@@ -196,12 +230,16 @@ export async function loadGenerationInput(
       (reg as any).slot_7_course_id,
       (reg as any).slot_8_course_id,
     ];
-    for (const courseId of slots) {
+    slots.forEach((courseId, slotIdx) => {
       if (courseId) {
         studentCoursePairs.push({ studentId: reg.student_id, courseId });
         allCourseIds.add(courseId);
+        if (!courseSlotMap.has(courseId)) {
+          courseSlotMap.set(courseId, new Set());
+        }
+        courseSlotMap.get(courseId)!.add(slotIdx + 1);
       }
-    }
+    });
   }
 
   if (allCourseIds.size === 0) {
@@ -264,6 +302,24 @@ export async function loadGenerationInput(
   if (courseError) {
     console.error('loadGenerationInput courses error:', courseError);
     throw new Error(`Database error while reading courses: ${courseError.message}`);
+  }
+
+  // Query 3b: Load teacher assignments for current cohort (F37)
+  let teacherQuery = supabase
+    .from('teacher_course_assignments')
+    .select('course_id, teacher_id')
+    .eq('academic_year', academicYear)
+    .eq('semester', semester);
+
+  if (campusId) {
+    teacherQuery = teacherQuery.eq('campus_id', campusId);
+  }
+  const { data: currentTeacherAssignments } = await teacherQuery;
+  const courseTeacherMap = new Map<string, string>();
+  for (const row of currentTeacherAssignments || []) {
+    if (row.course_id && row.teacher_id) {
+      courseTeacherMap.set(row.course_id, row.teacher_id);
+    }
   }
 
   const courseMetaMap = new Map<
@@ -355,6 +411,7 @@ export async function loadGenerationInput(
       practicalHours: group.practicalHours,
       isCrossDept: group.studentDeptIds.size > 1,
       studentIds: group.studentIds,
+      teacherId: courseTeacherMap.get(courseId),
       conflictSummary: '', // computed below once all courses are populated
     });
   }
@@ -413,8 +470,86 @@ export async function loadGenerationInput(
   let slotCount = 0;
   slotMap.forEach((dayMap) => (slotCount += dayMap.size));
 
-  // Auto-detect parallel groups dynamically from live registration data using studentDeptMap
-  const parallelGroups = detectParallelGroups(courses, studentDeptMap);
+  // Auto-detect parallel groups dynamically from live registration data using studentDeptMap and courseSlotMap (F71)
+  const parallelGroups = detectParallelGroups(courses, studentDeptMap, courseSlotMap);
+
+  // F37: Load published reservations across all other semesters & campuses for current academic year
+  const teacherReservations: TeacherReservation[] = [];
+  const { data: publishedEntries } = await supabase
+    .from('timetable_entries')
+    .select(`
+      id,
+      academic_year,
+      semester,
+      course_id,
+      department_id,
+      status,
+      time_slots (
+        day_of_week,
+        period_number
+      )
+    `)
+    .eq('academic_year', academicYear)
+    .eq('status', 'published');
+
+  // Also fetch all teacher course assignments for the academic year to resolve teachers
+  const { data: allYearTeacherAssignments } = await supabase
+    .from('teacher_course_assignments')
+    .select('course_id, campus_id, semester, teacher_id')
+    .eq('academic_year', academicYear);
+
+  const teacherByCourseTerm = new Map<string, string>();
+  for (const tca of allYearTeacherAssignments || []) {
+    if (tca.course_id && tca.teacher_id) {
+      teacherByCourseTerm.set(`${tca.course_id}:${tca.semester}`, tca.teacher_id);
+      teacherByCourseTerm.set(tca.course_id, tca.teacher_id);
+    }
+  }
+
+  for (const entry of publishedEntries || []) {
+    const slot = (entry as any).time_slots;
+    if (!slot) continue;
+
+    const isOtherSemester = entry.semester !== semester;
+    const isOtherCampus = !allCourseIds.has(entry.course_id);
+
+    if (isOtherSemester || isOtherCampus) {
+      const assignedTeacher =
+        (entry as any).teacher_id ||
+        teacherByCourseTerm.get(`${entry.course_id}:${entry.semester}`) ||
+        teacherByCourseTerm.get(entry.course_id);
+
+      if (assignedTeacher) {
+        teacherReservations.push({
+          teacherId: assignedTeacher,
+          day: slot.day_of_week,
+          period: slot.period_number,
+          sourceCourseId: entry.course_id,
+          sourceSemester: entry.semester,
+        });
+      }
+    }
+  }
+
+  // Preflight diagnostics for D03, D04, D05
+  const preflightDiagnostics: string[] = [];
+  for (const c of courses) {
+    if (c.practicalHours % 2 !== 0) {
+      preflightDiagnostics.push(
+        `[D03 Warning] Course ${c.courseCode} has practical_hours=${c.practicalHours} (odd contact period). Single period lab scheduled.`
+      );
+    }
+    if (semester === 3 && (c.category || '').toUpperCase() === 'VAC' && (c.theoryHours + c.practicalHours) > 2) {
+      preflightDiagnostics.push(
+        `[D04 Warning] Course ${c.courseCode} (VAC) has ${c.theoryHours + c.practicalHours} contact hours, exceeding Semester 3 Monday P5+P6 (2-hour) window.`
+      );
+    }
+    if (c.theoryHours === 0 && c.practicalHours === 0) {
+      preflightDiagnostics.push(
+        `[D05 Warning] Course ${c.courseCode} has 0 theory and 0 practical hours. Verify non-classroom syllabus component.`
+      );
+    }
+  }
 
   const stats = {
     registrationCount: rawRegistrations.length,
@@ -427,9 +562,18 @@ export async function loadGenerationInput(
 
   await onProgress?.(
     30,
-    `⏰ Verified ${slotCount} weekly time slots & detected ${parallelGroups.length} parallel group(s). Ready for AI scheduling...`,
+    `⏰ Verified ${slotCount} weekly time slots & detected ${parallelGroups.length} parallel group(s). Ready for solver...`,
     stats
   );
 
-  return { courses, slotMap, slotLookup, studentDeptMap, parallelGroups, stats };
+  return {
+    courses,
+    slotMap,
+    slotLookup,
+    studentDeptMap,
+    parallelGroups,
+    teacherReservations,
+    preflightDiagnostics,
+    stats,
+  };
 }
