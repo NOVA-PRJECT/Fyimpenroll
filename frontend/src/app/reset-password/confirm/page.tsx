@@ -64,6 +64,7 @@ function ConfirmResetForm() {
 
     // Check for explicit error from Supabase (e.g. token expired, already used)
     if (explicitError) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the client view with fetched data, browser storage, or the selected resource.
       setStatus('error')
       setErrorMessage(explicitError)
       return
@@ -122,7 +123,7 @@ function ConfirmResetForm() {
             '/reset-password?message=Please%20request%20a%20new%20password%20reset%20link.',
           )
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Session initialization error:', err)
         if (isMounted) {
           setStatus('error')
@@ -167,8 +168,8 @@ function ConfirmResetForm() {
       router.replace(
         '/login?message=Password%20updated%20successfully.%20Please%20log%20in%20with%20your%20new%20password.',
       )
-    } catch (err: any) {
-      setSubmitError(err?.message || 'Synchronization request failed. Please check your connection.')
+    } catch (err: unknown) {
+      setSubmitError((err instanceof Error ? err.message : '') || 'Synchronization request failed. Please check your connection.')
       setSubmitting(false)
     }
   }
@@ -236,8 +237,8 @@ function ConfirmResetForm() {
       router.replace(
         '/login?message=Password%20updated%20successfully.%20Please%20log%20in%20with%20your%20new%20password.',
       )
-    } catch (err: any) {
-      setSubmitError(err?.message || 'An unexpected error occurred. Please try again.')
+    } catch (err: unknown) {
+      setSubmitError((err instanceof Error ? err.message : '') || 'An unexpected error occurred. Please try again.')
       setSubmitting(false)
     }
   }

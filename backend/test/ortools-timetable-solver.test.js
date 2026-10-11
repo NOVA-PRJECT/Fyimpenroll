@@ -412,76 +412,10 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
   // 4. F33: Immutable Publication & In-Place Teacher Substitution
   // ──────────────────────────────────────────────────────────────────────────
   describe('4. F33: Immutable Publication & Teacher Substitution In-Place', () => {
-    it('service rejects generation when a published timetable exists for the term', async () => {
-      const mockSupabase = {
-        admin: {
-          from: (table) => {
-            if (table === 'campus_settings') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    maybeSingle: async () => ({
-                      data: { deadline: '2026-09-01T00:00:00Z', academic_year: '2025-2026' }, // closed window
-                    }),
-                  }),
-                }),
-              }
-            }
-            if (table === 'allocation_runs') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    eq: () => ({
-                      eq: () => ({
-                        eq: async () => ({ data: [{ id: 'run-1', status: 'completed' }] }), // completed allocation
-                      }),
-                    }),
-                  }),
-                }),
-              }
-            }
-            if (table === 'departments') {
-              return {
-                select: () => ({
-                  eq: async () => ({ data: [{ id: 'dept-1' }] }),
-                }),
-              }
-            }
-            if (table === 'timetable_entries') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    eq: () => ({
-                      eq: () => ({
-                        limit: () => ({
-                          in: async () => ({ data: [{ id: 'published-entry-1' }] }), // Published entry exists!
-                        }),
-                      }),
-                    }),
-                  }),
-                }),
-              }
-            }
-            return {
-              select: () => ({ eq: async () => ({ data: null }) }),
-            }
-          },
-        },
-      }
-
-      const service = new TimetableService(mockSupabase, { log: async () => {} }, { error: () => {}, warn: () => {} })
-
-      await assert.rejects(
-        async () => {
-          await service.generate('2025-2026', 1, [], {
-            userId: 'dir-1',
-            role: 'campus_director',
-            campus_id: 'campus-1',
-          })
-        },
-        /Published timetables are strictly immutable \(F33\)/
-      )
-    })
+    it('generation propagates the atomic claim rejection for a published cohort', async()=>{
+ const service=new TimetableService({admin:{from(){const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:{deadline:'2026-09-01T00:00:00Z'}})};return q},rpc:async(name,args)=>{assert.equal(name,'claim_timetable_generation_job');assert.equal(args.p_campus_id,'campus-1');return {error:{message:'Published timetables are strictly immutable (F33)'}}}}},{log:async()=>{}},{error:()=>{},warn:()=>{}})
+ await assert.rejects(service.generate('2025-2026',1,[],{userId:'director',role:'campus_director',campus_id:'campus-1'}),/Published timetables are strictly immutable/)
+})
 
     it('substituteTeacher updates teacher_id in place without altering entry id or session structure', async () => {
       let updatedTeacherId = null
@@ -551,44 +485,14 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
   })
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 5. F39: Durable JSON Constraints Merging & Overrides
+  // 5. R20: Durable JSON Constraints Merging & Overrides
   // ──────────────────────────────────────────────────────────────────────────
-  describe('5. F39: Durable JSON Constraints Management', () => {
-    it('merges university baseline constraints with campus director overrides', async () => {
-      const mockSupabase = {
-        admin: {
-          from: (table) => {
-            if (table === 'campus_settings') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    maybeSingle: async () => ({
-                      data: {
-                        timetable_constraints: {
-                          hard_constraints: ['Campus 1 custom rule: No classes on Friday P6'],
-                        },
-                      },
-                    }),
-                  }),
-                }),
-              }
-            }
-            return {}
-          },
-        },
-      }
-
-      const service = new TimetableService(mockSupabase, { log: async () => {} }, { error: () => {}, warn: () => {} })
-      const constraints = await service.getConstraints('1', {
-        userId: 'dir-1',
-        role: 'campus_director',
-        campus_id: 'campus-1',
-      })
-
-      assert.ok(constraints.hard_constraints.includes('Campus 1 custom rule: No classes on Friday P6'))
-      // Base rule should also be preserved
-      assert.ok(constraints.hard_constraints.some((r) => r.includes('lunch break')))
-    })
+  describe('5. R20: Durable JSON Constraints Management', () => {
+    it('server rule editing rejects file writes and serves the repository document', async () => {
+ const service=new TimetableService({admin:{}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
+ await assert.rejects(service.updateConstraints({rules:[]},{role:'campus_director',campus_id:'host'}),/Server files are read-only/)
+ const rules=await service.getConstraints('1',{role:'campus_director',campus_id:'host'});assert.equal(rules.campusId,'host');assert.ok(rules.rules.length>0)
+})
   })
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -679,13 +583,13 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
       assert.ok(violations.some((v) => v.detail.includes('outside operational timetable domain')))
     })
 
-    it('D03: permits single 1-hour practical period for courses with practicalHours=1 without failing lab pair check', () => {
+    it('R21: rejects single 1-hour practical period or odd practicalHours under the exact-two-period lab block rule', () => {
       const courses = [
         {
           courseId: 'c-odd',
           courseCode: 'KU01DSCBOT101',
           theoryHours: 2,
-          practicalHours: 1, // Observation D03: odd practical hour
+          practicalHours: 1, // Observation D03 / R21: odd practical hour
           studentIds: new Set(['s1']),
         },
       ]
@@ -704,7 +608,8 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
       }
 
       const violations = validateTimetable(response, courses, new Map(), [])
-      assert.strictEqual(violations.length, 0, `Expected 0 violations for D03, got: ${violationsToText(violations).join('; ')}`)
+      assert.ok(violations.length > 0, 'Validator must reject odd practical hours')
+      assert.ok(violations.some((v) => v.type === 'invalid_lab_block' && v.detail.includes('R21')))
     })
   })
 })

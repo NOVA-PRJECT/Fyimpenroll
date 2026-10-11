@@ -1,4 +1,5 @@
-﻿export type Role = 'superadmin' | 'campus_director' | 'hod' | 'teaching_staff' | 'teacher' | 'student'
+import type { Role } from '@fyimp/contracts'
+export type { Role } from '@fyimp/contracts'
 
 export interface AuthUser {
   userId: string

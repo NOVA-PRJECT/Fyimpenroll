@@ -10,6 +10,8 @@ import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
+import { fetchAllPaginated } from '../../core/database/pagination.util'
+import { ExportService } from '../credit-ledger/export.service'
 import { SEMESTERS } from '../../core/constants/semesters'
 import { validatePathwaySlots } from '../../core/utils/slotRules'
 
@@ -29,6 +31,7 @@ export class HodService {
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
     private readonly serverLogger: ServerLoggerService,
+    private readonly exportService: ExportService,
   ) {}
 
   // ──────────────── Catalog Readiness Checklist (F53, D07) ────────────────
@@ -525,7 +528,8 @@ export class HodService {
       query = query.eq('current_semester', semester)
     }
 
-    const { data, error } = await query.order('full_name')
+    const data = await fetchAllPaginated<any>(query.eq('campus_id',user.campus_id).order('full_name').order('id'))
+    const error = null
     if (error) {
       this.serverLogger.error('Failed to fetch students in HOD getStudents', error.message)
       throw new InternalServerErrorException('Failed to fetch students')
@@ -810,137 +814,9 @@ export class HodService {
   }
 
   async exportStudentsExcel(semester: number | undefined, user: AuthUser) {
-    let query = this.supabase.admin
-      .from('student_registrations')
-      .select(`
-        student_id,
-        semester,
-        slot_1_course_id,
-        slot_2_course_id,
-        slot_3_course_id,
-        slot_4_course_id,
-        slot_5_course_id,
-        slot_6_course_id,
-        slot_7_course_id,
-        slot_8_course_id,
-        selections,
-        students!inner(full_name, department_id)
-      `)
-      .eq('students.department_id', user.department_id)
-
-    if (semester) {
-      query = query.eq('semester', semester)
-    }
-
-    let { data: registrations, error } = await query
-    if (error && (error.message?.includes('slot_7_course_id') || error.message?.includes('slot_8_course_id'))) {
-      let fallbackQuery = this.supabase.admin
-        .from('student_registrations')
-        .select(`
-          student_id,
-          semester,
-          slot_1_course_id,
-          slot_2_course_id,
-          slot_3_course_id,
-          slot_4_course_id,
-          slot_5_course_id,
-          slot_6_course_id,
-          selections,
-          students!inner(full_name, department_id)
-        `)
-        .eq('students.department_id', user.department_id)
-      if (semester) fallbackQuery = fallbackQuery.eq('semester', semester)
-      const fallbackRes = await fallbackQuery
-      registrations = fallbackRes.data as any
-      error = fallbackRes.error
-    }
-    if (error) throw new InternalServerErrorException('Failed to fetch registration records')
-
-    // Collect all course IDs from registrations to lookup titles
-    const allCourseIds = new Set<string>()
-    for (const reg of registrations ?? []) {
-      for (let i = 1; i <= 8; i++) {
-        const cid = (reg as any)[`slot_${i}_course_id`]
-        if (cid) allCourseIds.add(cid)
-      }
-      const rawSel = (reg as any).selections
-      const list = Array.isArray(rawSel) ? rawSel : Array.isArray(rawSel?.courses) ? rawSel.courses : []
-      for (const item of list) {
-        const cid = typeof item === 'string' ? item : item?.id || item?.course_id
-        if (cid) allCourseIds.add(cid)
-      }
-    }
-
-    const courseTitleMap = new Map<string, string>()
-    const courseCreditsMap = new Map<string, number>()
-    if (allCourseIds.size > 0) {
-      const { data: courseList } = await this.supabase.admin
-        .from('courses')
-        .select('id, title, course_code, credits')
-        .in('id', Array.from(allCourseIds))
-      for (const c of courseList ?? []) {
-        courseTitleMap.set(c.id, `${c.title} (${c.course_code})`)
-        courseCreditsMap.set(c.id, Number(c.credits) || 0)
-      }
-    }
-
-    const rows = (registrations ?? []).map((reg: any) => {
-      const student = reg.students
-      const papers: string[] = []
-      let coreCredits = 0
-      let additionalCredits = 0
-
-      for (let i = 1; i <= 8; i++) {
-        const cid = reg[`slot_${i}_course_id`]
-        if (cid && courseTitleMap.has(cid)) {
-          papers.push(courseTitleMap.get(cid)!)
-          const cr = courseCreditsMap.get(cid) || 0
-          if (i <= 6) coreCredits += cr
-          else additionalCredits += cr
-        } else {
-          papers.push('')
-        }
-      }
-
-      // If flat slots were empty, check selections JSONB
-      if (papers.every((p) => !p)) {
-        const rawSel = reg.selections
-        const list = Array.isArray(rawSel) ? rawSel : Array.isArray(rawSel?.courses) ? rawSel.courses : []
-        list.forEach((item: any, idx: number) => {
-          const cid = typeof item === 'string' ? item : item?.id || item?.course_id
-          const title = item?.title || (cid ? courseTitleMap.get(cid) : '')
-          if (idx < 8) {
-            papers[idx] = title || ''
-            const cr = Number(item?.credits) || (cid ? courseCreditsMap.get(cid) : 0) || 0
-            if (idx < 6) coreCredits += cr
-            else additionalCredits += cr
-          }
-        })
-      }
-
-      const totalCredits = Number(reg.total_credits) || (coreCredits + additionalCredits)
-
-      return {
-        name: student?.full_name ?? '—',
-        sem: reg.semester,
-        paper_1: papers[0] ?? '',
-        paper_2: papers[1] ?? '',
-        paper_3: papers[2] ?? '',
-        paper_4: papers[3] ?? '',
-        paper_5: papers[4] ?? '',
-        paper_6: papers[5] ?? '',
-        paper_7: papers[6] ?? '',
-        paper_8: papers[7] ?? '',
-        core_credits: coreCredits,
-        additional_credits: additionalCredits,
-        total_credits: totalCredits,
-      }
-    })
-
-    return rows
+    return this.exportService.exportFinalRegistrations({ semester, format: 'json' }, user)
   }
 
-  // ──────────────── Teachers Management ────────────────
   async getDepartmentTeachers(user: AuthUser) {
     const departmentId = user.department_id
     if (!departmentId) {

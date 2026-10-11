@@ -1,8 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as crypto from 'crypto';
+import { FileConstraintStoreService } from './file-constraint-store.service';
 import { runOrtoolsSolver, OrtoolsInputPayload } from './ortools-runner';
 import { loadGenerationInput } from './loader';
 import { validateTimetable, violationsToText } from './validator';
@@ -24,34 +22,7 @@ function formatSolverErrorMessage(raw: string): string {
   return `Timetable solver failed: ${raw}`;
 }
 
-const BASE_CONSTRAINTS_PATH = path.join(__dirname, 'constraints.base.json');
-
-function loadMergedConstraints(campusSettingsConstraints?: Record<string, any>): {
-  constraints: Record<string, any>;
-  ruleHash: string;
-} {
-  let base: Record<string, any> = {};
-  try {
-    if (fs.existsSync(BASE_CONSTRAINTS_PATH)) {
-      base = JSON.parse(fs.readFileSync(BASE_CONSTRAINTS_PATH, 'utf8'));
-    }
-  } catch (err) {
-    console.warn('Warning: Could not read base constraints JSON:', err);
-  }
-
-  const merged = {
-    ...base,
-    ...(campusSettingsConstraints || {}),
-  };
-
-  const ruleHash = crypto
-    .createHash('sha256')
-    .update(JSON.stringify(merged))
-    .digest('hex')
-    .slice(0, 16);
-
-  return { constraints: merged, ruleHash };
-}
+const fileConstraintStore = new FileConstraintStoreService();
 
 export async function runGenerationJob(
   jobId: string,
@@ -62,7 +33,8 @@ export async function runGenerationJob(
   redis: Redis,
   campusId?: string,
   dynamicConstraints: DynamicConstraint[] = [],
-  campusConstraints?: Record<string, any>
+  campusConstraints?: Record<string, any>,
+  fencingToken?: string
 ): Promise<void> {
   const redisKey = `timetable:job:${academicYear}:${semester}${campusId ? `:${campusId}` : ''}`;
   const dbClient = supabase;
@@ -82,27 +54,15 @@ export async function runGenerationJob(
       stats: currentStats,
       jobId,
     };
-    await redis.set(redisKey, JSON.stringify(payload), { ex: 3600 });
-    try {
-      await dbClient
-        .from('timetable_generation_jobs')
-        .update({
-          progress,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', jobId);
-    } catch {
-      // Non-blocking progress sync
-    }
+    const { error } = await dbClient.rpc('update_timetable_worker', {
+      p_job_id: jobId, p_fencing_token: fencingToken, p_status: 'running', p_progress: progress,
+    });
+    if (error) throw new Error(`Worker claim rejected: ${error.message}`);
+    await redis.set(redisKey, JSON.stringify(payload), { ex: 3600 }).catch(() => {});
   };
 
   try {
-    // 1. Mark running
-    await dbClient
-      .from('timetable_generation_jobs')
-      .update({ status: 'running', started_at: new Date().toISOString() })
-      .eq('id', jobId);
-
+    if (!fencingToken) throw new Error('A worker fencing token is required');
     await reportProgress(5, '🚀 Initializing OR-Tools CP-SAT timetable generation job...');
 
     // Resolve campus departments
@@ -125,18 +85,24 @@ export async function runGenerationJob(
       throw new Error('Campus has no registered departments. Generation cannot proceed.');
     }
 
-    // F33: Immutable publication guard — NEVER regenerate if published schedule exists!
-    const { data: publishedRows, error: pubCheckErr } = await dbClient
+    // F33 & R06: Immutable publication guard — NEVER regenerate if published schedule exists for this campus!
+    let pubCheckQuery = dbClient
       .from('timetable_entries')
       .select('id')
       .eq('academic_year', academicYear)
       .eq('semester', semester)
-      .eq('status', 'published')
-      .in('department_id', deptIds)
-      .limit(1);
+      .eq('status', 'published');
+
+    if (campusId) {
+      pubCheckQuery = pubCheckQuery.or(`campus_id.eq.${campusId},department_id.in.(${deptIds.join(',')})`);
+    } else {
+      pubCheckQuery = pubCheckQuery.in('department_id', deptIds);
+    }
+
+    const { data: publishedRows, error: pubCheckErr } = await pubCheckQuery.limit(1);
 
     if (pubCheckErr) {
-      console.warn('Warning: Error checking published entries:', pubCheckErr);
+      throw new Error(`Could not verify publication state: ${pubCheckErr.message}`);
     }
 
     if (publishedRows && publishedRows.length > 0) {
@@ -165,12 +131,15 @@ export async function runGenerationJob(
       }
     );
 
-    // Load effective constraints snapshot (F39)
-    const { constraints: effectiveConstraints, ruleHash } = loadMergedConstraints(campusConstraints);
+    // R19 & R20: Load effective typed rules and schedule config from durable file store
+    const effectiveDoc = fileConstraintStore.getBaseConstraints();
+    effectiveDoc.rules = [...(campusConstraints?.rules ?? effectiveDoc.rules), ...dynamicConstraints.map(c => c.typedRule).filter(Boolean)]
+      .filter((rule: any) => !rule.targetSemester || rule.targetSemester === semester);
+    const ruleHash = fileConstraintStore.computeRuleHash(effectiveDoc);
 
     await reportProgress(
       25,
-      `📚 Loaded ${courses.length} courses across ${parallelGroups.length} parallel baskets. Compiling OR-Tools model (Rule hash: ${ruleHash})...`,
+      `📚 Loaded ${courses.length} courses across ${parallelGroups.length} parallel baskets. Compiling OR-Tools model (Rule hash: ${ruleHash.slice(0, 12)})...`,
       { ...loadStats, preflightDiagnosticsCount: preflightDiagnostics.length }
     );
 
@@ -204,9 +173,12 @@ export async function runGenerationJob(
         source: `sem_${r.sourceSemester || 'other'}_crs_${r.sourceCourseId || 'other'}`,
       })),
       constraints: {
-        ...effectiveConstraints,
+        schedule: effectiveDoc.schedule,
+        rules: effectiveDoc.rules,
+        semester_constraints: effectiveDoc.semester_constraints,
         dynamic_constraints: dynamicConstraints,
       },
+      rules: effectiveDoc.rules,
       config: {
         max_time_in_seconds: 30,
         num_workers: 4,
@@ -264,13 +236,17 @@ export async function runGenerationJob(
       assignments: Array.from(assignmentsByCourse.values()),
     };
 
-    // Independent validation (F36, F37, F71)
+    // Independent validation with semester context and effective rules (F36, F37, F71, R17, R18, R19, R21)
     const violations = validateTimetable(
       candidateResponse,
       courses,
       slotMap,
       parallelGroups,
-      teacherReservations
+      teacherReservations,
+      {
+        semester,
+        effectiveRules: effectiveDoc.rules,
+      }
     );
 
     if (violations.length > 0) {
@@ -286,47 +262,7 @@ export async function runGenerationJob(
       loadStats
     );
 
-    // 7. Atomic replacement of DRAFT entries ONLY (F33 & F34)
-    // Only delete draft entries for this campus, academic year, and semester! Never touch published entries!
-    const { error: deleteErr } = await dbClient
-      .from('timetable_entries')
-      .delete()
-      .eq('academic_year', academicYear)
-      .eq('semester', semester)
-      .eq('status', 'draft')
-      .in('department_id', deptIds);
-
-    if (deleteErr) {
-      console.warn('Warning: Error deleting prior draft entries:', deleteErr);
-    }
-
-    // Clear old unresolved conflicts strictly scoped to this campus's courses (F34)
-    const { data: campusCourses } = await dbClient
-      .from('courses')
-      .select('id')
-      .in('department_id', deptIds);
-
-    const campusCourseIds = (campusCourses || []).map((c: any) => c.id);
-    if (campusCourseIds.length > 0) {
-      await dbClient
-        .from('timetable_conflicts')
-        .delete()
-        .eq('academic_year', academicYear)
-        .eq('semester', semester)
-        .in('course_id', campusCourseIds);
-    }
-
-    // 8. Bulk insert new draft assignments (90%)
-    await reportProgress(
-      90,
-      `💾 Committing ${solverResult.assignments.length} verified schedule entries to database...`,
-      {
-        ...loadStats,
-        placedEntries: solverResult.assignments.length,
-        solverStatus: solverResult.status,
-      }
-    );
-
+    // 7. Stage complete verified assignments for atomic swap (R22)
     const entryRows: any[] = [];
     for (const a of solverResult.assignments) {
       const daySlots = slotMap.get(a.day);
@@ -342,6 +278,7 @@ export async function runGenerationJob(
         semester,
         course_id: a.courseId,
         department_id: a.departmentId,
+        campus_id: campusId || null,
         time_slot_id: slotUuid,
         is_lab_block: a.isLabBlock,
         session_type: a.sessionType,
@@ -350,26 +287,33 @@ export async function runGenerationJob(
       });
     }
 
-    // Insert in chunks of 500
-    const CHUNK_SIZE = 500;
-    for (let i = 0; i < entryRows.length; i += CHUNK_SIZE) {
-      const chunk = entryRows.slice(i, i + CHUNK_SIZE);
-      const { error: insertErr } = await dbClient.from('timetable_entries').insert(chunk);
-      if (insertErr) {
-        throw new Error(`Failed to save timetable entries: ${insertErr.message}`);
-      }
+    // Verify worker lease hasn't expired before committing entries
+    const { data: jobCheck } = await dbClient
+      .from('timetable_generation_jobs')
+      .select('status, error_message')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    if (jobCheck && jobCheck.status === 'failed') {
+      throw new Error(`Worker lease expired or was cancelled before commit: ${jobCheck.error_message || 'Job aborted'}`);
     }
 
-    // 9. Mark complete (100%)
-    await dbClient
-      .from('timetable_generation_jobs')
-      .update({
-        status: 'completed',
-        progress: 100,
-        completed_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .eq('id', jobId);
+    // 8. Atomic replacement of DRAFT entries (R22)
+    await reportProgress(
+      90,
+      `💾 Committing ${solverResult.assignments.length} verified schedule entries to database atomically...`,
+      {
+        ...loadStats,
+        placedEntries: solverResult.assignments.length,
+        solverStatus: solverResult.status,
+      }
+    );
+
+    const { error: replaceErr } = await dbClient.rpc('atomic_replace_timetable_draft', {
+      p_campus_id: campusId, p_academic_year: academicYear, p_semester: semester,
+      p_entries: entryRows, p_job_id: jobId, p_fencing_token: fencingToken,
+    });
+    if (replaceErr) throw new Error(`Atomic draft replacement failed: ${replaceErr.message}`);
 
     const completionMsg = `🎉 OR-Tools Timetable generated successfully with ${solverResult.assignments.length} entries (${solverResult.status}). Zero violations!`;
 
@@ -386,7 +330,7 @@ export async function runGenerationJob(
       },
       jobId,
     };
-    await redis.set(redisKey, JSON.stringify(finalPayload), { ex: 3600 });
+    await redis.set(redisKey, JSON.stringify(finalPayload), { ex: 3600 }).catch(() => {});
   } catch (err: any) {
     console.error('Timetable generation job failed:', err);
 
@@ -408,14 +352,9 @@ export async function runGenerationJob(
 
     // 2. Attempt Database record update
     try {
-      await dbClient
-        .from('timetable_generation_jobs')
-        .update({
-          status: 'failed',
-          error_message: friendlyError,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', jobId);
+      await dbClient.rpc('update_timetable_worker', {
+        p_job_id: jobId, p_fencing_token: fencingToken, p_status: 'failed', p_progress: 0, p_error: friendlyError,
+      });
     } catch (dbErr) {
       console.error('Warning: Failed to update DB job failure status:', dbErr);
     }

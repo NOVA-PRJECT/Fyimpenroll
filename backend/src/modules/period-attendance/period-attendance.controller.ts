@@ -1,5 +1,7 @@
+import { ExportBudgetInterceptor } from '../../core/security/export-budget.interceptor'
 import {
   Controller,
+  UseInterceptors,
   Get,
   Post,
   Body,
@@ -71,14 +73,15 @@ export class PeriodAttendanceController {
       throw new BadRequestException(parsed.error.issues[0]?.message || 'Invalid payload');
     }
 
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.periodService.submitAttendance(
       user,
       parsed.data.timetable_slot_id,
       parsed.data.absent_student_ids,
       ip,
       parsed.data.attendance_date,
-      parsed.data.last_marked_at
+      parsed.data.last_marked_at,
+      parsed.data.expected_revision
     );
   }
 
@@ -94,7 +97,7 @@ export class PeriodAttendanceController {
       throw new BadRequestException(parsed.error.issues[0]?.message || 'Invalid payload');
     }
 
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.periodService.copyPracticalAttendance(user, parsed.data, ip);
   }
 
@@ -128,6 +131,7 @@ export class PeriodAttendanceController {
   }
 
   @Get('export/statement')
+  @UseInterceptors(ExportBudgetInterceptor)
   @Roles('hod', 'superadmin')
   async exportStatement(
     @CurrentUser() user: AuthUser,

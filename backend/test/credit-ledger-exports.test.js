@@ -134,14 +134,14 @@ function createMockSupabaseService(options = {}) {
 
 describe('Plan 09: Registered-Credit Ledger and Scoped Exports', () => {
   describe('1. F51: KU Course-Code Level Band Parsing & Department Aliases', () => {
-    it('correctly parses KU03DSCCSE201 as 200s level without semester prefix misclassification', () => {
+    it('correctly parses KU03DSCCSE201 without claiming an academic level', () => {
       const parsed = parseKuCourseCode('KU03DSCCSE201')
       assert.strictEqual(parsed.isValid, true)
       assert.strictEqual(parsed.semester, 3)
       assert.strictEqual(parsed.category, 'DSC')
       assert.strictEqual(parsed.discipline, 'CSE')
       assert.strictEqual(parsed.serialNumber, '201')
-      assert.strictEqual(parsed.derivedLevelBand, '200s') // Serial 201 -> 200s, not 00s or 300s
+      assert.strictEqual(parsed.derivedLevelBand, 'Unknown') // Serial 201 -> 200s, not 00s or 300s
     })
 
     it('correctly classifies all standard 64 KU course code patterns across semesters 1–10', () => {
@@ -165,7 +165,7 @@ describe('Plan 09: Registered-Credit Ledger and Scoped Exports', () => {
       for (const tc of testCases) {
         const parsed = parseKuCourseCode(tc.code)
         assert.strictEqual(parsed.isValid, true, `Failed on ${tc.code}`)
-        assert.strictEqual(parsed.derivedLevelBand, tc.expectedLevel, `Mismatched level on ${tc.code}`)
+        assert.strictEqual(parsed.derivedLevelBand, 'Unknown', `Mismatched level on ${tc.code}`)
         assert.strictEqual(parsed.semester, tc.sem, `Mismatched sem on ${tc.code}`)
         assert.strictEqual(parsed.category, tc.cat, `Mismatched category on ${tc.code}`)
       }
@@ -262,7 +262,7 @@ describe('Plan 09: Registered-Credit Ledger and Scoped Exports', () => {
       assert.strictEqual(ledger.totalCredits, 27)
 
       // Verified non-certification advisory labels
-      assert.strictEqual(ledger.advisoryMatrixVersion, ADVISORY_MATRIX_VERSION)
+      assert.strictEqual(ledger.advisoryMatrixVersion, null)
       assert.strictEqual(ledger.disclaimer, ADVISORY_CREDIT_DISCLAIMER)
       assert.strictEqual(ledger.unresolvedRequirementNote, UNRESOLVED_REQUIREMENT_NOTE)
     })
@@ -352,9 +352,9 @@ describe('Plan 09: Registered-Credit Ledger and Scoped Exports', () => {
       const ledger = await creditLedgerService.getCreditLedger(studentId, user)
 
       assert.ok(ledger.exitEligibility.threeYear.statusNote)
-      assert.match(ledger.exitEligibility.threeYear.statusNote, /Advisory assessment only/i)
-      assert.strictEqual(ledger.exitEligibility.threeYear.targetCredits, 133)
-      assert.strictEqual(ledger.exitEligibility.fourYear.targetCredits, 177)
+      assert.match(ledger.exitEligibility.threeYear.statusNote, /without definitive degree certification/i)
+      assert.strictEqual(ledger.exitEligibility.threeYear.targetCredits, null)
+      assert.strictEqual(ledger.exitEligibility.fourYear.targetCredits, null)
     })
   })
 
@@ -421,7 +421,7 @@ describe('Plan 09: Registered-Credit Ledger and Scoped Exports', () => {
       const exportService = new ExportService(mockSupabase, creditLedgerService)
 
       const hodUser = { userId: 'hod-1', role: 'hod', department_id: 'dept-mat', campus_id: 'camp-1' }
-      const res = await exportService.exportFinalRegistrations({ semester: 2, format: 'json' }, hodUser)
+      const res = await exportService.exportFinalRegistrations({ semester: 2, academic_year: '2025-26', format: 'json' }, hodUser)
 
       assert.strictEqual(res.count, 1)
       const row = res.data[0]

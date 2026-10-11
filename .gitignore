@@ -76,3 +76,14 @@ security-audit-report/
 # supabase local temp
 supabase/.temp/
 supabase/.branches/
+
+# Isolated clean-build verification copies
+.release-clean-*/
+
+# Retired server-generated campus rule overrides; browser edits now accompany generation.
+backend/storage/
+/dependency-updates.json
+
+# Local verification diagnostics
+/frontend-lint.json
+/production-audit-current.json

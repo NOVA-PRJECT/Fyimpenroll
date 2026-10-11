@@ -100,6 +100,7 @@ export interface ValidationViolation {
     | 'half_block_overlap'
     | 'category_slot_mismatch'
     | 'mixed_category_conflict'
+    | 'invalid_window'
     | 'unplaced_course';
   courseId?: string;
   studentId?: string;
@@ -109,10 +110,75 @@ export interface ValidationViolation {
   detail: string;
 }
 
-// ─── Dynamic Constraints ──────────────────────────────────────────────────────
+// ─── Dynamic Constraints & Typed Rule Specification (R19) ───────────────────
+export type RuleKind =
+  | 'NO_STUDENT_OVERLAP'
+  | 'NO_TEACHER_OVERLAP'
+  | 'TEACHER_RESERVATIONS'
+  | 'NO_LUNCH_OVERLAP'
+  | 'EXACT_CONTACT_HOURS'
+  | 'LAB_CONSECUTIVE_PAIR'
+  | 'P6_LAST_RESORT'
+  | 'THEORY_SPREAD'
+  | 'DEPARTMENT_TIME_PREFERENCE'
+  | 'DAY_WINDOW'
+  | 'CATEGORY_WINDOW'
+  | 'SESSION_BLOCK'
+  | 'PARALLEL_CATEGORY_SYNC'
+  | 'CAMPUS_TIME_LIMIT';
+
+export type RuleScope = 'global' | 'campus' | 'semester' | 'category' | 'course' | 'department';
+
+export interface RuleDefinition {
+  id: string;
+  kind: RuleKind;
+  scope: RuleScope;
+  targetSemester?: number;
+  targetCategory?: string;
+  targetCourseId?: string;
+  targetDepartmentId?: string;
+  isHard: boolean;
+  weight?: number; // for soft constraints / penalties
+  parameters?: Record<string, any>;
+  version: number;
+  description: string;
+}
+
+export interface TimetableScheduleConfig {
+  days: string[];
+  periods: Array<{
+    number: number;
+    start: string;
+    end: string;
+    label: string;
+    extended?: boolean;
+  }>;
+  lunch: {
+    start: string;
+    end: string;
+  };
+  extended_period_policy?: string;
+}
+
+export interface EffectiveRuleDocument {
+  version: number;
+  schedule: TimetableScheduleConfig;
+  rules: RuleDefinition[];
+  hard_constraints?: string[];
+  soft_constraints?: string[];
+  semester_constraints?: Record<
+    string,
+    {
+      hard_constraints?: string[];
+      soft_constraints?: string[];
+    }
+  >;
+}
+
 // Sent in the generate API request body by the Campus Director
 export interface DynamicConstraint {
   id: string; // client-generated uuid, for UI list keys
   text: string; // plain English sentence
   category?: 'hard' | 'soft'; // whether strict invariant or preference
+  typedRule?: RuleDefinition; // structured rule if typed
 }

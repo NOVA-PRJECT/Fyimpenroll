@@ -23,8 +23,8 @@ export class FacultyController {
   }
 
   @Get('attendance')
-  async getAttendance(@Query('course_id') courseId: string, @CurrentUser() user: AuthUser) {
-    return this.facultyService.getClassRoster(courseId, user)
+  async getAttendance(@Query('course_id') courseId: string, @CurrentUser() user: AuthUser, @Query('delivery_id') deliveryId?: string) {
+    return this.facultyService.getClassRoster(courseId, user, deliveryId)
   }
 
   @Get('defaulters')

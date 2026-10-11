@@ -1,14 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
-interface SessionRecord {
-  id: string
-  session_type: 'morning' | 'evening'
-  status: 'present' | 'absent' | 'out_of_bounds'
-  signed_in_at: string
-  location_accuracy_meters?: number
-}
+import { useEffect, useState, useCallback } from 'react'
 
 interface CampusStatusResponse {
   student_id: string
@@ -39,7 +31,7 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
   const [locating, setLocating] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
-  async function fetchStatus() {
+  const fetchStatus = useCallback(async () => {
     if (!studentId) return
     setLoading(true)
     try {
@@ -53,11 +45,13 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
     } finally {
       setLoading(false)
     }
-  }
+  }, [studentId])
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchStatus()
-  }, [studentId])
+  }, [fetchStatus])
 
   async function handleGpsSignIn() {
     setFeedback(null)
@@ -96,10 +90,10 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
               message: data.message || 'GPS check-in failed. Please verify you are within the campus boundary.',
             })
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           setFeedback({
             type: 'error',
-            message: err?.message || 'Network error while recording campus check-in.',
+            message: (err instanceof Error ? err.message : '') || 'Network error while recording campus check-in.',
           })
         } finally {
           setLocating(false)

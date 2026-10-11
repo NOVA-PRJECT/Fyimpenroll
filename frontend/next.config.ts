@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from 'node:path'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -12,6 +13,8 @@ const connectSrc = isDev
   : `'self' ${backendUrl} https://*.supabase.co`
 
 const nextConfig: NextConfig = {
+  turbopack: { root: path.resolve(__dirname, '..') },
+  outputFileTracingRoot: path.resolve(__dirname, '..'),
   async rewrites() {
     return [
       {

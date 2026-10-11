@@ -205,6 +205,12 @@ export class AdminController {
     return this.adminService.graduateStudents(campusId, body.student_ids ?? [], user)
   }
 
+  @Get('campus/graduation-pending')
+  @Roles('campus_director')
+  async pendingGraduations(@CurrentUser() user: AuthUser) {
+    return this.adminService.pendingGraduations(user)
+  }
+
   // ──────────────── Concluded Attendance Cleanup (Retention Purge) ────────────────
   @Post('campus/concluded-attendance-cleanup')
   @Roles('campus_director', 'superadmin')

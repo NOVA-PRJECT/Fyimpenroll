@@ -1,11 +1,14 @@
 'use client'
 
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './director-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
+import { useCurrentTime } from '@/core/hooks/useCurrentTime'
 import {
   utcIsoToKolkataInput,
   kolkataInputToUtcIso,
@@ -27,19 +30,20 @@ export default function DirectorDashboard() {
   // Window settings state
   const [currentDeadline, setCurrentDeadline] = useState<string | null>(null)
   const [deadline, setDeadline] = useState('')
-  const [minCredits, setMinCredits] = useState(18)
-  const [maxCredits, setMaxCredits] = useState(26)
   const [savingWindow, setSavingWindow] = useState(false)
   const [windowSuccess, setWindowSuccess] = useState('')
   const [windowError, setWindowError] = useState('')
 
   // Promotion state
+  const currentTime = useCurrentTime(60000, currentDeadline)
   const [promoting, setPromoting] = useState(false)
   const [promoteSuccess, setPromoteSuccess] = useState('')
   const [promoteError, setPromoteError] = useState('')
   const [promoteStep, setPromoteStep] = useState<0 | 1 | 2>(0)
   const [loggingOut, setLoggingOut] = useState(false)
   const [lastPromotedAt, setLastPromotedAt] = useState<string | null>(null)
+  const [failedGraduations, setFailedGraduations] = useState<string[]>([])
+  const [retryingGraduation, setRetryingGraduation] = useState(false)
 
   // Auto-clear promotion success message after 5 s
   useEffect(() => {
@@ -50,8 +54,8 @@ export default function DirectorDashboard() {
 
   // Allocation state
   const [allocationSemester, setAllocationSemester] = useState<number>(1)
-  const [allocationAcademicYear, setAllocationAcademicYear] = useState<string>('')
-  const [allocationRun, setAllocationRun] = useState<any | null>(null)
+  const [allocationAcademicYear, setAllocationAcademicYear] = useState<string>(getAcademicYear)
+  const [allocationRun, setAllocationRun] = useState<{ id?: string; triggered_at: string; completed_at?: string; fully_allocated?: number; partially_allocated?: number; unallocated?: number; error_message?: string; status?: string; total_students?: number; allocated_count?: number; unresolved_count?: number; error?: string; result?: Record<string, unknown> } | null>(null)
   const [triggeringRun, setTriggeringRun] = useState(false)
   const [showRerunConfirm, setShowRerunConfirm] = useState(false)
   const [showWindowOpenWarning, setShowWindowOpenWarning] = useState(false)
@@ -60,7 +64,7 @@ export default function DirectorDashboard() {
   const [allocationSuccess, setAllocationSuccess] = useState('')
 
   // Derived window status
-  const windowIsOpen = currentDeadline !== null && new Date() < new Date(currentDeadline)
+  const windowIsOpen = currentDeadline !== null && currentTime < Date.parse(currentDeadline)
 
   function invalidateDirectorCache() {
     if (typeof window !== 'undefined') {
@@ -83,15 +87,13 @@ export default function DirectorDashboard() {
         sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(data))
       }
 
-      setDirectorName(data.directorName || '')
+        setDirectorName(data.directorName || '')
       setCampusId(data.campusId || '')
       setCampusName(data.campusName || '')
 
       if (data.settings) {
         setCurrentDeadline(data.settings.deadline)
         setDeadline(utcIsoToKolkataInput(data.settings.deadline))
-        setMinCredits(data.settings.min_credits ?? 18)
-        setMaxCredits(data.settings.max_credits ?? 26)
         setLastPromotedAt(data.settings.last_promoted_at ?? null)
       }
     } catch {
@@ -107,6 +109,8 @@ export default function DirectorDashboard() {
     if (cached) {
       try {
         const data = JSON.parse(cached)
+
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore browser settings after hydration and revalidate.
         setDirectorName(data.directorName || '')
         setCampusId(data.campusId || '')
         setCampusName(data.campusName || '')
@@ -114,8 +118,6 @@ export default function DirectorDashboard() {
         if (data.settings) {
           setCurrentDeadline(data.settings.deadline)
           setDeadline(utcIsoToKolkataInput(data.settings.deadline))
-          setMinCredits(data.settings.min_credits ?? 18)
-          setMaxCredits(data.settings.max_credits ?? 26)
           setLastPromotedAt(data.settings.last_promoted_at ?? null)
         }
         setLoadingDirector(false)
@@ -139,19 +141,13 @@ export default function DirectorDashboard() {
     return `${year - 1}-${String(year).slice(2)}`
   }
 
-  // Initialize allocation academic year
-  useEffect(() => {
-    if (!allocationAcademicYear) {
-      setAllocationAcademicYear(getAcademicYear())
-    }
-  }, [])
 
   // Poll allocation status while running
   useEffect(() => {
     if (activeTab !== 'allocation') return
     const year = allocationAcademicYear || getAcademicYear()
 
-    let timer: any = null
+    let timer: ReturnType<typeof setTimeout> | null = null
     async function checkStatus() {
       try {
         const res = await fetch(
@@ -185,7 +181,7 @@ export default function DirectorDashboard() {
     setDeadline(`${y}-${m}-${d}T23:59`)
   }
 
-  async function handleRunAllocation(forceRerun: boolean = false) {
+  async function handleRunAllocation() {
     if (allocationRun?.status === 'completed') {
       setAllocationError(
         'Allocation for this semester has already been completed and locked. It can only be executed once per semester per academic year.',
@@ -252,8 +248,8 @@ export default function DirectorDashboard() {
 
       setAllocationSuccess('Course allocation run completed successfully!')
       setAllocationRun({ status: 'running', triggered_at: new Date().toISOString() })
-    } catch (err: any) {
-      setAllocationError(err.message || 'Error triggering allocation')
+    } catch (err: unknown) {
+      setAllocationError((err instanceof Error ? err.message : '') || 'Error triggering allocation')
     } finally {
       setTriggeringRun(false)
     }
@@ -297,8 +293,8 @@ export default function DirectorDashboard() {
       setDeadline(utcIsoToKolkataInput(utcIso))
       setWindowSuccess(data.message || 'Registration window updated successfully.')
       invalidateDirectorCache()
-    } catch (err: any) {
-      setWindowError(err?.message || 'Network error: could not connect to server. Your input has been preserved; please retry.')
+    } catch (err: unknown) {
+      setWindowError((err instanceof Error ? err.message : '') || 'Network error: could not connect to server. Your input has been preserved; please retry.')
     } finally {
       setSavingWindow(false)
     }
@@ -333,8 +329,8 @@ export default function DirectorDashboard() {
       setDeadline(utcIsoToKolkataInput(nowIso))
       setWindowSuccess('Registration window closed successfully. Timetable generation is now unlocked.')
       invalidateDirectorCache()
-    } catch (err: any) {
-      setWindowError(err?.message || 'Network error: could not close registration window. Please retry.')
+    } catch (err: unknown) {
+      setWindowError((err instanceof Error ? err.message : '') || 'Network error: could not close registration window. Please retry.')
     } finally {
       setSavingWindow(false)
     }
@@ -342,6 +338,9 @@ export default function DirectorDashboard() {
 
   // Promote students (F60)
   async function handlePromoteStudents() {
+    const requestKeyStorage = 'fyimp:promotion:' + campusId
+    const promotionKey = sessionStorage.getItem(requestKeyStorage) || crypto.randomUUID()
+    sessionStorage.setItem(requestKeyStorage, promotionKey)
     setPromoting(true)
     setPromoteError('')
     setPromoteSuccess('')
@@ -350,6 +349,7 @@ export default function DirectorDashboard() {
       const response = await fetch('/api/admin/campus/promote-students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idempotency_key: promotionKey }),
       })
 
       const data = await response.json().catch(() => ({}))
@@ -365,25 +365,70 @@ export default function DirectorDashboard() {
       const rawMsg = typeof data.message === 'string' && !data.message.includes('[object')
         ? data.message
         : `${countDisplay ? `${countDisplay} ` : ''}Students promoted to next semester successfully.`
+      if (Array.isArray(data.failed_graduations) && data.failed_graduations.length > 0) {
+        setFailedGraduations(data.failed_graduations)
+      } else {
+        setFailedGraduations([])
+      }
       setPromoteSuccess(`${rawMsg}${data.graduated_count > 0 ? ` (${data.graduated_count} students graduated and removed)` : ''}`)
+      if (data.success) sessionStorage.removeItem(requestKeyStorage)
       setLastPromotedAt(nowIso)
       invalidateDirectorCache()
-    } catch (err: any) {
-      setPromoteError(err?.message || 'Network error during promotion. Please check connection and retry.')
+    } catch (err: unknown) {
+      setPromoteError((err instanceof Error ? err.message : '') || 'Network error during promotion. Please check connection and retry.')
     } finally {
       setPromoting(false)
       setPromoteStep(0)
     }
   }
 
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/campus/graduation-pending').then(async response => {
+      if (!response.ok) return
+      const result = await response.json()
+      if (active) setFailedGraduations(result.failed_student_ids || [])
+    }).catch(() => { if (active) setPromoteError('Pending graduation status could not be loaded. Retry after reconnecting.') })
+    return () => { active = false }
+  }, [])
+
+  // Retry graduation cleanup for pending students (R27)
+  async function handleRetryGraduation() {
+    if (!failedGraduations.length) return
+    setRetryingGraduation(true)
+    setPromoteError('')
+    try {
+      const response = await fetch('/api/admin/campus/graduate-students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_ids: failedGraduations }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setPromoteError(data.message || 'Failed to retry graduation cleanup.')
+        return
+      }
+      if (data.failed_student_ids && data.failed_student_ids.length > 0) {
+        setFailedGraduations(data.failed_student_ids)
+        setPromoteError(`Graduation retry incomplete: ${data.failed_student_ids.length} student accounts still pending Auth cleanup.`)
+      } else {
+        setFailedGraduations([])
+        setPromoteSuccess(`Graduation cleanup successfully completed for all ${data.graduated_count || failedGraduations.length} students.`)
+      }
+    } catch (err: unknown) {
+      setPromoteError((err instanceof Error ? err.message : '') || 'Network error retrying graduation cleanup.')
+    } finally {
+      setRetryingGraduation(false)
+    }
+  }
+
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   return (
@@ -682,6 +727,32 @@ export default function DirectorDashboard() {
 
             {promoteError && <div className={styles.errorBanner}>{promoteError}</div>}
             {promoteSuccess && <div className={styles.successBanner}>✓ {promoteSuccess}</div>}
+            {failedGraduations.length > 0 && (
+              <div style={{
+                background: '#fff3cd',
+                color: '#856404',
+                padding: '0.75rem 1rem',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                border: '1px solid #ffeeba',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.88rem'
+              }}>
+                <span>
+                  ⚠️ <strong>{failedGraduations.length}</strong> graduating student account(s) pending Auth cleanup.
+                </span>
+                <button
+                  className={styles.secondaryBtn}
+                  onClick={handleRetryGraduation}
+                  disabled={retryingGraduation}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  {retryingGraduation ? 'Retrying...' : 'Retry Cleanup Now'}
+                </button>
+              </div>
+            )}
 
             <div className={styles.windowCard}>
               <p style={{ fontSize: '0.82rem', color: '#44474e', margin: '0 0 1rem 0' }}>
@@ -746,7 +817,7 @@ export default function DirectorDashboard() {
               {/* Step 2: Explicit confirmation (or locked if within 90 days) */}
               {promoteStep === 2 && (() => {
                 const isWithin90Days = lastPromotedAt
-                  ? new Date(lastPromotedAt) > new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+                  ? new Date(lastPromotedAt) > new Date(currentTime - 90 * 24 * 60 * 60 * 1000)
                   : false
 
                 if (isWithin90Days) {
@@ -791,7 +862,7 @@ export default function DirectorDashboard() {
                         ⚠️ Has the next semester officially started?
                       </p>
                       <p style={{ fontSize: '0.78rem', color: '#44474e', margin: '0.35rem 0 0' }}>
-                        This will increment every student's semester by 1 and permanently remove Semester 10 graduates.
+                        This will increment every student&apos;s semester by 1 and permanently remove Semester 10 graduates.
                       </p>
                     </div>
 
@@ -1099,7 +1170,7 @@ export default function DirectorDashboard() {
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <button
                     className={styles.primaryBtn}
-                    onClick={() => handleRunAllocation(false)}
+                    onClick={() => handleRunAllocation()}
                     disabled={triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'completed'}
                     style={{
                       background: allocationRun?.status === 'completed'
@@ -1184,7 +1255,7 @@ export default function DirectorDashboard() {
                     </button>
                     <button
                       className={styles.primaryBtn}
-                      onClick={() => handleRunAllocation(true)}
+                      onClick={() => handleRunAllocation()}
                       style={{ background: '#dc2626' }}
                     >
                       Yes, Re-Run Allocation →

@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
+import { useState, useEffect, useEffectEvent } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
@@ -18,7 +20,7 @@ interface SystemLog {
   status: string
   action?: string
   error_message?: string
-  metadata?: any
+  metadata?: Record<string, unknown>
   created_at: string
 }
 
@@ -116,6 +118,8 @@ export default function SuperAdminDashboard() {
       const params = new URLSearchParams(window.location.search)
       const tabParam = params.get('tab')
       if (tabParam === 'logs' || tabParam === 'campuses' || tabParam === 'departments' || tabParam === 'faculty') {
+
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
         setActiveTab(tabParam as Tab)
       }
     }
@@ -130,14 +134,15 @@ export default function SuperAdminDashboard() {
       setLoadingAdmin(false)
     }
     loadAdmin()
-  }, [])
+  }, [router])
 
-  useEffect(() => {
+  const loadActiveTab = useEffectEvent(() => {
     if (activeTab === 'campuses') fetchCampuses()
     else if (activeTab === 'departments') { fetchDepartments(); fetchCampuses() }
     else if (activeTab === 'faculty') { fetchFaculty(); fetchCampuses(); fetchDepartments() }
     else if (activeTab === 'logs') { fetchLogs() }
-  }, [activeTab, logTypeFilter, logStatusFilter])
+  })
+  useEffect(() => { loadActiveTab() }, [activeTab, logTypeFilter, logStatusFilter])
 
   function clearMessages() { setError(''); setSuccess('') }
 
@@ -371,18 +376,12 @@ export default function SuperAdminDashboard() {
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
-  const roleLabel = (role: string) => ({
-    hod: 'HOD',
-    campus_director: 'Campus Director',
-    teaching_staff: 'Teaching Staff',
-  }[role] ?? role)
 
   return (
     <div className={styles.pageWrapper}>

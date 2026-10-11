@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CourseNode, ParallelGroup, SlotId, SlotLookup, SlotMap, TeacherReservation } from './types';
+import { fetchAllPaginated, fetchByIdChunks } from '../../../core/database/pagination.util';
 
 /**
  * Build human-readable conflict summary in plain English for each course.
@@ -25,6 +26,23 @@ function buildConflictSummary(
   return conflicts.length > 0
     ? `Conflicts with: ${conflicts.join(', ')}`
     : 'No conflicts with other courses';
+}
+
+export function validatePreflightRules(courses: CourseNode[], semester: number): void {
+  for (const c of courses) {
+    // R21: Practical contact hours must be in exact 2-period consecutive blocks
+    if (c.practicalHours % 2 !== 0) {
+      throw new Error(
+        `[Preflight Rule Conflict] Course ${c.courseCode} (${c.courseId}) has practicalHours=${c.practicalHours} (odd contact period). Practical courses must be scheduled in 2-period consecutive blocks (no odd-hour practicals permitted under current academic rules) (R21).`
+      );
+    }
+    // R18: Semester 3 VAC window check
+    if (semester === 3 && (c.category || '').toUpperCase() === 'VAC' && (c.theoryHours + c.practicalHours) > 2) {
+      throw new Error(
+        `[Preflight Rule Conflict] Course ${c.courseCode} (VAC) requires ${c.theoryHours + c.practicalHours} contact hours, which exceeds the mandatory Semester 3 Monday P5+P6 (2-hour) window (R18). Academic curriculum requires correction before scheduling.`
+      );
+    }
+  }
 }
 
 const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC', 'AEC']);
@@ -197,12 +215,7 @@ export async function loadGenerationInput(
     regQuery = regQuery.eq('campus_id', campusId);
   }
 
-  const { data: rawRegistrations, error: regError } = await regQuery;
-
-  if (regError) {
-    console.error('loadGenerationInput student_registrations error:', regError);
-    throw new Error(`Database error while reading student registrations: ${regError.message}`);
-  }
+  const rawRegistrations = await fetchAllPaginated<any>(regQuery.order('id'));
 
   if (!rawRegistrations || rawRegistrations.length === 0) {
     throw new Error('No student registrations found for this academic year and semester. Ensure students have submitted their course registrations.');
@@ -251,33 +264,18 @@ export async function loadGenerationInput(
   const allStudentIds = Array.from(new Set(rawRegistrations.map((r: any) => r.student_id).filter(Boolean)));
 
   if (allStudentIds.length > 0) {
-    const { data: studentDepts } = await supabase
-      .from('students')
-      .select('id, department_id')
-      .in('id', allStudentIds);
-
-    for (const row of studentDepts ?? []) {
-      if (row.department_id) studentDeptMap.set(row.id, row.department_id);
-    }
-
-    const unmappedIds = allStudentIds.filter((id) => !studentDeptMap.has(id));
-    if (unmappedIds.length > 0) {
-      const { data: userDepts } = await supabase
-        .from('users')
-        .select('id, department_id, dep')
-        .in('id', unmappedIds);
-
-      for (const row of userDepts ?? []) {
-        const deptId = row.department_id || row.dep;
-        if (deptId) studentDeptMap.set(row.id, deptId);
-      }
+    const studentDepts = await fetchByIdChunks<any>(allStudentIds, ids => supabase.from('students')
+      .select('id, department_id').in('id', ids).order('id'));
+    for (const row of studentDepts) if (row.department_id) studentDeptMap.set(row.id, row.department_id);
+    if (allStudentIds.some(id => !studentDeptMap.has(id))) {
+      throw new Error('Some enrolled students have no current department mapping; repair the cohort before generation.');
     }
   }
 
   const deptCount = new Set(Array.from(studentDeptMap.values())).size;
 
   // Query 2b: Fetch all departments for name mapping
-  const { data: rawDepts } = await supabase.from('departments').select('id, name, code');
+  const rawDepts = await fetchAllPaginated<any>(supabase.from('departments').select('id, name, code').order('id'));
   const deptNameMap = new Map<string, string>();
   for (const d of rawDepts ?? []) {
     deptNameMap.set(d.id, d.name);
@@ -294,15 +292,10 @@ export async function loadGenerationInput(
   );
 
   // Query 3: Fetch courses metadata
-  const { data: rawCourses, error: courseError } = await supabase
-    .from('courses')
+  const rawCourses = await fetchByIdChunks<any>([...allCourseIds], ids => supabase.from('courses')
     .select('id, title, course_code, department_id, theory_hours_per_week, practical_hours_per_week, category')
-    .in('id', Array.from(allCourseIds));
-
-  if (courseError) {
-    console.error('loadGenerationInput courses error:', courseError);
-    throw new Error(`Database error while reading courses: ${courseError.message}`);
-  }
+    .in('id', ids).order('id'));
+  if (rawCourses.length !== allCourseIds.size) throw new Error('Some registered courses are missing from the catalogue');
 
   // Query 3b: Load teacher assignments for current cohort (F37)
   let teacherQuery = supabase
@@ -314,7 +307,7 @@ export async function loadGenerationInput(
   if (campusId) {
     teacherQuery = teacherQuery.eq('campus_id', campusId);
   }
-  const { data: currentTeacherAssignments } = await teacherQuery;
+  const currentTeacherAssignments = await fetchAllPaginated<any>(teacherQuery.order('id'));
   const courseTeacherMap = new Map<string, string>();
   for (const row of currentTeacherAssignments || []) {
     if (row.course_id && row.teacher_id) {
@@ -473,14 +466,16 @@ export async function loadGenerationInput(
   // Auto-detect parallel groups dynamically from live registration data using studentDeptMap and courseSlotMap (F71)
   const parallelGroups = detectParallelGroups(courses, studentDeptMap, courseSlotMap);
 
-  // F37: Load published reservations across all other semesters & campuses for current academic year
+  // F37 & R08: Load published reservations across all other semesters & campuses for current academic year
   const teacherReservations: TeacherReservation[] = [];
-  const { data: publishedEntries } = await supabase
+  const publishedEntries = await fetchAllPaginated<any>(supabase
     .from('timetable_entries')
     .select(`
       id,
       academic_year,
       semester,
+      campus_id,
+      teacher_id,
       course_id,
       department_id,
       status,
@@ -490,19 +485,21 @@ export async function loadGenerationInput(
       )
     `)
     .eq('academic_year', academicYear)
-    .eq('status', 'published');
+    .eq('status', 'published').order('id'));
 
   // Also fetch all teacher course assignments for the academic year to resolve teachers
-  const { data: allYearTeacherAssignments } = await supabase
+  const allYearTeacherAssignments = await fetchAllPaginated<any>(supabase
     .from('teacher_course_assignments')
     .select('course_id, campus_id, semester, teacher_id')
-    .eq('academic_year', academicYear);
+    .eq('academic_year', academicYear).order('id'));
 
   const teacherByCourseTerm = new Map<string, string>();
   for (const tca of allYearTeacherAssignments || []) {
     if (tca.course_id && tca.teacher_id) {
-      teacherByCourseTerm.set(`${tca.course_id}:${tca.semester}`, tca.teacher_id);
-      teacherByCourseTerm.set(tca.course_id, tca.teacher_id);
+      if (tca.campus_id && tca.semester) {
+        teacherByCourseTerm.set(`${tca.course_id}:${tca.campus_id}:${tca.semester}`, tca.teacher_id);
+      }
+
     }
   }
 
@@ -510,14 +507,17 @@ export async function loadGenerationInput(
     const slot = (entry as any).time_slots;
     if (!slot) continue;
 
+    const entryCampusId = (entry as any).campus_id;
     const isOtherSemester = entry.semester !== semester;
-    const isOtherCampus = !allCourseIds.has(entry.course_id);
+    // R08: Check explicit campus_id first rather than falling back to course absence heuristic
+    const isOtherCampus = campusId
+      ? (entryCampusId ? entryCampusId !== campusId : !allCourseIds.has(entry.course_id))
+      : false;
 
     if (isOtherSemester || isOtherCampus) {
       const assignedTeacher =
         (entry as any).teacher_id ||
-        teacherByCourseTerm.get(`${entry.course_id}:${entry.semester}`) ||
-        teacherByCourseTerm.get(entry.course_id);
+        teacherByCourseTerm.get(`${entry.course_id}:${entryCampusId}:${entry.semester}`);
 
       if (assignedTeacher) {
         teacherReservations.push({
@@ -525,25 +525,18 @@ export async function loadGenerationInput(
           day: slot.day_of_week,
           period: slot.period_number,
           sourceCourseId: entry.course_id,
+          sourceCampusId: entryCampusId,
           sourceSemester: entry.semester,
         });
       }
     }
   }
 
-  // Preflight diagnostics for D03, D04, D05
+  // R18 & R21 Preflight Rule Enforcement: Block odd practical hours and VAC > 2h before solver invocation
+  validatePreflightRules(courses, semester);
+
   const preflightDiagnostics: string[] = [];
   for (const c of courses) {
-    if (c.practicalHours % 2 !== 0) {
-      preflightDiagnostics.push(
-        `[D03 Warning] Course ${c.courseCode} has practical_hours=${c.practicalHours} (odd contact period). Single period lab scheduled.`
-      );
-    }
-    if (semester === 3 && (c.category || '').toUpperCase() === 'VAC' && (c.theoryHours + c.practicalHours) > 2) {
-      preflightDiagnostics.push(
-        `[D04 Warning] Course ${c.courseCode} (VAC) has ${c.theoryHours + c.practicalHours} contact hours, exceeding Semester 3 Monday P5+P6 (2-hour) window.`
-      );
-    }
     if (c.theoryHours === 0 && c.practicalHours === 0) {
       preflightDiagnostics.push(
         `[D05 Warning] Course ${c.courseCode} has 0 theory and 0 practical hours. Verify non-classroom syllabus component.`

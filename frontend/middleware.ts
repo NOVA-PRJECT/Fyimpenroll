@@ -15,6 +15,7 @@ async function resolveRoleFromBackend(token: string): Promise<ProfileCheck> {
     const response = await fetch(`${backendUrl}/api/auth/profile`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       cache: 'no-store',
+      signal: AbortSignal.timeout(10000),
     })
 
     if (response.status === 401) {
@@ -55,7 +56,7 @@ async function resolveRoleFromBackend(token: string): Promise<ProfileCheck> {
 
 async function tryRefreshSession(
   request: NextRequest,
-): Promise<{ token: string; refreshToken?: string; role: Role; mustChangePassword: boolean } | null> {
+): Promise<{ token: string; refreshToken?: string; role: Role; mustChangePassword: boolean } | 'unavailable' | null> {
   const refreshToken = request.cookies.get('refresh_token')?.value
   if (!refreshToken) return null
 
@@ -66,8 +67,10 @@ async function tryRefreshSession(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
       cache: 'no-store',
+      signal: AbortSignal.timeout(10000),
     })
-    if (!res.ok) return null
+    if (res.status === 401 || res.status === 400) return null
+    if (!res.ok) return 'unavailable'
     const data = await res.json()
     if (!data.token) return null
     return {
@@ -77,7 +80,7 @@ async function tryRefreshSession(
       mustChangePassword: !!data.must_change_password,
     }
   } catch {
-    return null
+    return 'unavailable'
   }
 }
 
@@ -116,23 +119,44 @@ export async function middleware(request: NextRequest) {
   const isHomeRoute = pathname === '/'
   const isApiRoute = pathname.startsWith('/api')
 
-  // API requests are authorized by the NestJS AuthGuard and never by this UI middleware.
-  if (isApiRoute) return NextResponse.next()
+  // API requests: if access token is missing but refresh token is present, proactively refresh (R30)
+  if (isApiRoute) {
+    const hasAuthToken = !!request.cookies.get('auth_token')?.value
+    const hasRefreshToken = !!request.cookies.get('refresh_token')?.value
+    if (!hasAuthToken && hasRefreshToken) {
+      const refreshed = await tryRefreshSession(request)
+      if (refreshed === 'unavailable') return NextResponse.json({ message: 'Authentication service is temporarily unavailable. Please retry.' }, { status: 503 })
+      if (refreshed) {
+        const requestHeaders = new Headers(request.headers)
+        requestHeaders.set('authorization', `Bearer ${refreshed.token}`)
+        const response = NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        })
+        return attachAuthCookies(response, refreshed.token, refreshed.refreshToken)
+      }
+    }
+    return NextResponse.next()
+  }
 
   const isPasswordResetRoute = pathname.startsWith('/reset-password')
+  const isSharedChangePasswordRoute = pathname === '/change-password'
   const isStudentChangePasswordRoute = pathname === '/dashboard/student/change-password'
 
   const needsRole = isDashboardRoute || isConsentRoute || isLoginRoute || isHomeRoute
-  if (!needsRole && !isPasswordResetRoute) return NextResponse.next()
+  if (!needsRole && !isPasswordResetRoute && !isSharedChangePasswordRoute) return NextResponse.next()
 
   let token = request.cookies.get('auth_token')?.value
   let profile: ProfileCheck = token ? await resolveRoleFromBackend(token) : { kind: 'unauthorized' }
   let refreshedTokens: { token: string; refreshToken?: string } | null = null
 
-  // F11: If access token is missing or unauthorized, try refreshing with refresh_token cookie
+  // F11 / R30: If access token is missing or unauthorized, try refreshing with refresh_token cookie
   if (profile.kind === 'unauthorized') {
     const refreshed = await tryRefreshSession(request)
-    if (refreshed) {
+    if (refreshed === 'unavailable') {
+      profile = { kind: 'unavailable' }
+    } else if (refreshed) {
       token = refreshed.token
       refreshedTokens = { token: refreshed.token, refreshToken: refreshed.refreshToken }
       profile = refreshed.mustChangePassword
@@ -161,9 +185,10 @@ export async function middleware(request: NextRequest) {
     return clearAuthCookies(NextResponse.next())
   }
 
-  // Handle restricted session (must_change_password: true) (F07)
+  // Handle restricted session (must_change_password: true) (F07, R32)
   if (profile.kind === 'restricted') {
     const isAllowedRestrictedPage =
+      isSharedChangePasswordRoute ||
       isStudentChangePasswordRoute ||
       isPasswordResetRoute ||
       isConsentRoute ||
@@ -171,9 +196,8 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/auth/logout')
 
     if (!isAllowedRestrictedPage && isDashboardRoute) {
-      const dest = profile.role === 'student'
-        ? '/dashboard/student/change-password'
-        : '/reset-password/confirm'
+      // R32: Route both student and teacher to shared authenticated /change-password route
+      const dest = '/change-password'
       const response = NextResponse.redirect(new URL(dest, request.url))
       if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
       return response

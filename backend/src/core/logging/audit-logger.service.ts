@@ -113,35 +113,7 @@ export class AuditLoggerService {
       // 1. Attempt writing to unified system_logs table
       const { error } = await this.supabase.admin.from('system_logs').insert(logPayload)
 
-      if (error) {
-        this.logger.debug(
-          `[AuditLoggerService] system_logs insert returned (${error.message}); attempting audit_logs fallback`,
-        )
-
-        // 2. Fallback to audit_logs view / legacy table.
-        // Omit top-level user_agent since older audit_logs views do not have this column;
-        // preserve user_agent inside metadata so logging never fails schema validation.
-        const fallbackMetadata = {
-          ...enrichedMetadata,
-          ...(entry.userAgent ? { user_agent: entry.userAgent } : {}),
-        }
-
-        const { error: fallbackError } = await this.supabase.admin.from('audit_logs').insert({
-          event_type: entry.eventType,
-          user_id: validUserId,
-          user_role: entry.userRole,
-          action: entry.action,
-          resource_type: entry.resourceType,
-          resource_id: validResourceId,
-          status: entry.status,
-          ip_address: sanitizedIp,
-          metadata: fallbackMetadata,
-        })
-
-        if (fallbackError) {
-          this.logger.warn(`Failed to persist audit log: ${fallbackError.message}`)
-        }
-      }
+      if (error) this.logger.warn(`Failed to persist audit log in system_logs: ${error.message}`)
     } catch (err: any) {
       this.logger.warn(`Exception writing audit log: ${err.message}`)
     }

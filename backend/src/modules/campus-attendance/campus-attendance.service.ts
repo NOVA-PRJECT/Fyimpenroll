@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util';
 import { AuthUser } from '../../core/auth/types';
 
 interface CampusRecord {
@@ -411,7 +412,8 @@ export class CampusAttendanceService {
     const dayEndMin = this.timeStringToMinutes(campus?.day_end_time || '17:00:00');
 
     // 2. Fetch scoped students
-    const { data: students, error: studentsError } = await studentsQuery;
+    const students = await fetchAllPaginated<any>(studentsQuery.order('id'));
+    const studentsError = null;
 
     if (studentsError) {
       throw new InternalServerErrorException(`Failed to fetch students: ${studentsError.message}`);
@@ -422,17 +424,11 @@ export class CampusAttendanceService {
     // 3. Fetch sign-in rows for these students on targetDate
     let signIns: any[] = [];
     if (studentIds.length > 0) {
-      const { data: signInData, error: signInError } = await this.supabase.admin
-        .from('campus_sign_ins')
-        .select('id, student_id, session_type, status, signed_in_at')
-        .in('student_id', studentIds)
-        .eq('signed_in_date', targetDate);
-
-      if (signInError) {
-        throw new InternalServerErrorException(`Failed to fetch sign-ins: ${signInError.message}`);
-      }
-      signIns = signInData || [];
+      signIns = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin
+        .from('campus_sign_ins').select('id, student_id, session_type, status, signed_in_at')
+        .in('student_id', ids).eq('signed_in_date', targetDate).order('id'));
     }
+    const signInByStudentSession = new Map(signIns.map(row => [`${row.student_id}:${row.session_type}`, row]));
 
     // 4. Map students to status derivation
     let morningOnTime = 0;
@@ -446,12 +442,8 @@ export class CampusAttendanceService {
     let eveningPending = 0;
 
     const roster = (students || []).map((student) => {
-      const morningRecord = signIns.find(
-        (si) => si.student_id === student.id && si.session_type === 'morning'
-      );
-      const eveningRecord = signIns.find(
-        (si) => si.student_id === student.id && si.session_type === 'evening'
-      );
+      const morningRecord = signInByStudentSession.get(`${student.id}:morning`);
+      const eveningRecord = signInByStudentSession.get(`${student.id}:evening`);
 
       // Derive Morning Status
       let morningDerivedStatus: 'on_time' | 'late' | 'absent' | 'pending';

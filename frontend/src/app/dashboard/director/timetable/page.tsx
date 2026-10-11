@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import ExcelJS from 'exceljs';
+import dynamic from 'next/dynamic';
+import type { SchedulingRule } from './BrowserRulesEditor';
+const BrowserRulesEditor = dynamic(() => import('./BrowserRulesEditor'));
 import { downloadBlob } from '@/core/utils/downloadFile';
 import styles from './timetable.module.css';
 
@@ -36,26 +38,9 @@ interface ConflictItem {
   conflictingStudentCount: number;
 }
 
-interface DynamicConstraint {
-  id: string;
-  text: string;
-  category?: 'hard' | 'soft';
-}
-
 interface BaseConstraintsData {
-  schedule: {
-    days: string[];
-    periods: Array<{ number: number; start: string; end: string; label: string; extended?: boolean }>;
-    lunch: { start: string; end: string };
-    extended_period_policy: string;
-  };
-  universal_hard_constraints: string[];
-  universal_soft_constraints: string[];
-  semester_constraints: Record<string, { hard_constraints?: string[]; soft_constraints?: string[] }>;
-  hard_constraints: string[];
-  soft_constraints: string[];
-  selected_semester_hard: string[];
-  selected_semester_soft: string[];
+  campusId: string;
+  rules: SchedulingRule[];
 }
 
 const DAYS_MAP: Record<number, string> = {
@@ -90,28 +75,12 @@ export default function CampusDirectorTimetablePage() {
 
   // Dynamic Constraints & Base Rules Modal State
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [rulesActiveTab, setRulesActiveTab] = useState<'custom' | 'base'>('custom');
-
-  // Custom Constraints (CRUD with Hard/Soft Selector)
-  const [dynamicConstraints, setDynamicConstraints] = useState<DynamicConstraint[]>([]);
-  const [newConstraintText, setNewConstraintText] = useState('');
-  const [newCustomCategory, setNewCustomCategory] = useState<'hard' | 'soft'>('hard');
-  const [editingConstraintId, setEditingConstraintId] = useState<string | null>(null);
-  const [editingConstraintText, setEditingConstraintText] = useState('');
-  const [editingConstraintCategory, setEditingConstraintCategory] = useState<'hard' | 'soft'>('hard');
-
-  // Base Rules (Existing Base Rules CRUD - Edit/Delete/Reset)
   const [baseConstraints, setBaseConstraints] = useState<BaseConstraintsData | null>(null);
-  const [editingBaseRule, setEditingBaseRule] = useState<{ scope: 'universal' | 'semester'; category: 'hard' | 'soft'; index: number } | null>(null);
-  const [editingBaseRuleText, setEditingBaseRuleText] = useState('');
-  const [savingBaseRules, setSavingBaseRules] = useState(false);
-  const [baseRulesFilterScope, setBaseRulesFilterScope] = useState<'all' | 'universal' | 'semester'>('all');
 
   // Generation Overlay & Job status state
   const [showGenerationOverlay, setShowGenerationOverlay] = useState(false);
   const [jobStatus, setJobStatus] = useState<'idle' | 'queued' | 'running' | 'completed' | 'failed'>('idle');
   const [jobProgress, setJobProgress] = useState(0);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [stepMessage, setStepMessage] = useState<string | null>(null);
 
@@ -139,7 +108,7 @@ export default function CampusDirectorTimetablePage() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishModalError, setPublishModalError] = useState<string | null>(null);
-  const [publishConflicts, setPublishConflicts] = useState<any[] | null>(null);
+  const [publishConflicts, setPublishConflicts] = useState<{courseName: string; reason: string; conflictingStudentCount: number}[] | null>(null);
 
   // Feedback banners
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -151,209 +120,37 @@ export default function CampusDirectorTimetablePage() {
       const res = await fetch(`/api/timetable/constraints?semester=${semester}`);
       if (res.ok) {
         const data = await res.json();
-        setBaseConstraints(data);
+        const key = `fyimp:rules:${data.campusId}`;
+        const saved = localStorage.getItem(key);
+        let rules = data.rules;
+        if (saved) {
+          try { const parsed = JSON.parse(saved); if (Array.isArray(parsed)) rules = parsed; } catch { localStorage.removeItem(key); }
+        }
+        setBaseConstraints({ ...data, rules });
       }
     } catch {}
   }, [semester]);
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchBaseConstraints();
   }, [fetchBaseConstraints]);
 
-  // Load dynamic constraints from sessionStorage on year/semester change
-  useEffect(() => {
-    const storageKey = `fyimp:constraints:${academicYear}:${semester}`;
-    const saved = sessionStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        setDynamicConstraints(JSON.parse(saved));
-      } catch {
-        setDynamicConstraints([]);
-      }
-    } else {
-      setDynamicConstraints([]);
-    }
-  }, [academicYear, semester]);
-
-  // Save dynamic constraints to sessionStorage
-  const updateDynamicConstraints = useCallback(
-    (updater: (prev: DynamicConstraint[]) => DynamicConstraint[]) => {
-      setDynamicConstraints((prev) => {
-        const next = updater(prev);
-        const storageKey = `fyimp:constraints:${academicYear}:${semester}`;
-        sessionStorage.setItem(storageKey, JSON.stringify(next));
-        return next;
-      });
-    },
-    [academicYear, semester]
-  );
-
-  // ── Custom Rules CRUD ───────────────────────────────────────────────────────
-  function handleAddCustomConstraint() {
-    if (!newConstraintText.trim()) return;
-    const constraint: DynamicConstraint = {
-      id: crypto.randomUUID(),
-      text: newConstraintText.trim(),
-      category: newCustomCategory,
-    };
-    updateDynamicConstraints((prev) => [...prev, constraint]);
-    setNewConstraintText('');
-  }
-
-  function handleStartEditCustomConstraint(constraint: DynamicConstraint) {
-    setEditingConstraintId(constraint.id);
-    setEditingConstraintText(constraint.text);
-    setEditingConstraintCategory(constraint.category || 'hard');
-  }
-
-  function handleSaveEditCustomConstraint(id: string) {
-    if (!editingConstraintText.trim()) return;
-    updateDynamicConstraints((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, text: editingConstraintText.trim(), category: editingConstraintCategory }
-          : c
-      )
-    );
-    setEditingConstraintId(null);
-    setEditingConstraintText('');
-  }
-
-  function handleDeleteCustomConstraint(id: string) {
-    updateDynamicConstraints((prev) => prev.filter((c) => c.id !== id));
-  }
-
-  // ── Base Rules CRUD ─────────────────────────────────────────────────────────
-  async function persistBaseRules(payload: {
-    universal_hard_constraints?: string[];
-    universal_soft_constraints?: string[];
-    semester_constraints?: Record<string, { hard_constraints?: string[]; soft_constraints?: string[] }>;
-  }) {
-    setSavingBaseRules(true);
-    try {
-      const res = await fetch('/api/timetable/constraints', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        await fetchBaseConstraints();
-      }
-    } catch (e) {
-      console.error('Failed to save base constraints:', e);
-    } finally {
-      setSavingBaseRules(false);
-    }
-  }
-
-  function handleStartEditBaseRule(scope: 'universal' | 'semester', category: 'hard' | 'soft', index: number, text: string) {
-    setEditingBaseRule({ scope, category, index });
-    setEditingBaseRuleText(text);
-  }
-
-  async function handleSaveEditBaseRule() {
-    if (!editingBaseRule || !editingBaseRuleText.trim() || !baseConstraints) return;
-    const { scope, category, index } = editingBaseRule;
-    const semKey = String(semester);
-    const currentSemObj = baseConstraints.semester_constraints?.[semKey] || { hard_constraints: [], soft_constraints: [] };
-
-    if (scope === 'universal') {
-      const payload = {
-        universal_hard_constraints:
-          category === 'hard'
-            ? baseConstraints.universal_hard_constraints.map((t, i) => (i === index ? editingBaseRuleText.trim() : t))
-            : baseConstraints.universal_hard_constraints,
-        universal_soft_constraints:
-          category === 'soft'
-            ? baseConstraints.universal_soft_constraints.map((t, i) => (i === index ? editingBaseRuleText.trim() : t))
-            : baseConstraints.universal_soft_constraints,
-        semester_constraints: baseConstraints.semester_constraints,
-      };
-      await persistBaseRules(payload);
-    } else {
-      const updatedSemObj = {
-        hard_constraints:
-          category === 'hard'
-            ? (currentSemObj.hard_constraints || []).map((t, i) => (i === index ? editingBaseRuleText.trim() : t))
-            : currentSemObj.hard_constraints || [],
-        soft_constraints:
-          category === 'soft'
-            ? (currentSemObj.soft_constraints || []).map((t, i) => (i === index ? editingBaseRuleText.trim() : t))
-            : currentSemObj.soft_constraints || [],
-      };
-      const payload = {
-        universal_hard_constraints: baseConstraints.universal_hard_constraints,
-        universal_soft_constraints: baseConstraints.universal_soft_constraints,
-        semester_constraints: {
-          ...baseConstraints.semester_constraints,
-          [semKey]: updatedSemObj,
-        },
-      };
-      await persistBaseRules(payload);
-    }
-
-    setEditingBaseRule(null);
-    setEditingBaseRuleText('');
-  }
-
-  async function handleDeleteBaseRule(scope: 'universal' | 'semester', category: 'hard' | 'soft', index: number) {
+  function saveBrowserRules(rules: SchedulingRule[]) {
     if (!baseConstraints) return;
-    const semKey = String(semester);
-    const currentSemObj = baseConstraints.semester_constraints?.[semKey] || { hard_constraints: [], soft_constraints: [] };
-
-    if (scope === 'universal') {
-      const payload = {
-        universal_hard_constraints:
-          category === 'hard'
-            ? baseConstraints.universal_hard_constraints.filter((_, i) => i !== index)
-            : baseConstraints.universal_hard_constraints,
-        universal_soft_constraints:
-          category === 'soft'
-            ? baseConstraints.universal_soft_constraints.filter((_, i) => i !== index)
-            : baseConstraints.universal_soft_constraints,
-        semester_constraints: baseConstraints.semester_constraints,
-      };
-      await persistBaseRules(payload);
-    } else {
-      const updatedSemObj = {
-        hard_constraints:
-          category === 'hard'
-            ? (currentSemObj.hard_constraints || []).filter((_, i) => i !== index)
-            : currentSemObj.hard_constraints || [],
-        soft_constraints:
-          category === 'soft'
-            ? (currentSemObj.soft_constraints || []).filter((_, i) => i !== index)
-            : currentSemObj.soft_constraints || [],
-      };
-      const payload = {
-        universal_hard_constraints: baseConstraints.universal_hard_constraints,
-        universal_soft_constraints: baseConstraints.universal_soft_constraints,
-        semester_constraints: {
-          ...baseConstraints.semester_constraints,
-          [semKey]: updatedSemObj,
-        },
-      };
-      await persistBaseRules(payload);
-    }
+    try {
+      localStorage.setItem(`fyimp:rules:${baseConstraints.campusId}`, JSON.stringify(rules));
+      setBaseConstraints({ ...baseConstraints, rules });
+      setShowRulesModal(false);
+    } catch { setErrorMsg('Browser storage is unavailable. Allow local storage before saving rules.'); }
   }
 
-  async function handleResetBaseRules() {
-    if (!confirm('Are you sure you want to reset all base rules in constraints.base.json to factory defaults?')) return;
-    setSavingBaseRules(true);
-    try {
-      const res = await fetch('/api/timetable/constraints', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reset: true }),
-      });
-      if (res.ok) {
-        await fetchBaseConstraints();
-      }
-    } catch (e) {
-      console.error('Reset error:', e);
-    } finally {
-      setSavingBaseRules(false);
-    }
+  function resetBrowserRules() {
+    if (!baseConstraints) return;
+    localStorage.removeItem(`fyimp:rules:${baseConstraints.campusId}`);
+    setShowRulesModal(false);
+    void fetchBaseConstraints();
   }
 
   // Live fetch function directly from API
@@ -385,8 +182,8 @@ export default function CampusDirectorTimetablePage() {
         setAllEntries(entriesList);
         setAllConflicts(conflictsList);
         setDepartments(deptList);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError((err instanceof Error ? err.message : ''));
       } finally {
         setLoading(false);
       }
@@ -400,13 +197,14 @@ export default function CampusDirectorTimetablePage() {
 
   // Selector change effect: Reset banners & fetch job status
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
     setErrorMsg(null);
     setSuccessMsg(null);
     setJobError(null);
     setError(null);
     setJobStatus('idle');
     setJobProgress(0);
-    setJobId(null);
     setStepMessage(null);
     setShowGenerationOverlay(false);
 
@@ -429,6 +227,8 @@ export default function CampusDirectorTimetablePage() {
 
   // Single fetch on mount / selector change
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Fetch the selected cohort from the API.
     fetchEntries(true);
   }, [fetchEntries]);
 
@@ -457,6 +257,8 @@ export default function CampusDirectorTimetablePage() {
     if (departments.length > 0 && (!selectedDeptId || (selectedDeptId !== 'VIEW_ALL_CONFLICTS' && !departments.some((d) => d.id === selectedDeptId)))) {
       const deptWithEntries = departments.find((d) => allEntries.some((e) => e.departmentId === d.id));
       if (deptWithEntries) {
+
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Clears a selection invalidated by a refreshed external roster.
         setSelectedDeptId(deptWithEntries.id);
       } else {
         setSelectedDeptId(departments[0].id);
@@ -592,7 +394,7 @@ export default function CampusDirectorTimetablePage() {
         body: JSON.stringify({
           academicYear,
           semester,
-          dynamicConstraints,
+          rules: baseConstraints?.rules,
         }),
       });
 
@@ -605,7 +407,6 @@ export default function CampusDirectorTimetablePage() {
         return;
       }
 
-      setJobId(data.jobId);
       setJobStatus('queued');
       setJobProgress(5);
     } catch {
@@ -630,8 +431,8 @@ export default function CampusDirectorTimetablePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        const msg = typeof data.message === 'string' 
-          ? data.message 
+        const msg = typeof data.message === 'string'
+          ? data.message
           : data.message?.error || data.error || 'Failed to publish timetable';
 
         if (data.conflicts && Array.isArray(data.conflicts) && data.conflicts.length > 0) {
@@ -673,6 +474,7 @@ export default function CampusDirectorTimetablePage() {
     setShowExportModal(false);
 
     if (exportType === 'excel') {
+      const { default: ExcelJS } = await import('exceljs');
       const wb = new ExcelJS.Workbook();
       wb.creator = 'FYIMP Academic Portal';
 
@@ -912,7 +714,7 @@ export default function CampusDirectorTimetablePage() {
                 title="Manage custom and base scheduling constraints"
               >
                 <span>⚙️ Scheduling Rules</span>
-                <span className={styles.rulesBadge}>{dynamicConstraints.length} Custom</span>
+                <span className={styles.rulesBadge}>{baseConstraints?.rules.length ?? 0} Rules</span>
               </button>
             </div>
 
@@ -1221,7 +1023,7 @@ export default function CampusDirectorTimetablePage() {
             ) : (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', background: '#ffffff', borderRadius: '0.5rem' }}>
                 <p>No timetable entries generated yet for Semester {semester} ({academicYear}).</p>
-                <p style={{ fontSize: '0.85rem' }}>Click <strong>"Generate AI Timetable"</strong> above to run the scheduler.</p>
+                <p style={{ fontSize: '0.85rem' }}>Click <strong>&quot;Generate AI Timetable&quot;</strong> above to run the scheduler.</p>
               </div>
             )}
 
@@ -1307,7 +1109,7 @@ export default function CampusDirectorTimetablePage() {
                     ? jobError
                     : jobStatus === 'completed'
                     ? (stepMessage || '🎉 Timetable generation complete! All department schedules placed.')
-                    : (stepMessage || '🧠 Processing scheduling constraints and student registrations with AI...')}
+                    : (stepMessage || '🧠 Processing scheduling constraints and student registrations with OR-Tools...')}
                 </p>
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#818cf8' }}>
@@ -1334,7 +1136,7 @@ export default function CampusDirectorTimetablePage() {
               </div>
               <div className={`${styles.aiStepPill} ${jobProgress >= 40 ? (jobProgress > 40 ? styles.aiStepDone : styles.aiStepActive) : ''}`}>
                 <span>{jobProgress > 40 ? '✓' : '2'}</span>
-                <span>AI Scheduling</span>
+                <span>Scheduling</span>
               </div>
               <div className={`${styles.aiStepPill} ${jobProgress >= 70 ? (jobProgress > 70 ? styles.aiStepDone : styles.aiStepActive) : ''}`}>
                 <span>{jobProgress > 70 ? '✓' : '3'}</span>
@@ -1423,532 +1225,7 @@ export default function CampusDirectorTimetablePage() {
         </div>
       )}
 
-      {/* SCHEDULING RULES & CONSTRAINTS MODAL */}
-      {showRulesModal && (
-        <div className={styles.rulesModalOverlay}>
-          <div className={styles.rulesModal}>
-            <div className={styles.rulesModalHeader}>
-              <h3 className={styles.rulesModalTitle}>
-                <span>⚙️ Scheduling Rules & Constraints</span>
-              </h3>
-              <button
-                className={styles.rulesModalCloseBtn}
-                onClick={() => setShowRulesModal(false)}
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Tabs */}
-            <div className={styles.rulesModalTabs}>
-              <button
-                className={`${styles.rulesTabBtn} ${rulesActiveTab === 'custom' ? styles.rulesTabBtnActive : ''}`}
-                onClick={() => setRulesActiveTab('custom')}
-              >
-                ✏️ Custom Rules for Semester {semester} ({dynamicConstraints.length})
-              </button>
-              <button
-                className={`${styles.rulesTabBtn} ${rulesActiveTab === 'base' ? styles.rulesTabBtnActive : ''}`}
-                onClick={() => setRulesActiveTab('base')}
-              >
-                📖 System Base Rules for Semester {semester} (
-                {baseConstraints ? baseConstraints.hard_constraints.length + baseConstraints.soft_constraints.length : 0}
-                )
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className={styles.rulesModalBody}>
-              {/* TAB 1: CUSTOM RULES */}
-              {rulesActiveTab === 'custom' && (
-                <>
-                  <div className={styles.rulesCreateBox}>
-                    <label className={styles.rulesCreateLabel}>
-                      Add New Custom Rule for Semester {semester} ({academicYear})
-                    </label>
-                    <div className={styles.rulesCreateRow}>
-                      <select
-                        className={styles.rulesSelectCategory}
-                        value={newCustomCategory}
-                        onChange={(e) => setNewCustomCategory(e.target.value as 'hard' | 'soft')}
-                      >
-                        <option value="hard">🔒 Hard Constraint</option>
-                        <option value="soft">💡 Soft Constraint</option>
-                      </select>
-
-                      <input
-                        type="text"
-                        className={styles.rulesInput}
-                        placeholder="e.g., AEC courses must be in afternoon P4+P5+P6, or Friday P6 free for sports..."
-                        value={newConstraintText}
-                        onChange={(e) => setNewConstraintText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddCustomConstraint();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className={styles.rulesAddBtn}
-                        onClick={handleAddCustomConstraint}
-                        disabled={!newConstraintText.trim()}
-                      >
-                        + Add Rule
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className={styles.rulesListContainer}>
-                    <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                      Active Custom Rules ({dynamicConstraints.length}):
-                    </p>
-
-                    {dynamicConstraints.length > 0 ? (
-                      dynamicConstraints.map((c, idx) => (
-                        <div key={c.id} className={styles.ruleCard}>
-                          {editingConstraintId === c.id ? (
-                            <div className={styles.ruleEditRow}>
-                              <select
-                                className={styles.rulesSelectCategory}
-                                style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
-                                value={editingConstraintCategory}
-                                onChange={(e) => setEditingConstraintCategory(e.target.value as 'hard' | 'soft')}
-                              >
-                                <option value="hard">🔒 Hard</option>
-                                <option value="soft">💡 Soft</option>
-                              </select>
-                              <input
-                                type="text"
-                                className={styles.ruleEditInput}
-                                value={editingConstraintText}
-                                onChange={(e) => setEditingConstraintText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditCustomConstraint(c.id);
-                                  } else if (e.key === 'Escape') {
-                                    setEditingConstraintId(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className={styles.ruleSaveBtn}
-                                onClick={() => handleSaveEditCustomConstraint(c.id)}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.ruleCancelBtn}
-                                onClick={() => setEditingConstraintId(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                                <span
-                                  className={`${styles.ruleCategoryBadge} ${
-                                    c.category === 'soft' ? styles.ruleCategorySoft : styles.ruleCategoryHard
-                                  }`}
-                                >
-                                  {c.category === 'soft' ? 'Soft' : 'Hard'}
-                                </span>
-                                <span className={styles.ruleText}>
-                                  <strong>{idx + 1}.</strong> {c.text}
-                                </span>
-                              </div>
-                              <div className={styles.ruleActions}>
-                                <button
-                                  type="button"
-                                  className={styles.ruleEditBtn}
-                                  onClick={() => handleStartEditCustomConstraint(c)}
-                                  title="Edit rule"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.ruleDeleteBtn}
-                                  onClick={() => handleDeleteCustomConstraint(c.id)}
-                                  title="Delete rule"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '1.5rem', background: '#f8fafc', borderRadius: '0.5rem', color: '#64748b', fontSize: '0.85rem' }}>
-                        No custom rules entered yet for Semester {semester}. Choose Hard or Soft and enter a constraint above in plain English.
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* TAB 2: SYSTEM BASE RULES */}
-              {rulesActiveTab === 'base' && baseConstraints && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Filter:</span>
-                      <button
-                        type="button"
-                        style={{
-                          background: baseRulesFilterScope === 'all' ? '#0f172a' : '#f1f5f9',
-                          color: baseRulesFilterScope === 'all' ? '#ffffff' : '#334155',
-                          border: 'none',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '0.3rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setBaseRulesFilterScope('all')}
-                      >
-                        All Active ({baseConstraints.hard_constraints.length + baseConstraints.soft_constraints.length})
-                      </button>
-                      <button
-                        type="button"
-                        style={{
-                          background: baseRulesFilterScope === 'semester' ? '#0f172a' : '#f1f5f9',
-                          color: baseRulesFilterScope === 'semester' ? '#ffffff' : '#334155',
-                          border: 'none',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '0.3rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setBaseRulesFilterScope('semester')}
-                      >
-                        Sem {semester} Scoped ({baseConstraints.selected_semester_hard.length + baseConstraints.selected_semester_soft.length})
-                      </button>
-                      <button
-                        type="button"
-                        style={{
-                          background: baseRulesFilterScope === 'universal' ? '#0f172a' : '#f1f5f9',
-                          color: baseRulesFilterScope === 'universal' ? '#ffffff' : '#334155',
-                          border: 'none',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '0.3rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setBaseRulesFilterScope('universal')}
-                      >
-                        Universal ({baseConstraints.universal_hard_constraints.length + baseConstraints.universal_soft_constraints.length})
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      className={styles.rulesResetBtn}
-                      onClick={handleResetBaseRules}
-                      disabled={savingBaseRules}
-                      title="Restore factory default base rules"
-                    >
-                      🔄 Reset to Defaults
-                    </button>
-                  </div>
-
-                  <div className={styles.rulesListContainer}>
-                    <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.82rem', fontWeight: 700, color: '#dc2626' }}>
-                      🔒 Hard Constraints:
-                    </p>
-
-                    {(baseRulesFilterScope === 'all' || baseRulesFilterScope === 'universal') &&
-                      baseConstraints.universal_hard_constraints.map((hc, idx) => (
-                        <div key={`u-hard-${idx}`} className={styles.ruleCard}>
-                          {editingBaseRule?.scope === 'universal' && editingBaseRule.category === 'hard' && editingBaseRule.index === idx ? (
-                            <div className={styles.ruleEditRow}>
-                              <input
-                                type="text"
-                                className={styles.ruleEditInput}
-                                value={editingBaseRuleText}
-                                onChange={(e) => setEditingBaseRuleText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditBaseRule();
-                                  } else if (e.key === 'Escape') {
-                                    setEditingBaseRule(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className={styles.ruleSaveBtn}
-                                onClick={handleSaveEditBaseRule}
-                                disabled={savingBaseRules}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.ruleCancelBtn}
-                                onClick={() => setEditingBaseRule(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                                <span className={`${styles.ruleCategoryBadge} ${styles.ruleCategoryHard}`}>Universal Hard</span>
-                                <span className={styles.ruleText}>{hc}</span>
-                              </div>
-                              <div className={styles.ruleActions}>
-                                <button
-                                  type="button"
-                                  className={styles.ruleEditBtn}
-                                  onClick={() => handleStartEditBaseRule('universal', 'hard', idx, hc)}
-                                  title="Edit rule"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.ruleDeleteBtn}
-                                  onClick={() => handleDeleteBaseRule('universal', 'hard', idx)}
-                                  title="Delete rule"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-
-                    {(baseRulesFilterScope === 'all' || baseRulesFilterScope === 'semester') &&
-                      baseConstraints.selected_semester_hard.map((hc, idx) => (
-                        <div key={`s-hard-${idx}`} className={styles.ruleCard} style={{ borderLeft: '3px solid #dc2626' }}>
-                          {editingBaseRule?.scope === 'semester' && editingBaseRule.category === 'hard' && editingBaseRule.index === idx ? (
-                            <div className={styles.ruleEditRow}>
-                              <input
-                                type="text"
-                                className={styles.ruleEditInput}
-                                value={editingBaseRuleText}
-                                onChange={(e) => setEditingBaseRuleText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditBaseRule();
-                                  } else if (e.key === 'Escape') {
-                                    setEditingBaseRule(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className={styles.ruleSaveBtn}
-                                onClick={handleSaveEditBaseRule}
-                                disabled={savingBaseRules}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.ruleCancelBtn}
-                                onClick={() => setEditingBaseRule(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                                <span className={`${styles.ruleCategoryBadge} ${styles.ruleCategoryHard}`}>Sem {semester} Hard</span>
-                                <span className={styles.ruleText}>{hc}</span>
-                              </div>
-                              <div className={styles.ruleActions}>
-                                <button
-                                  type="button"
-                                  className={styles.ruleEditBtn}
-                                  onClick={() => handleStartEditBaseRule('semester', 'hard', idx, hc)}
-                                  title="Edit rule"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.ruleDeleteBtn}
-                                  onClick={() => handleDeleteBaseRule('semester', 'hard', idx)}
-                                  title="Delete rule"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-
-                  <div className={styles.rulesListContainer} style={{ marginTop: '0.75rem' }}>
-                    <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>
-                      💡 Soft Constraints:
-                    </p>
-
-                    {(baseRulesFilterScope === 'all' || baseRulesFilterScope === 'universal') &&
-                      baseConstraints.universal_soft_constraints.map((sc, idx) => (
-                        <div key={`u-soft-${idx}`} className={styles.ruleCard}>
-                          {editingBaseRule?.scope === 'universal' && editingBaseRule.category === 'soft' && editingBaseRule.index === idx ? (
-                            <div className={styles.ruleEditRow}>
-                              <input
-                                type="text"
-                                className={styles.ruleEditInput}
-                                value={editingBaseRuleText}
-                                onChange={(e) => setEditingBaseRuleText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditBaseRule();
-                                  } else if (e.key === 'Escape') {
-                                    setEditingBaseRule(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className={styles.ruleSaveBtn}
-                                onClick={handleSaveEditBaseRule}
-                                disabled={savingBaseRules}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.ruleCancelBtn}
-                                onClick={() => setEditingBaseRule(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                                <span className={`${styles.ruleCategoryBadge} ${styles.ruleCategorySoft}`}>Universal Soft</span>
-                                <span className={styles.ruleText}>{sc}</span>
-                              </div>
-                              <div className={styles.ruleActions}>
-                                <button
-                                  type="button"
-                                  className={styles.ruleEditBtn}
-                                  onClick={() => handleStartEditBaseRule('universal', 'soft', idx, sc)}
-                                  title="Edit rule"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.ruleDeleteBtn}
-                                  onClick={() => handleDeleteBaseRule('universal', 'soft', idx)}
-                                  title="Delete rule"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-
-                    {(baseRulesFilterScope === 'all' || baseRulesFilterScope === 'semester') &&
-                      baseConstraints.selected_semester_soft.map((sc, idx) => (
-                        <div key={`s-soft-${idx}`} className={styles.ruleCard} style={{ borderLeft: '3px solid #2563eb' }}>
-                          {editingBaseRule?.scope === 'semester' && editingBaseRule.category === 'soft' && editingBaseRule.index === idx ? (
-                            <div className={styles.ruleEditRow}>
-                              <input
-                                type="text"
-                                className={styles.ruleEditInput}
-                                value={editingBaseRuleText}
-                                onChange={(e) => setEditingBaseRuleText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditBaseRule();
-                                  } else if (e.key === 'Escape') {
-                                    setEditingBaseRule(null);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                className={styles.ruleSaveBtn}
-                                onClick={handleSaveEditBaseRule}
-                                disabled={savingBaseRules}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.ruleCancelBtn}
-                                onClick={() => setEditingBaseRule(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                                <span className={`${styles.ruleCategoryBadge} ${styles.ruleCategorySoft}`}>Sem {semester} Soft</span>
-                                <span className={styles.ruleText}>{sc}</span>
-                              </div>
-                              <div className={styles.ruleActions}>
-                                <button
-                                  type="button"
-                                  className={styles.ruleEditBtn}
-                                  onClick={() => handleStartEditBaseRule('semester', 'soft', idx, sc)}
-                                  title="Edit rule"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.ruleDeleteBtn}
-                                  onClick={() => handleDeleteBaseRule('semester', 'soft', idx)}
-                                  title="Delete rule"
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className={styles.rulesModalFooter}>
-              <button
-                className={styles.rulesDoneBtn}
-                onClick={() => setShowRulesModal(false)}
-              >
-                <span>✓ Done</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showRulesModal && baseConstraints && <BrowserRulesEditor rules={baseConstraints.rules} onSave={saveBrowserRules} onReset={resetBrowserRules} onClose={() => setShowRulesModal(false)} />}
 
       {/* Dedicated PDF Print Section */}
       <div className={styles.printArea}>

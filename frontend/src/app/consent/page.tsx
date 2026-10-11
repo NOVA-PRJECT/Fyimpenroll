@@ -90,8 +90,8 @@ export default function ConsentPage() {
 
       const dest = userRole ? ROLE_DASHBOARD_MAP[userRole] || '/dashboard/student' : '/dashboard/student'
       router.replace(dest)
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during submission.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'An error occurred during submission.')
       setLoading(false)
     }
   }

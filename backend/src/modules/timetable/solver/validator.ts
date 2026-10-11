@@ -5,6 +5,8 @@ import type {
   SlotMap,
   ParallelGroup,
   TeacherReservation,
+  EffectiveRuleDocument,
+  RuleDefinition,
 } from './types';
 
 export function validateTimetable(
@@ -12,10 +14,25 @@ export function validateTimetable(
   courses: CourseNode[],
   slotMap: SlotMap,
   parallelGroups: ParallelGroup[] = [],
-  teacherReservations: TeacherReservation[] = []
+  teacherReservations: TeacherReservation[] = [],
+  options?: {
+    semester?: number;
+    effectiveRules?: EffectiveRuleDocument | RuleDefinition[];
+  }
 ): ValidationViolation[] {
   const violations: ValidationViolation[] = [];
   const courseMap = new Map(courses.map((c) => [c.courseId, c]));
+  const semester = options?.semester;
+
+  // Extract rules if provided
+  let rulesList: RuleDefinition[] = [];
+  if (options?.effectiveRules) {
+    if (Array.isArray(options.effectiveRules)) {
+      rulesList = options.effectiveRules;
+    } else if (options.effectiveRules.rules) {
+      rulesList = options.effectiveRules.rules;
+    }
+  }
 
   // F36: Complete coverage check — ensure every course with contact hours is scheduled
   for (const course of courses) {
@@ -36,10 +53,16 @@ export function validateTimetable(
   // F37: Build teacherId → Set of (day-period) strings assigned to them
   const teacherSchedule = new Map<string, Set<string>>();
 
+  // Extract campus/global time limit rules (R19)
+  const timeLimitRules = rulesList.filter(
+    (r) => r.kind === 'CAMPUS_TIME_LIMIT' || r.kind === 'DAY_WINDOW'
+  );
+
   for (const assignment of response.assignments) {
     const course = courseMap.get(assignment.courseId);
     if (!course) continue;
 
+    const category = (course.category || '').toUpperCase().trim();
     let theoryCount = 0;
     let practicalCount = 0;
     const seenSlotsInCourse = new Set<string>();
@@ -55,6 +78,63 @@ export function validateTimetable(
           detail: `Invalid slot Day ${slot.day} Period ${slot.period} outside operational timetable domain (Mon-Fri, P1-P6).`,
         });
         continue;
+      }
+
+      // R19: Enforce dynamic time limit rules (e.g. limiting to Friday P6)
+      for (const tRule of timeLimitRules) {
+        if (tRule.isHard) {
+          const params = tRule.parameters || {};
+          const allowedDays: number[] | undefined = params.days || params.allowed_days;
+          const allowedPeriods: number[] | undefined = params.periods || params.allowed_periods;
+
+          if (allowedDays && !allowedDays.includes(slot.day)) {
+            violations.push({
+              type: 'invalid_window',
+              courseId: assignment.courseId,
+              day: slot.day,
+              period: slot.period,
+              detail: `Slot Day ${slot.day} Period ${slot.period} for ${course.courseCode} violates hard time limit rule "${tRule.id}" (allowed days: ${allowedDays.join(', ')}).`,
+            });
+          }
+          if (allowedPeriods && !allowedPeriods.includes(slot.period)) {
+            violations.push({
+              type: 'invalid_window',
+              courseId: assignment.courseId,
+              day: slot.day,
+              period: slot.period,
+              detail: `Slot Day ${slot.day} Period ${slot.period} for ${course.courseCode} violates hard time limit rule "${tRule.id}" (allowed periods: ${allowedPeriods.join(', ')}).`,
+            });
+          }
+        }
+      }
+
+      // R17: Semester 1 AEC restriction — strictly on Tuesdays (2) and/or Wednesdays (3) during afternoon (P4, P5, P6)
+      if (semester === 1 && category === 'AEC') {
+        const isAllowedDay = slot.day === 2 || slot.day === 3;
+        const isAllowedPeriod = slot.period >= 4 && slot.period <= 6;
+        if (!isAllowedDay || !isAllowedPeriod) {
+          violations.push({
+            type: 'invalid_window',
+            courseId: assignment.courseId,
+            day: slot.day,
+            period: slot.period,
+            detail: `Course ${course.courseCode} (AEC) slot Day ${slot.day} Period ${slot.period} violates Semester 1 mandatory window (strictly Tuesday/Wednesday P4-P6).`,
+          });
+        }
+      }
+
+      // R18: Semester 3 VAC restriction — strictly on Mondays (1) during Periods 5 and 6 (P5+P6) for ALL session periods
+      if (semester === 3 && category === 'VAC') {
+        const isAllowed = slot.day === 1 && (slot.period === 5 || slot.period === 6);
+        if (!isAllowed) {
+          violations.push({
+            type: 'invalid_window',
+            courseId: assignment.courseId,
+            day: slot.day,
+            period: slot.period,
+            detail: `Course ${course.courseCode} (VAC) slot Day ${slot.day} Period ${slot.period} violates Semester 3 mandatory window (strictly Monday P5+P6).`,
+          });
+        }
       }
 
       const key = `${slot.day}-${slot.period}`;
@@ -147,17 +227,42 @@ export function validateTimetable(
       });
     }
 
-    // Validate lab blocks are valid consecutive pairs (D03: allow single practical hour if course has odd practical hours)
-    const labSlots = assignment.slots.filter((s) => s.isLabBlock);
-    if (course.practicalHours % 2 === 0 && labSlots.length % 2 !== 0) {
+    // Semester 1 MDC rule: "split into a 2-hour continuous session on one day and a 1-hour session on another day"
+    if (semester === 1 && category === 'MDC' && course.theoryHours === 3 && course.practicalHours === 0) {
+      const slotsByDay = new Map<number, number[]>();
+      for (const s of assignment.slots) {
+        if (!slotsByDay.has(s.day)) slotsByDay.set(s.day, []);
+        slotsByDay.get(s.day)!.push(s.period);
+      }
+      if (slotsByDay.size !== 2) {
+        violations.push({
+          type: 'invalid_window',
+          courseId: assignment.courseId,
+          detail: `Semester 1 MDC course ${course.courseCode} must be split across exactly 2 different days (got ${slotsByDay.size} day(s)).`,
+        });
+      } else {
+        const dayCounts = Array.from(slotsByDay.values()).map((pList) => pList.length).sort((a, b) => a - b);
+        if (dayCounts[0] !== 1 || dayCounts[1] !== 2) {
+          violations.push({
+            type: 'invalid_window',
+            courseId: assignment.courseId,
+            detail: `Semester 1 MDC course ${course.courseCode} must have 1 single session on one day and a 2-hour continuous block on another day.`,
+          });
+        }
+      }
+    }
+
+    // R21: Validate lab blocks are valid consecutive pairs with NO unapproved single-hour exceptions
+    const labSlots = assignment.slots.filter((s) => s.isLabBlock || s.sessionType === 'practical');
+    if (labSlots.length % 2 !== 0) {
       violations.push({
         type: 'invalid_lab_block',
         courseId: assignment.courseId,
-        detail: `Course ${course.courseCode} has an odd number of lab block slots (${labSlots.length}) — must be in pairs`,
+        detail: `Course ${course.courseCode} has an odd number of lab slots (${labSlots.length}) — all practical contact hours must be in exact 2-period pairs (R21).`,
       });
     }
 
-    // Group lab slots by day, check they are consecutive pairs
+    // Group lab slots by day, check they are valid consecutive pairs
     const labByDay = new Map<number, number[]>();
     for (const s of labSlots) {
       if (!labByDay.has(s.day)) labByDay.set(s.day, []);
@@ -170,15 +275,11 @@ export function validateTimetable(
         const pA = periods[i];
         const pB = periods[i + 1];
         if (pB === undefined) {
-          // If odd practical hour (D03), single period is acceptable
-          if (course.practicalHours % 2 !== 0 && periods.length === 1) {
-            continue;
-          }
           violations.push({
             type: 'invalid_lab_block',
             courseId: assignment.courseId,
             day,
-            detail: `Course ${course.courseCode} lab block on day ${day} has un-paired period: ${pA}`,
+            detail: `Course ${course.courseCode} lab block on day ${day} has un-paired period: ${pA} (R21: no single-hour practicals permitted).`,
           });
           continue;
         }
@@ -190,7 +291,8 @@ export function validateTimetable(
             detail: `Course ${course.courseCode} lab block on day ${day} has non-consecutive periods: ${pA} and ${pB}`,
           });
         }
-        // P3+P4 is illegal
+        // Valid pairs: (1, 2), (2, 3), (4, 5), (5, 6)
+        // P3+P4 crosses lunch
         if (pA === 3 && pB === 4) {
           violations.push({
             type: 'lunch_overlap',
@@ -222,7 +324,7 @@ export function validateTimetable(
     const courseA = courseMap.get(assignmentA.courseId);
     if (!courseA) continue;
 
-    const labSlotsA = assignmentA.slots.filter((s) => s.isLabBlock);
+    const labSlotsA = assignmentA.slots.filter((s) => s.isLabBlock || s.sessionType === 'practical');
     const labByDayA = new Map<number, number[]>();
     for (const s of labSlotsA) {
       if (!labByDayA.has(s.day)) labByDayA.set(s.day, []);
@@ -296,7 +398,7 @@ export function validateTimetable(
       }
     }
   } else {
-    // Fallback: Campus-wide category slot consistency (only for groups of courses that share category and have zero student overlap)
+    // Fallback: Campus-wide category slot consistency
     const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC']);
     const categoryAssignments = new Map<string, Array<{ course: CourseNode; slots: string[] }>>();
 

@@ -296,7 +296,7 @@ export class StudentService {
       throw new BadRequestException('Current password is incorrect')
     }
 
-    // 2. Update to new password
+    // 2. Update to new password in Supabase Auth (mark pending_profile_sync: true as proof)
     const { error: pwError } = await this.supabase.admin.auth.admin.updateUserById(
       user.userId,
       {
@@ -305,7 +305,8 @@ export class StudentService {
           role: 'student',
           department_id: user.department_id,
           campus_id: user.campus_id,
-          must_change_password: false,
+          must_change_password: true,
+          pending_profile_sync: true,
         },
       },
     )
@@ -327,6 +328,17 @@ export class StudentService {
         canRetrySync: true,
       }
     }
+
+    // 3. Clear must_change_password and pending_profile_sync once profile update succeeds
+    await this.supabase.admin.auth.admin.updateUserById(user.userId, {
+      app_metadata: {
+        role: 'student',
+        department_id: user.department_id,
+        campus_id: user.campus_id,
+        must_change_password: false,
+        pending_profile_sync: false,
+      },
+    })
 
     // Sign in to get fresh session tokens
     const refreshAuthClient = this.supabase.createAuthClient()

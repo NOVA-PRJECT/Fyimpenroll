@@ -4,10 +4,10 @@
 -- Version: 4.0.0 (Unified Idempotent Master Migration)
 -- Target Schema: PostgreSQL 15+ / Supabase (public)
 --
--- Safe for execution on:
---   1. A brand new Supabase project
---   2. An existing database with older/partial schemas
---   3. Production databases (Idempotent: preserves all existing user/auth data)
+-- Historical consolidation script; not a certified production upgrade recipe.
+-- It contains conditional DROP TABLE/COLUMN operations. Never run the whole
+-- script against an existing database as an idempotent upgrade. Use reviewed,
+-- unapplied forward migrations; see implementation-handoffs/followup/RELEASE_RUNBOOK.md.
 -- =============================================================================
 
 -- =============================================================================

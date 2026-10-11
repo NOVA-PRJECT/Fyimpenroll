@@ -451,42 +451,11 @@ describe('Plan 01: Authorization & Role Boundaries (F01, F02, F03, F04, F05, F06
   })
 
   describe('7. F04 & F05: Timetable Scoping, Draft Isolation & Empty-Campus Safety', () => {
-    it('publishTimetable safely returns 0 published and performs no update on empty campus', async () => {
-      let updateCalls = 0
-      const mockSupabase = {
-        admin: {
-          from: (table) => {
-            if (table === 'departments') {
-              return {
-                select: () => ({
-                  eq: async () => ({
-                    data: [], // Empty campus, no departments
-                    error: null,
-                  })
-                })
-              }
-            }
-            if (table === 'timetable_entries') {
-              return {
-                update: () => {
-                  updateCalls++
-                  return {
-                    eq: () => ({ eq: () => ({ in: () => ({ select: async () => ({ data: [], error: null }) }) }) })
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const timetableService = new TimetableService(mockSupabase, mockAuditLogger, mockServerLogger)
-      const directorUser = { userId: 'd-1', role: 'campus_director', campus_id: 'empty-campus' }
-
-      const result = await timetableService.publish('2026-27', 1, directorUser)
-      assert.strictEqual(result.publishedCount, 0)
-      assert.strictEqual(updateCalls, 0, 'No global update query must execute when campus has 0 departments')
-    })
+    it('empty-campus publication rejects through the scoped transaction without a global update', async () => {
+ let args;const service=new TimetableService({admin:{rpc:async(name,input)=>{args=input;return {error:{message:'No verified current draft'}}},from:()=>{throw Error('Direct publication forbidden')}}},mockAuditLogger,mockServerLogger)
+ await assert.rejects(service.publish('2026-27',1,{userId:'dir',role:'campus_director',campus_id:'empty-campus'}),/No verified current draft/)
+ assert.equal(args.p_campus_id,'empty-campus')
+})
 
     it('getEntries blocks campus director from querying foreign department not in their campus', async () => {
       const mockSupabase = {

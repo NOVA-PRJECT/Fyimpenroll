@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import PortalHeader from '@/components/portal/PortalHeader'
@@ -15,14 +15,9 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
-  const [infoMessage, setInfoMessage] = useState('')
+  const [messageOverride, setInfoMessage] = useState<string | null>(null)
+  const infoMessage = messageOverride ?? searchParams.get('message') ?? ''
 
-  useEffect(() => {
-    const msg = searchParams.get('message')
-    if (msg) {
-      setInfoMessage(msg)
-    }
-  }, [searchParams])
 
   async function handleFormSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault()

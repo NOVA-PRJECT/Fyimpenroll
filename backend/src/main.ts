@@ -1,4 +1,5 @@
 ﻿import { NestFactory } from '@nestjs/core'
+import { randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
 import { AppModule } from './app.module'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -8,8 +9,20 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap')
   const app = await NestFactory.create(AppModule)
 
-  // Trust first proxy hop (Render, Cloudflare, Nginx) for accurate client IP in rate limiting & audits
-  ;(app.getHttpAdapter().getInstance() as any).set('trust proxy', 1)
+  // Match the actual ingress. Do not accept arbitrary leftmost forwarded headers.
+  const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0)
+  if (!Number.isInteger(proxyHops) || proxyHops < 0 || proxyHops > 5) throw new Error('TRUST_PROXY_HOPS must be 0–5')
+  ;(app.getHttpAdapter().getInstance() as any).set('trust proxy', proxyHops)
+  app.enableShutdownHooks()
+  app.use((req: any, res: any, next: any) => {
+    const requestId = randomUUID()
+    req.requestId = requestId
+    res.setHeader('X-Request-ID', requestId)
+    res.on('finish', () => {
+      if (res.statusCode >= 500) logger.error(`${requestId} ${req.method} ${req.path} ${res.statusCode}`)
+    })
+    next()
+  })
 
   app.use(cookieParser())
 
@@ -55,7 +68,7 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Content-Disposition'],
+    exposedHeaders: ['Content-Disposition', 'X-Request-ID'],
   })
 
   const port = process.env.PORT || 4000

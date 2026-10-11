@@ -56,6 +56,8 @@ export default function StudentDashboardPage() {
         if (cached) {
           const parsed = JSON.parse(cached)
           if (parsed?.studentInfo) {
+
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
             setStudentInfo(parsed.studentInfo)
             setHasSubmission(parsed.hasSubmission ?? false)
             setHasRegistration(parsed.hasRegistration ?? false)

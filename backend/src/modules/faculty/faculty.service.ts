@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 import { AuthUser } from '../../core/auth/types'
 
 @Injectable()
@@ -27,58 +28,35 @@ export class FacultyService {
     let deptIds: string[] = []
 
     if (user.role === 'teacher') {
-      // Individual Teacher: return ONLY assigned courses
-      const { data: assignments, error: assignError } = await this.supabase.admin
+      const assignments = await fetchAllPaginated<any>(this.supabase.admin
         .from('teacher_course_assignments')
-        .select('course_id')
-        .eq('teacher_id', user.userId)
-
-      if (assignError) {
-        throw new InternalServerErrorException('Failed to fetch teacher course assignments')
-      }
-
-      const assignedCourseIds = (assignments || []).map((a) => a.course_id)
-      if (assignedCourseIds.length > 0) {
-        const { data: courses, error: coursesError } = await this.supabase.admin
-          .from('courses')
-          .select('id, course_code, title, semester, department_id, credits, category')
-          .in('id', assignedCourseIds)
-          .order('title')
-
-        if (coursesError) {
-          throw new InternalServerErrorException('Failed to fetch assigned courses')
-        }
-        courseList = courses || []
-        deptIds = Array.from(new Set(courseList.map((c) => c.department_id).filter(Boolean)))
-      }
+        .select('id, course_id, campus_id, academic_year, semester, courses(id, course_code, title, semester, department_id, credits, category)')
+        .eq('teacher_id', user.userId).order('id'))
+      const settings = await fetchByIdChunks<any>(assignments.map(a => a.campus_id).filter(Boolean), ids =>
+        this.supabase.admin.from('campus_settings').select('campus_id, academic_year').in('campus_id', ids).order('campus_id'))
+      const years = new Map(settings.map(s => [s.campus_id, s.academic_year]))
+      courseList = assignments.filter(a => a.campus_id && a.academic_year === years.get(a.campus_id) && a.courses)
+        .map(a => ({ ...a.courses, delivery_id: a.id, campus_id: a.campus_id, academic_year: a.academic_year, semester: a.semester }))
+      deptIds = [...new Set(courseList.map(c => c.department_id))]
     } else {
       // General teaching staff / department view
-      const { data: depts } = await this.supabase.admin
-        .from('departments')
-        .select('id, name, code')
-        .eq('campus_id', user.campus_id)
-        .order('name')
+      const depts = await fetchAllPaginated<any>(this.supabase.admin
+        .from('departments').select('id, name, code')
+        .eq('campus_id', user.campus_id).order('id'))
 
       deptIds = (depts ?? []).map((d) => d.id)
 
       if (deptIds.length > 0) {
-        const { data: courses } = await this.supabase.admin
-          .from('courses')
-          .select('id, course_code, title, semester, department_id, credits, category')
-          .in('department_id', deptIds)
-          .order('title')
+        const courses = await fetchByIdChunks<any>(deptIds, ids => this.supabase.admin
+          .from('courses').select('id, course_code, title, semester, department_id, credits, category')
+          .in('department_id', ids).order('id'))
 
         courseList = courses || []
       }
     }
 
-    const { data: depts } = deptIds.length > 0
-      ? await this.supabase.admin
-          .from('departments')
-          .select('id, name, code')
-          .in('id', deptIds)
-          .order('name')
-      : { data: [] }
+    const depts = await fetchByIdChunks<any>(deptIds, ids => this.supabase.admin
+      .from('departments').select('id, name, code').in('id', ids).order('id'))
 
     const { data: campusSettings } = await this.supabase.admin
       .from('campus_settings')
@@ -89,46 +67,21 @@ export class FacultyService {
     const academicYear = campusSettings?.academic_year ?? ''
     const enrolledCounts: Record<string, number> = {}
 
-    if (academicYear && courseList.length > 0) {
-      const { data: registrations } = await this.supabase.admin
-        .from('student_registrations')
-        .select(`
-          slot_1_course_id,
-          slot_2_course_id,
-          slot_3_course_id,
-          slot_4_course_id,
-          slot_5_course_id,
-          slot_6_course_id,
-          slot_7_course_id,
-          slot_8_course_id
-        `)
-        .eq('academic_year', academicYear)
-
-      if (registrations) {
-        const courseIdSet = new Set(courseList.map((c) => c.id))
-        for (const reg of registrations) {
-          const slots = [
-            reg.slot_1_course_id,
-            reg.slot_2_course_id,
-            reg.slot_3_course_id,
-            reg.slot_4_course_id,
-            reg.slot_5_course_id,
-            reg.slot_6_course_id,
-            (reg as any).slot_7_course_id,
-            (reg as any).slot_8_course_id,
-          ]
-          for (const cid of slots) {
-            if (cid && courseIdSet.has(cid)) {
-              enrolledCounts[cid] = (enrolledCounts[cid] || 0) + 1
-            }
-          }
-        }
-      }
+    for (const course of courseList) {
+      const host = course.campus_id || user.campus_id
+      const year = course.academic_year || academicYear
+      if (!host || !year) continue
+      const slots = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id.eq.${course.id}`).join(',')
+      const { count, error } = await this.supabase.admin.from('student_registrations')
+        .select('id', { count: 'exact', head: true }).eq('campus_id', host)
+        .eq('academic_year', year).eq('semester', course.semester).or(slots)
+      if (error) throw new InternalServerErrorException('Failed to count course enrollment')
+      enrolledCounts[course.delivery_id || course.id] = count || 0
     }
 
     const coursesWithCounts = (courseList ?? []).map((course) => ({
       ...course,
-      enrolled_count: enrolledCounts[course.id] || 0,
+      enrolled_count: enrolledCounts[course.delivery_id || course.id] || 0,
     }))
 
     return {
@@ -140,50 +93,40 @@ export class FacultyService {
     }
   }
 
-  async getClassRoster(courseId: string, user: AuthUser) {
-    const campus_id = user.campus_id
-    if (!campus_id) throw new BadRequestException('Campus ID missing')
-
-    // For individual teacher, enforce that course is assigned to them
+  async getClassRoster(courseId: string, user: AuthUser, deliveryId?: string) {
+    let deliveryCampusId = user.campus_id;
+    let delivery: any;
     if (user.role === 'teacher') {
-      const { data: assignment } = await this.supabase.admin
-        .from('teacher_course_assignments')
-        .select('id')
-        .eq('teacher_id', user.userId)
-        .eq('course_id', courseId)
-        .maybeSingle()
-
-      if (!assignment) {
-        throw new ForbiddenException('You are not assigned as a teacher for this course')
-      }
+      if (!deliveryId) throw new BadRequestException('Select an assigned course delivery');
+      const { data, error } = await this.supabase.admin.from('teacher_course_assignments')
+        .select('id, campus_id, academic_year, semester').eq('id', deliveryId)
+        .eq('teacher_id', user.userId).eq('course_id', courseId).maybeSingle();
+      if (error) throw new InternalServerErrorException('Could not verify teaching assignment');
+      if (!data?.campus_id) throw new ForbiddenException('You are not assigned to this delivery');
+      delivery = data;
+      deliveryCampusId = data.campus_id;
     }
-
-    const { data: campusSettings } = await this.supabase.admin
-      .from('campus_settings')
-      .select('academic_year')
-      .eq('campus_id', campus_id)
-      .single()
-
-    const academicYear = campusSettings?.academic_year ?? ''
+    if (!deliveryCampusId) throw new BadRequestException('Campus ID missing');
+    const { data: campusSettings, error: settingsError } = await this.supabase.admin.from('campus_settings')
+      .select('academic_year').eq('campus_id', deliveryCampusId).maybeSingle();
+    if (settingsError || !campusSettings?.academic_year) throw new InternalServerErrorException('Current academic year unavailable');
+    const academicYear = campusSettings.academic_year;
+    if (delivery && delivery.academic_year !== academicYear) throw new ForbiddenException('This assignment is not for the current academic year');
 
     const { data: course, error: courseError } = await this.supabase.admin
       .from('courses')
-      .select('id, title, course_code, department_id')
+      .select('id, title, course_code, department_id, semester')
       .eq('id', courseId)
-      .single()
+      .single();
 
     if (courseError || !course) {
-      throw new NotFoundException('Course not found')
+      throw new NotFoundException('Course not found');
     }
 
-    const { data: courseDept } = await this.supabase.admin
-      .from('departments')
-      .select('campus_id')
-      .eq('id', course.department_id)
-      .single()
-
-    if (!courseDept || courseDept.campus_id !== campus_id) {
-      throw new ForbiddenException('Course does not belong to your campus')
+    // R06: Do NOT reject visiting faculty or cross-campus catalogue courses where courseDept.campus_id !== user.campus_id!
+    // For HOD, verify authority over their own department
+    if (user.role === 'hod' && user.department_id && course.department_id !== user.department_id) {
+      throw new ForbiddenException('Course does not belong to your department');
     }
 
     const slotFields = [
@@ -195,10 +138,10 @@ export class FacultyService {
       'slot_6_course_id',
       'slot_7_course_id',
       'slot_8_course_id',
-    ]
-    const orClause = slotFields.map((field) => `${field}.eq.${courseId}`).join(',')
+    ];
+    const orClause = slotFields.map((field) => `${field}.eq.${courseId}`).join(',');
 
-    const { data: registrations, error: regError } = await this.supabase.admin
+    let regQuery = this.supabase.admin
       .from('student_registrations')
       .select(`
         student_id,
@@ -213,10 +156,19 @@ export class FacultyService {
         slot_8_course_id
       `)
       .eq('academic_year', academicYear)
-      .or(orClause)
+      .eq('semester', delivery?.semester ?? course.semester)
+      .order('id')
+      .or(orClause);
+
+    if (deliveryCampusId) {
+      regQuery = regQuery.eq('campus_id', deliveryCampusId);
+    }
+
+    const registrations = await fetchAllPaginated<any>(regQuery);
+    const regError = null;
 
     if (regError) {
-      throw new InternalServerErrorException('Failed to fetch registrations')
+      throw new InternalServerErrorException('Failed to fetch registrations');
     }
 
     if (!registrations || registrations.length === 0) {
@@ -225,22 +177,17 @@ export class FacultyService {
         total_students: 0,
         department_breakdown: {},
         students: [],
-      }
+      };
     }
 
-    const studentIds = registrations.map((r: any) => r.student_id)
+    const studentIds = registrations.map((r: any) => r.student_id);
     const studentPathwayMap = new Map(
       registrations.map((r: any) => [r.student_id, r.pathway_id ?? null]),
-    )
+    );
 
-    const { data: students, error: studentError } = await this.supabase.admin
-      .from('students')
-      .select('id, full_name, departments (name, code)')
-      .in('id', studentIds)
-
-    if (studentError || !students) {
-      throw new InternalServerErrorException('Failed to fetch student details')
-    }
+    const students = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('students')
+      .select('id, full_name, campus_id, departments (name, code)').in('id', ids)
+      .eq('campus_id', deliveryCampusId).order('id'));
 
     const departmentBreakdown: Record<string, number> = {}
     students.forEach((student: any) => {
@@ -297,11 +244,12 @@ export class FacultyService {
         .select('academic_year')
         .eq('campus_id', campusId)
         .maybeSingle(),
-      studentsQuery,
+      fetchAllPaginated<any>(studentsQuery.order('id')),
     ])
 
-    const academicYear = settingsRes.data?.academic_year || '2026-27'
-    const students = studentsRes.data ?? []
+    if (settingsRes.error || !settingsRes.data?.academic_year) throw new InternalServerErrorException('Current academic year unavailable')
+    const academicYear = settingsRes.data.academic_year
+    const students = studentsRes
 
     if (students.length === 0) {
       return {
@@ -312,20 +260,9 @@ export class FacultyService {
       }
     }
 
-    // Query registrations for these students (without overly strict academic_year filtering)
-    let regQuery = this.supabase.admin
-      .from('student_registrations')
-      .select('student_id, semester, academic_year, submitted_at, slot_1_course_id')
-      .in(
-        'student_id',
-        students.map((s: any) => s.id),
-      )
-
-    const { data: registrations, error: regError } = await regQuery
-
-    if (regError) {
-      this.serverLogger.error('Failed to query registrations in getDefaulters', regError.message)
-    }
+    const registrations = await fetchByIdChunks<any>(students.map(s => s.id), ids => this.supabase.admin
+      .from('student_registrations').select('id, student_id, semester, academic_year, submitted_at, slot_1_course_id')
+      .in('student_id', ids).eq('academic_year', academicYear).eq('campus_id', campusId).order('id'))
 
     // A registration is valid if submitted_at is set or slot_1 is filled
     const validRegistrations = (registrations ?? []).filter((r: any) => {

@@ -28,16 +28,7 @@ export class ServerLoggerService {
         metadata: context ?? null,
       })
 
-      if (dbError) {
-        // Fallback to legacy server_error_logs table
-        await this.supabase.admin.from('server_error_logs').insert({
-          route,
-          error_message: errorMessage,
-          error_stack: errorStack ?? null,
-          user_id: context?.userId ?? null,
-          context: context ?? null,
-        })
-      }
+      if (dbError) this.logger.warn(`Failed to persist server error in system_logs: ${dbError.message}`)
     } catch {
       // Fire-and-forget: do not let logging failure crash the request
     }

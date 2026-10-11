@@ -25,9 +25,9 @@ export async function downloadBlob(blob: Blob, filename: string, mimeType?: stri
   const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : ''
 
   // ── Tier 1: Native File System Access API (Chrome, Edge, Opera) ──
-  if ('showSaveFilePicker' in window) {
+  if (typeof window.showSaveFilePicker === 'function') {
     try {
-      const pickerOptions: any = {
+      const pickerOptions: SaveFilePickerOptions = {
         suggestedName: filename,
       }
       if (ext) {
@@ -44,14 +44,14 @@ export async function downloadBlob(blob: Blob, filename: string, mimeType?: stri
         ]
       }
 
-      const handle = await (window as any).showSaveFilePicker(pickerOptions)
+      const handle = await window.showSaveFilePicker(pickerOptions)
       const writable = await handle.createWritable()
       await writable.write(effectiveBlob)
       await writable.close()
       return
-    } catch (err: any) {
+    } catch (err: unknown) {
       // User cancelled the file save dialog — do not trigger fallback or error
-      if (err?.name === 'AbortError') {
+      if (err instanceof Error && err.name === 'AbortError') {
         return
       }
       console.warn('[downloadBlob] showSaveFilePicker failed or was not allowed, attempting data URL fallback:', err)

@@ -2,13 +2,15 @@ services:
   - type: web
     name: fyimp-backend
     runtime: node
-    rootDir: backend
+    rootDir: .
     plan: free
-    buildCommand: pip install -r requirements.txt && npm install --include=dev && npm run build
-    startCommand: npm run start:prod
+    buildCommand: pip install -r requirements.txt && npm ci --workspace=backend --include-workspace-root --include=dev && npm run build:backend && npm prune --omit=dev --workspace=backend --include-workspace-root
+    startCommand: npm run start:prod --workspace=backend
     autoDeploy: true
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
@@ -23,5 +25,5 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: 1

@@ -16,6 +16,8 @@ import { AuthGuard } from '../../core/auth/guards/auth.guard'
 import { CurrentUser } from '../../core/auth/decorators/current-user.decorator'
 import { AuthUser } from '../../core/auth/types'
 import { z } from 'zod'
+import { RateLimitGuard } from '../../core/security/rate-limit.guard'
+import { RateLimit } from '../../core/security/rate-limit.decorator'
 
 const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -43,7 +45,7 @@ export class AuthController {
       throw new BadRequestException(parsed.error.issues[0].message)
     }
 
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || (req as any).ip || 'unknown'
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown'
     const result = await this.authService.login(parsed.data.email, parsed.data.password, ip)
 
     const cookieBase = {
@@ -84,7 +86,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const token = (req as any).cookies?.refresh_token || body?.refreshToken || body?.refresh_token
-    if (!token) {
+    if (typeof token !== 'string' || !token || token.length > 8192) {
       throw new BadRequestException('Refresh token is required')
     }
 
@@ -123,18 +125,19 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || (req as any).ip || 'unknown'
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown'
     const authHeader = (req.headers as any).authorization as string | undefined
     const token = (req as any).cookies?.auth_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined)
     const user = (req as any).user as AuthUser | undefined
 
-    await this.authService.logout(user || token, ip)
+    const userWithToken = user ? { ...user, token: user.token || token } : token
+    const result = await this.authService.logout(userWithToken, ip)
 
     res.clearCookie('auth_token', { path: '/' })
     res.clearCookie('refresh_token', { path: '/' })
     res.clearCookie('user_role', { path: '/' })
 
-    return { success: true }
+    return result
   }
 
   @Get('profile')
@@ -144,7 +147,8 @@ export class AuthController {
   }
 
   @Post('change-password')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RateLimitGuard)
+  @RateLimit('password_change')
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Body() body: unknown,
@@ -185,17 +189,21 @@ export class AuthController {
   }
 
   @Post('complete-password-reset')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RateLimitGuard)
+  @RateLimit('password_change')
   @HttpCode(HttpStatus.OK)
   async completePasswordReset(
     @CurrentUser() user: AuthUser,
     @Body() body?: { newPassword?: string; passwordUpdated?: boolean },
   ) {
-    return this.authService.completePasswordReset(user.userId, body)
+    const parsed = z.object({ newPassword: z.string().min(8).max(256) }).safeParse(body)
+    if (!parsed.success) throw new BadRequestException('A new password of 8–256 characters is required')
+    return this.authService.completePasswordReset(user.userId, parsed.data)
   }
 
   @Post('sync-password-status')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RateLimitGuard)
+  @RateLimit('password_change')
   @HttpCode(HttpStatus.OK)
   async syncPasswordStatus(@CurrentUser() user: AuthUser) {
     return this.authService.syncPasswordStatus(user.userId)

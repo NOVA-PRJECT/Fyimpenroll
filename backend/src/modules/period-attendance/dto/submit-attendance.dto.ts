@@ -9,6 +9,7 @@ export const SubmitAttendanceSchema = z.object({
   absent_student_ids: z.array(z.string().uuid()).default([]),
   present_student_ids: z.array(z.string().uuid()).optional(),
   last_marked_at: z.string().optional(),
+  expected_revision: z.union([z.number(), z.string()]).optional(),
   client_timestamp: z.string().optional(),
   synced_late: z.boolean().optional(),
 });

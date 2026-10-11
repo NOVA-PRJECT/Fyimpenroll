@@ -11,10 +11,7 @@ import {
   AlertTriangle,
   XCircle,
   HelpCircle,
-  Building2,
-  Users,
 } from 'lucide-react'
-import styles from './hod-dashboard.module.css'
 
 interface SessionInfo {
   status: 'on_time' | 'late' | 'early_leave' | 'absent' | 'pending'
@@ -77,14 +74,16 @@ export default function CampusAttendanceTab() {
         return
       }
       setData(json)
-    } catch (err: any) {
-      setError(err.message || 'Network error fetching campus attendance.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error fetching campus attendance.')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchRoster(selectedDate)
   }, [selectedDate, fetchRoster])
 
@@ -100,10 +99,10 @@ export default function CampusAttendanceTab() {
         (st.cap_application_number && st.cap_application_number.toLowerCase().includes(q))
       return matchSem && matchQuery
     })
-  }, [data?.roster, semesterFilter, searchQuery])
+  }, [data, semesterFilter, searchQuery])
 
   // Status Badge Component
-  function renderStatusBadge(session: SessionInfo, isMorning: boolean) {
+  function renderStatusBadge(session: SessionInfo) {
     const timeDisplay = session.signed_in_at
       ? new Date(session.signed_in_at).toLocaleTimeString('en-IN', {
           timeZone: 'Asia/Kolkata',
@@ -495,8 +494,8 @@ export default function CampusAttendanceTab() {
                     </td>
 
                     <td style={{ padding: '10px 14px', color: '#64748b' }}>Sem {st.current_semester}</td>
-                    <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.morning, true)}</td>
-                    <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.evening, false)}</td>
+                    <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.morning)}</td>
+                    <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.evening)}</td>
                   </tr>
                 ))}
               </tbody>

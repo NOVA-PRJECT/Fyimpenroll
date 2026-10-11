@@ -9,6 +9,7 @@ import {
 import { SupabaseService } from '../../database/supabase.service'
 import { AuthUser, Role } from '../types'
 import { CURRENT_POLICY_VERSION } from '../../../modules/consent/consent.constants'
+import { assertAuthProviderAvailable, authProviderCall } from '../provider-error'
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -24,7 +25,8 @@ export class AuthGuard implements CanActivate {
 
     this.validateMutatingOrigin(request)
 
-    const { data: authData, error: authError } = await this.supabaseService.admin.auth.getUser(token)
+    const { data: authData, error: authError } = await authProviderCall(this.supabaseService.admin.auth.getUser(token))
+    assertAuthProviderAvailable(authError)
     if (authError || !authData?.user) {
       throw new UnauthorizedException('Invalid or expired authentication session')
     }

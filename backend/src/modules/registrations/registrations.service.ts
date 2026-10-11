@@ -862,6 +862,14 @@ export class RegistrationsService {
       }
     })
 
+    // R14: If a slot was previously marked as fixed but is not fixed in the newly submitted pathway, clear its fixed metadata
+    for (let s = 1; s <= 8; s++) {
+      const k = `slot_${s}`
+      if (!fixedCourseAssignments[k] && allocationMetadata[k]?.allocated_by === 'fixed') {
+        delete allocationMetadata[k]
+      }
+    }
+
     // Optional Slot 7 (Paper 7 - Additional Minor Elective)
     if (preferences && preferences['slot_7'] && preferences['slot_7'].length > 0) {
       if (preferences['slot_7'].length > 3) {
@@ -1118,66 +1126,39 @@ export class RegistrationsService {
       updated_at: new Date().toISOString(),
     }
 
-    let rpcSuccess = false
-    try {
-      const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('submit_student_registration', {
-        p_student_id: user.userId,
-        p_campus_id: campusId || user.campus_id,
-        p_semester: semester,
-        p_academic_year: settings.academic_year,
-        p_pathway_id: pathway_id,
-        p_preferences: unifiedPreferences,
-        p_allocation_metadata: {
-          ...allocationMetadata,
-          credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
-        },
-        p_fixed_assignments: fixedCourseAssignments,
-        p_total_credits: totalCredits,
-        p_submitted_at: submittedAt,
-      })
-      if (!rpcErr && rpcRes?.success) {
-        rpcSuccess = true
-      }
-    } catch {
-      rpcSuccess = false
+    // R10/R11: Execute atomic transaction RPC submit_student_registration; do NOT bypass with direct table writes
+    if (typeof this.supabase.admin.rpc !== 'function') {
+      throw new InternalServerErrorException('Database RPC submit_student_registration is required')
     }
 
-    if (!rpcSuccess) {
-      // Fallback checked transaction:
-      const { error: prefErr } = await this.supabase.admin
-        .from('registration_preferences')
-        .upsert(prefPayload, { onConflict: 'student_id,semester,academic_year' })
+    const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('submit_student_registration', {
+      p_student_id: user.userId,
+      p_campus_id: campusId || user.campus_id,
+      p_semester: semester,
+      p_academic_year: settings.academic_year,
+      p_pathway_id: pathway_id,
+      p_preferences: unifiedPreferences,
+      p_allocation_metadata: {
+        ...allocationMetadata,
+        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
+      },
+      p_fixed_assignments: fixedCourseAssignments,
+      p_total_credits: totalCredits,
+      p_submitted_at: submittedAt,
+    })
 
-      if (prefErr) {
-        this.logger.error(`Failed to save registration preferences: ${prefErr.message}`)
-        throw new InternalServerErrorException('Failed to save course preferences')
+    if (rpcErr || !rpcRes?.success) {
+      const errMsg = rpcErr?.message || 'Registration transaction failed'
+      if (errMsg.includes('capacity') || errMsg.includes('seat')) {
+        throw new ConflictException(errMsg)
       }
-
-      let { error: regErr } = await this.supabase.admin
-        .from('student_registrations')
-        .upsert(regPayload, { onConflict: 'student_id,semester,academic_year' })
-
-      if (regErr && (regErr.message?.includes('slot_7_course_id') || regErr.message?.includes('slot_8_course_id'))) {
-        const { slot_7_course_id, slot_8_course_id, ...legacyPayload } = regPayload
-        const fallbackRes = await this.supabase.admin
-          .from('student_registrations')
-          .upsert(legacyPayload, { onConflict: 'student_id,semester,academic_year' })
-        regErr = fallbackRes.error
+      if (errMsg.includes('Registration window') || errMsg.includes('closed') || errMsg.includes('Timetable')) {
+        throw new ForbiddenException(errMsg)
       }
-
-      if (regErr) {
-        // F17: Companion write failed: do not report success!
-        this.logger.error(`Critical registration companion write failure: ${regErr.message}`)
-        if (!existingPref) {
-          await this.supabase.admin
-            .from('registration_preferences')
-            .delete()
-            .eq('student_id', user.userId)
-            .eq('semester', semester)
-            .eq('academic_year', settings.academic_year)
-        }
-        throw new InternalServerErrorException(`Registration failed: ${regErr.message}`)
+      if (errMsg.includes('Duplicate') || errMsg.includes('Invalid')) {
+        throw new BadRequestException(errMsg)
       }
+      throw new InternalServerErrorException(errMsg)
     }
 
     await this.auditLogger.log({
@@ -1426,14 +1407,19 @@ export class RegistrationsService {
       )
     }
 
-    // F30: Enforce unpublished cohort state (no changes after timetable generation/publication)
-    const { data: publishedEntries } = await this.supabase.admin
+    // F30 & R15: Enforce unpublished cohort state (scoped to student's host campus)
+    let pubQuery = this.supabase.admin
       .from('timetable_entries')
       .select('id')
       .eq('academic_year', settings.academic_year)
       .eq('semester', currentSemester)
       .eq('status', 'published')
-      .limit(1)
+
+    if (campusId) {
+      pubQuery = pubQuery.eq('campus_id', campusId)
+    }
+
+    const { data: publishedEntries } = await pubQuery.limit(1)
 
     if (publishedEntries && publishedEntries.length > 0) {
       throw new ForbiddenException(
@@ -1505,7 +1491,7 @@ export class RegistrationsService {
     // Step 4: Verify the target course exists and belongs to current semester
     const { data: course, error: cErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisite_course_ids')
+      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, tag, prerequisite_course_ids')
       .eq('id', course_id)
       .single()
 
@@ -1517,6 +1503,57 @@ export class RegistrationsService {
       throw new BadRequestException(
         `Course belongs to semester ${course.semester}, but your current semester is ${currentSemester}`,
       )
+    }
+
+    // Step 4.2: Enforce blueprint pathway slot eligibility (R12)
+    const slotNum = parseInt(slot_key.replace('slot_', ''), 10)
+    const pathwayId = reg.pathway_id
+
+    if (slotNum <= 6) {
+      const { data: blueprint, error: blueprintError } = await this.supabase.admin
+        .from('semester_blueprints')
+        .select('pathways')
+        .eq('department_id', departmentId)
+        .eq('semester', currentSemester)
+        .maybeSingle()
+
+      if (blueprintError) throw new InternalServerErrorException('Could not verify semester slot rules')
+      if (!blueprint) throw new NotFoundException('Semester blueprint not configured')
+      const pathways = Array.isArray(blueprint.pathways) ? blueprint.pathways : []
+      const pathway = pathways.find((p) => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined)
+      if (!pathway || !Array.isArray(pathway.slots) || !pathway.slots[slotNum - 1]?.rule) {
+        throw new BadRequestException('The selected pathway does not define this slot')
+      }
+      {
+        const slotDef = pathway.slots[slotNum - 1]
+        const { data: depts } = await this.supabase.admin.from('departments').select('id, code')
+        const deptMap = new Map((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
+        const isEligible = isCourseEligibleForSlot(
+          course,
+          slotDef.rule,
+          slotDef.target || '',
+          departmentId,
+          deptMap,
+          slotDef.name,
+        )
+        if (!isEligible) {
+          throw new BadRequestException(
+            `Course ${course.course_code} (${course.title}) is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`,
+          )
+        }
+      }
+    } else {
+      // Minor rule for Paper 7 and Paper 8
+      if (course.department_id === departmentId) {
+        throw new BadRequestException(
+          `Course ${course.course_code} - ${course.title} is not eligible for ${slot_key}. Minor papers cannot be from your own department.`,
+        )
+      }
+      if (course.semester !== currentSemester) {
+        throw new BadRequestException(
+          `Course ${course.course_code} - ${course.title} is for Semester ${course.semester}, but your current semester is ${currentSemester}.`,
+        )
+      }
     }
 
     // Step 4.5: Enforce strict prerequisite checks (F19)
@@ -1581,125 +1618,35 @@ export class RegistrationsService {
       )
     }
 
-    // Step 5.5: Try atomic RPC execution first (F21, F31)
-    try {
-      const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('execute_student_course_change', {
-        p_student_id: user.userId,
-        p_campus_id: campusId,
-        p_semester: currentSemester,
-        p_academic_year: settings.academic_year,
-        p_slot_key: slot_key,
-        p_new_course_id: course_id,
-        p_client_idempotency_key: (body as any).idempotency_key || null,
-      })
-      if (!rpcErr && rpcRes?.success) {
-        return rpcRes
-      }
-    } catch {
-      // Fallback to checked transaction below
+    // Step 5.5: Atomic RPC transaction execution (F21, F31, R11)
+    if (typeof this.supabase.admin.rpc !== 'function') {
+      throw new InternalServerErrorException('Database RPC execute_student_course_change is required')
     }
 
-    // Step 6: Recalculate total credits with the new course (F16)
-    const prevCourseId = reg[`${slot_key}_course_id`]
-    const assignedCourseIds: string[] = []
-    for (let s = 1; s <= 8; s++) {
-      const k = `slot_${s}`
-      const cid = k === slot_key ? course.id : reg[`${k}_course_id`]
-      if (cid) assignedCourseIds.push(cid)
-    }
-
-    let calculatedCredits = 0
-    if (assignedCourseIds.length > 0) {
-      const { data: assignedCourses } = await this.supabase.admin
-        .from('courses')
-        .select('credits')
-        .in('id', assignedCourseIds)
-      calculatedCredits = (assignedCourses || []).reduce((acc: number, c: any) => acc + (c.credits || 0), 0)
-    }
-
-    // Step 7: Update student_registrations row and track change in slot_change_history
-    const PRUNE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000 // keep last 7 days of history
-    const prunedHistory = history.filter(
-      (entry: any) => entry?.at && now - new Date(entry.at).getTime() < PRUNE_THRESHOLD_MS,
-    )
-
-    const newHistoryEntry = {
-      slot_key,
-      previous_course_id: prevCourseId || null,
-      new_course_id: course.id,
-      course_code: course.course_code,
-      at: new Date(now).toISOString(),
-    }
-
-    const updatedMeta = {
-      ...allocationMeta,
-      [slot_key]: {
-        allocated_by: 'student_direct',
-        updated_at: new Date(now).toISOString(),
-        previous_course_id: prevCourseId || null,
-        course_id: course.id,
-      },
-      slot_change_history: [...prunedHistory, newHistoryEntry],
-    }
-
-    const { error: updateErr } = await this.supabase.admin
-      .from('student_registrations')
-      .update({
-        [`${slot_key}_course_id`]: course.id,
-        allocation_metadata: updatedMeta,
-        total_credits: calculatedCredits,
-      })
-      .eq('id', reg.id)
-
-    if (updateErr) {
-      this.logger.error(`Failed to update student registration: ${updateErr.message}`)
-      throw new InternalServerErrorException('Failed to update course registration slot')
-    }
-
-    // Compute updated quota values
-    const updatedRemaining = Math.max(0, 3 - (recentChanges.length + 1))
-    let slotChangesNextReset: string | null = null
-    const allRecent = [...recentChanges, newHistoryEntry]
-    if (allRecent.length > 0) {
-      const sorted = [...allRecent].sort(
-        (a: any, b: any) => new Date(a.at).getTime() - new Date(b.at).getTime(),
-      )
-      slotChangesNextReset = new Date(new Date(sorted[0].at).getTime() + WINDOW_MS).toISOString()
-    }
-
-    // Step 8: Audit log the post-allocation update
-    await this.auditLogger.log({
-      eventType: AuditEvents.REGISTRATION_SUBMITTED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `student direct slot update for ${slot_key} to course ${course.course_code}`,
-      resourceType: 'student_registrations',
-      resourceId: reg.id,
-      status: 'success',
-      metadata: {
-        slot_key,
-        previous_course_id: prevCourseId,
-        new_course_id: course.id,
-        course_code: course.course_code,
-        total_credits: calculatedCredits,
-        slot_changes_remaining: updatedRemaining,
-      },
+    const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('execute_student_course_change', {
+      p_student_id: user.userId,
+      p_campus_id: campusId,
+      p_semester: currentSemester,
+      p_academic_year: settings.academic_year,
+      p_slot_key: slot_key,
+      p_new_course_id: course_id,
+      p_client_idempotency_key: (body as any).idempotency_key || null,
     })
 
-    return {
-      success: true,
-      message: `Successfully updated ${slot_key} to ${course.course_code} - ${course.title}`,
-      total_credits: calculatedCredits,
-      slot_key,
-      course_id: course.id,
-      slotChangesRemaining: updatedRemaining,
-      slotChangesNextReset,
-      course: {
-        id: course.id,
-        course_code: course.course_code,
-        title: course.title,
-        credits: course.credits,
-      },
+    if (rpcErr || !rpcRes?.success) {
+      const errMsg = rpcErr?.message || 'Course change transaction failed'
+      if (errMsg.includes('capacity') || errMsg.includes('seat')) {
+        throw new ConflictException(errMsg)
+      }
+      if (errMsg.includes('Rate limit') || errMsg.includes('deadline') || errMsg.includes('closed') || errMsg.includes('published')) {
+        throw new ForbiddenException(errMsg)
+      }
+      if (errMsg.includes('already assigned') || errMsg.includes('Duplicate') || errMsg.includes('Invalid') || errMsg.includes('Idempotency key')) {
+        throw new BadRequestException(errMsg)
+      }
+      throw new InternalServerErrorException(errMsg)
     }
+
+    return rpcRes
   }
 }

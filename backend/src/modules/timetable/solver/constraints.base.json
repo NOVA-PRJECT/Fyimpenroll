@@ -1,4 +1,5 @@
 {
+  "version": 1,
   "schedule": {
     "days": [
       "Monday",
@@ -52,6 +53,162 @@
     },
     "extended_period_policy": "Use Period 6 only when no other slot is available"
   },
+  "rules": [
+    {
+      "id": "base_no_student_overlap",
+      "kind": "NO_STUDENT_OVERLAP",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "No student may have two courses scheduled in the same time slot"
+    },
+    {
+      "id": "base_no_teacher_overlap",
+      "kind": "NO_TEACHER_OVERLAP",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "A teacher cannot teach multiple courses simultaneously in the same time slot"
+    },
+    {
+      "id": "base_teacher_reservations",
+      "kind": "TEACHER_RESERVATIONS",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "Teachers cannot be scheduled in slots already published in other campuses or cohorts"
+    },
+    {
+      "id": "base_no_lunch_overlap",
+      "kind": "NO_LUNCH_OVERLAP",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "No classes during lunch break (12:30 to 13:30)"
+    },
+    {
+      "id": "base_lab_consecutive_pair",
+      "kind": "LAB_CONSECUTIVE_PAIR",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "Lab blocks must be exactly 2 consecutive periods on the same day (valid: P1+P2, P2+P3, P4+P5, P5+P6 only; never cross lunch)",
+      "parameters": {
+        "validPairs": [
+          [1, 2],
+          [2, 3],
+          [4, 5],
+          [5, 6]
+        ]
+      }
+    },
+    {
+      "id": "base_exact_contact_hours",
+      "kind": "EXACT_CONTACT_HOURS",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "Assign exactly the required theory and practical hours per course (no more, no less)"
+    },
+    {
+      "id": "base_p6_last_resort",
+      "kind": "P6_LAST_RESORT",
+      "scope": "global",
+      "isHard": false,
+      "weight": 10,
+      "version": 1,
+      "description": "Use Period 6 only as a last resort"
+    },
+    {
+      "id": "base_theory_spread",
+      "kind": "THEORY_SPREAD",
+      "scope": "global",
+      "isHard": false,
+      "weight": 5,
+      "version": 1,
+      "description": "Spread theory hours across different days of the week (avoid multiple theory sessions on the same day)"
+    },
+    {
+      "id": "base_dept_time_preference",
+      "kind": "DEPARTMENT_TIME_PREFERENCE",
+      "scope": "global",
+      "isHard": false,
+      "weight": 2,
+      "version": 1,
+      "description": "Single-department courses are preferred in the morning (P1, P2, P3); cross-department courses preferred in afternoon (P4, P5)"
+    },
+    {
+      "id": "base_parallel_category_sync",
+      "kind": "PARALLEL_CATEGORY_SYNC",
+      "scope": "global",
+      "isHard": true,
+      "version": 1,
+      "description": "Campus-wide category synchronization: All courses with categories MDC, VAC, SEC, and AEC must share identical days and time slots across all departments",
+      "parameters": {
+        "campusWideCategories": [
+          "MDC",
+          "VAC",
+          "SEC",
+          "AEC"
+        ]
+      }
+    },
+    {
+      "id": "sem1_aec_window",
+      "kind": "CATEGORY_WINDOW",
+      "scope": "semester",
+      "targetSemester": 1,
+      "targetCategory": "AEC",
+      "isHard": true,
+      "version": 1,
+      "description": "AEC courses (3 hours) must be scheduled strictly on Tuesdays and/or Wednesdays during afternoon periods (P4, P5, P6) campus-wide",
+      "parameters": {
+        "days": [2, 3],
+        "periods": [4, 5, 6],
+        "maxContactHours": 3
+      }
+    },
+    {
+      "id": "sem1_mdc_block",
+      "kind": "SESSION_BLOCK",
+      "scope": "semester",
+      "targetSemester": 1,
+      "targetCategory": "MDC",
+      "isHard": true,
+      "version": 1,
+      "description": "MDC courses (3 theory hours) must be split into a 2-hour continuous session on one day and a 1-hour session on another day (never 3 hours on the same day)",
+      "parameters": {
+        "blocks": [
+          {
+            "duration": 2,
+            "isLab": false
+          },
+          {
+            "duration": 1,
+            "isLab": false
+          }
+        ],
+        "separateDays": true,
+        "preferred2hDay": 4,
+        "preferred1hDay": 5
+      }
+    },
+    {
+      "id": "sem3_vac_window",
+      "kind": "CATEGORY_WINDOW",
+      "scope": "semester",
+      "targetSemester": 3,
+      "targetCategory": "VAC",
+      "isHard": true,
+      "version": 1,
+      "description": "All VAC courses (2 hours) must be scheduled strictly on Mondays during Periods 5 and 6 (P5+P6) campus-wide",
+      "parameters": {
+        "days": [1],
+        "periods": [5, 6],
+        "maxContactHours": 2
+      }
+    }
+  ],
   "hard_constraints": [
     "No student may have two courses scheduled in the same time slot",
     "No classes during lunch break (12:30 to 13:30)",

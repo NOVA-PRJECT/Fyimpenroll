@@ -422,13 +422,13 @@ describe('Plan 07: Period Attendance & Independent GPS Sign-Ins', () => {
         '2026-10-05'
       );
 
-      // Submit marks on Date B: Oct 6
+      // Submit marks on Date B: Sep 28 (Monday, day 1)
       await periodAttendanceService.submitAttendance(
         mockTeacherUser,
         publishedSlotId,
-        [validStudent2.id], // Student 2 absent on Oct 6
+        [validStudent2.id], // Student 2 absent on Sep 28
         '127.0.0.1',
-        '2026-10-06'
+        '2026-09-28'
       );
 
       // Query Oct 5
@@ -443,17 +443,17 @@ describe('Plan 07: Period Attendance & Independent GPS Sign-Ins', () => {
       const s1Oct5 = rosterOct5.students.find((s) => s.id === validStudent1.id);
       assert.equal(s1Oct5.status, 'absent');
 
-      // Query Oct 6
-      const rosterOct6 = await periodAttendanceService.getSlotRosterForHod(
+      // Query Sep 28
+      const rosterSep28 = await periodAttendanceService.getSlotRosterForHod(
         mockHodUser,
         publishedSlotId,
-        '2026-10-06'
+        '2026-09-28'
       );
-      assert.equal(rosterOct6.attendance_date, '2026-10-06');
-      assert.equal(rosterOct6.summary.absent_count, 1);
-      assert.equal(rosterOct6.summary.present_count, 1);
-      const s2Oct6 = rosterOct6.students.find((s) => s.id === validStudent2.id);
-      assert.equal(s2Oct6.status, 'absent');
+      assert.equal(rosterSep28.attendance_date, '2026-09-28');
+      assert.equal(rosterSep28.summary.absent_count, 1);
+      assert.equal(rosterSep28.summary.present_count, 1);
+      const s2Sep28 = rosterSep28.students.find((s) => s.id === validStudent2.id);
+      assert.equal(s2Sep28.status, 'absent');
     });
 
     it('HOD department slots query reports accurate marked status for chosen date without unlock dependency', async () => {

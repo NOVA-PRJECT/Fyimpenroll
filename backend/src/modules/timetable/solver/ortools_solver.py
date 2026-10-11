@@ -1,14 +1,38 @@
 #!/usr/bin/env python3
 """
-OR-Tools CP-SAT Timetable Solver for FYIMP (Plan 06)
-Complies with F15, F33, F34, F35, F36, F37, F39, F40, F41, F42, F71, D03, D04, D05.
+OR-Tools CP-SAT Timetable Solver for FYIMP (Follow-up Plan 06)
+Complies with R17, R18, R19, R20, R21, R22; F33, F34, F35, F36, F37, F39, F40, F41, F42, F71.
 """
 
 import sys
 import json
 import time
+import hashlib
 from typing import Dict, List, Any, Tuple, Set
 from ortools.sat.python import cp_model
+
+
+SUPPORTED_RULE_KINDS = {
+    "NO_STUDENT_OVERLAP",
+    "NO_TEACHER_OVERLAP",
+    "TEACHER_RESERVATIONS",
+    "NO_LUNCH_OVERLAP",
+    "EXACT_CONTACT_HOURS",
+    "LAB_CONSECUTIVE_PAIR",
+    "P6_LAST_RESORT",
+    "THEORY_SPREAD",
+    "DEPARTMENT_TIME_PREFERENCE",
+    "DAY_WINDOW",
+    "CATEGORY_WINDOW",
+    "SESSION_BLOCK",
+    "PARALLEL_CATEGORY_SYNC",
+    "CAMPUS_TIME_LIMIT",
+}
+
+
+def compute_rule_hash(rules_data: List[Dict[str, Any]], schedule_data: Dict[str, Any]) -> str:
+    normalized = json.dumps({"rules": rules_data, "schedule": schedule_data}, sort_keys=True)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -36,21 +60,105 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
     # Valid lab blocks: (1, 2), (2, 3), (4, 5), (5, 6)
     LAB_START_PERIODS = [1, 2, 4, 5]
 
-    # Parse semester-specific JSON constraints
-    sem_constraints = constraints.get("semester_constraints", {}).get(str(semester), {})
-    sem_hard = sem_constraints.get("hard_constraints", [])
+    # Parse effective rules from constraints document or input data (R19)
+    rules_list: List[Dict[str, Any]] = (
+        input_data.get("rules") or
+        constraints.get("rules") or
+        []
+    )
+    schedule_config = constraints.get("schedule", {})
+    rule_hash = compute_rule_hash(rules_list, schedule_config)
+
+    # Validate rules for unsupported hard rules upfront (R19)
+    for r in rules_list:
+        kind = r.get("kind", "")
+        is_hard = r.get("isHard", True)
+        if kind not in SUPPORTED_RULE_KINDS:
+            if is_hard:
+                return {
+                    "status": "MODEL_INVALID",
+                    "assignments": [],
+                    "diagnostics": [
+                        f"Unsupported hard rule kind '{kind}' in rule '{r.get('id', 'unknown')}'. "
+                        f"Dynamic text without formal CP-SAT compiler handler cannot be compiled (R19)."
+                    ],
+                    "stats": {
+                        "wall_time_seconds": 0.0,
+                        "rule_hash": rule_hash,
+                        "total_courses": len(courses_data),
+                        "total_sessions_assigned": 0,
+                    },
+                }
+            else:
+                diagnostics.append(f"Ignored unsupported soft rule kind '{kind}'.")
+
+    # Check for campus or global time limit rules (R19)
+    # E.g. limiting the entire schedule to Friday P6 or disallowing certain days/periods
+    campus_allowed_slots: Set[Tuple[int, int]] = set(ALL_SLOTS)
+    for r in rules_list:
+        if r.get("kind") in ("CAMPUS_TIME_LIMIT", "DAY_WINDOW"):
+            scope = r.get("scope", "global")
+            if scope in ("global", "campus"):
+                params = r.get("parameters", {})
+                allowed_days = params.get("days") or params.get("allowed_days")
+                allowed_periods = params.get("periods") or params.get("allowed_periods")
+                new_allowed: Set[Tuple[int, int]] = set()
+                for d, p in campus_allowed_slots:
+                    day_ok = (allowed_days is None) or (d in allowed_days)
+                    period_ok = (allowed_periods is None) or (p in allowed_periods)
+                    if day_ok and period_ok:
+                        new_allowed.add((d, p))
+                campus_allowed_slots = new_allowed
+
+    # Data structures for courses
+    courses_by_id: Dict[str, Dict[str, Any]] = {c["courseId"]: c for c in courses_data}
+
+    # Preflight data conflict checks (R18 & R21)
+    for c in courses_data:
+        cid = c["courseId"]
+        t_hours = int(c.get("theoryHours", 0))
+        p_hours = int(c.get("practicalHours", 0))
+        category = (c.get("category") or "").upper().strip()
+
+        # R21: Odd practical hours check - strictly prohibited under 2-period lab block rule
+        if p_hours % 2 != 0:
+            return {
+                "status": "MODEL_INVALID",
+                "assignments": [],
+                "diagnostics": [
+                    f"Course {c.get('courseCode')} ({cid}) has practicalHours={p_hours} (odd number). "
+                    f"Practical contact hours must be in exact 2-period consecutive blocks (R21). "
+                    f"Single-period practical workarounds are unapproved."
+                ],
+                "stats": {
+                    "wall_time_seconds": 0.0,
+                    "rule_hash": rule_hash,
+                    "total_courses": len(courses_data),
+                    "total_sessions_assigned": 0,
+                },
+            }
+
+        # R18: Semester 3 VAC window check - required contact hours cannot exceed 2-hour window (Mon P5+P6)
+        if semester == 3 and category == "VAC" and (t_hours + p_hours) > 2:
+            return {
+                "status": "MODEL_INVALID",
+                "assignments": [],
+                "diagnostics": [
+                    f"Course {c.get('courseCode')} (VAC) requires {t_hours + p_hours} contact hours, "
+                    f"which exceeds the mandatory Semester 3 Monday P5+P6 (2-hour) window (R18). "
+                    f"Academic curriculum requires correction before scheduling."
+                ],
+                "stats": {
+                    "wall_time_seconds": 0.0,
+                    "rule_hash": rule_hash,
+                    "total_courses": len(courses_data),
+                    "total_sessions_assigned": 0,
+                },
+            }
 
     model = cp_model.CpModel()
 
-    # Data structures for courses
-    # Course ID -> Course dict
-    courses_by_id: Dict[str, Dict[str, Any]] = {c["courseId"]: c for c in courses_data}
-
-    # Session definitions per course:
-    # A session has a type ('theory' or 'lab_block' or 'lab_single'), index, duration
-    # We create boolean indicator variables: X[(course_id, session_id, day, period)] == 1 if session is active at (day, period)
-    # For a lab_block starting at (d, p), it is active at (d, p) and (d, p+1).
-
+    # Session definitions per course
     course_sessions: Dict[str, List[Dict[str, Any]]] = {}
 
     for c in courses_data:
@@ -61,18 +169,10 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         sessions = []
 
-        # D04 Check: Semester 3 VAC restriction with > 2 hours
-        if semester == 3 and category == "VAC" and (t_hours + p_hours) > 2:
-            diagnostics.append(
-                f"Course {c.get('courseCode')} (VAC) has {t_hours + p_hours} contact hours, "
-                f"which exceeds the Semester 3 Monday P5+P6 (2-hour) limit (Observation D04)."
-            )
-
         # Semester 1 MDC rule: "MDC courses (3 theory hours) must be split into a 2-hour continuous session on one day and a 1-hour session on another day"
         is_sem1_mdc = (semester == 1 and category == "MDC" and t_hours == 3 and p_hours == 0)
 
         if is_sem1_mdc:
-            # 1 2-hour block + 1 1-hour block
             sessions.append({
                 "id": "mdc_block_2h",
                 "type": "theory_block_2h",
@@ -95,7 +195,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "is_lab": False,
                 })
 
-            # Practical sessions: 2-hour consecutive lab blocks
+            # Practical sessions: 2-hour consecutive lab blocks (exact pairs, no odd lab singles)
             lab_blocks_count = p_hours // 2
             for i in range(lab_blocks_count):
                 sessions.append({
@@ -105,31 +205,10 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "is_lab": True,
                 })
 
-            # Observation D03: Odd practical hour (e.g. practicalHours == 1)
-            if p_hours % 2 != 0:
-                diagnostics.append(
-                    f"Course {c.get('courseCode')} has practical_hours={p_hours} (odd number, Observation D03). "
-                    f"Scheduling single 1-hour practical period."
-                )
-                sessions.append({
-                    "id": f"lab_odd",
-                    "type": "lab_single",
-                    "duration": 1,
-                    "is_lab": True,
-                })
-
         course_sessions[cid] = sessions
 
     # Decision Variables:
-    # For each course c and session s:
-    # If duration == 1:
-    #   V[(c, s_id, d, p)] is BoolVar indicating placement at (d, p)
-    # If duration == 2:
-    #   Start[(c, s_id, d, p)] is BoolVar for start at (d, p) where p in LAB_START_PERIODS
-    #   Occupies (d, p) and (d, p+1)
-
-    # Indicator of whether course c has ANY session at slot (d, p)
-    # active_vars[(c, d, p)] = list of BoolVars
+    # active_vars[(cid, d, p)] = list of BoolVars active at slot (d, p)
     active_vars: Dict[Tuple[str, int, int], List[cp_model.IntVar]] = {}
     for cid in courses_by_id:
         for d, p in ALL_SLOTS:
@@ -149,17 +228,24 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
             if dur == 1:
                 for d, p in ALL_SLOTS:
-                    # Enforce domain restrictions upfront
-                    # Semester 1 AEC restriction: "strictly on Tuesdays (2) and/or Wednesdays (3) during afternoon (P4, P5, P6)"
+                    # Enforce campus allowed slots (R19)
+                    if (d, p) not in campus_allowed_slots:
+                        continue
+
+                    # R17: Semester 1 AEC restriction: strictly on Tuesdays (2) and/or Wednesdays (3) during afternoon (P4, P5, P6)
                     if semester == 1 and category == "AEC":
                         if d not in [2, 3] or p not in [4, 5, 6]:
+                            continue
+
+                    # R18: Semester 3 VAC restriction: applied to EVERY occupied period, including single-hour theory!
+                    if semester == 3 and category == "VAC":
+                        if d != 1 or p not in [5, 6]:
                             continue
 
                     v = model.NewBoolVar(f"x_{cid}_{sid}_d{d}_p{p}")
                     start_dict[(d, p)] = v
                     active_vars[(cid, d, p)].append(v)
 
-                # Exactly one slot must be selected
                 if start_dict:
                     model.AddExactlyOne(list(start_dict.values()))
                 else:
@@ -169,12 +255,16 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                 # 2-hour continuous block
                 for d in DAYS:
                     for p in LAB_START_PERIODS:
+                        # Enforce campus allowed slots (R19)
+                        if (d, p) not in campus_allowed_slots or (d, p + 1) not in campus_allowed_slots:
+                            continue
+
                         # Semester 1 AEC restriction for 2-hour blocks if any
                         if semester == 1 and category == "AEC":
                             if d not in [2, 3] or p not in [4, 5]:
                                 continue
 
-                        # Semester 3 VAC restriction: "strictly on Mondays (1) during Periods 5 and 6 (P5+P6)"
+                        # R18: Semester 3 VAC restriction: strictly on Mondays (1) during Periods 5 and 6 (P5+P6)
                         if semester == 3 and category == "VAC":
                             if d != 1 or p != 5:
                                 continue
@@ -199,20 +289,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
         if len(var_list) > 1:
             model.Add(sum(var_list) <= 1)
 
-    # 2. Theory spread: no two theory sessions of same course on same day (if theoryHours <= 5)
-    for cid, sessions in course_sessions.items():
-        th_sessions = [s for s in sessions if not s["is_lab"] and s["duration"] == 1]
-        if len(th_sessions) <= 5 and len(th_sessions) > 1:
-            for d in DAYS:
-                day_th_vars = []
-                for s in th_sessions:
-                    for p in PERIODS:
-                        if (d, p) in session_start_vars[(cid, s["id"])]:
-                            day_th_vars.append(session_start_vars[(cid, s["id"])][(d, p)])
-                if day_th_vars:
-                    model.Add(sum(day_th_vars) <= 1)
-
-    # Semester 1 MDC spread: 2h block and 1h block on DIFFERENT days
+    # 2. Semester 1 MDC spread (Hard Rule): 2h block and 1h block on DIFFERENT days
     for cid, sessions in course_sessions.items():
         c_meta = courses_by_id[cid]
         if semester == 1 and (c_meta.get("category") or "").upper().strip() == "MDC":
@@ -232,7 +309,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 3. Student Conflict Graph:
     # No student may have two overlapping courses at the same (d, p) slot
-    # Map student -> set of courseIds
     student_courses: Dict[str, Set[str]] = {}
     for c in courses_data:
         cid = c["courseId"]
@@ -241,7 +317,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                 student_courses[s_id] = set()
             student_courses[s_id].add(cid)
 
-    # To keep model concise, find pairs of conflicting courses
     conflict_pairs: Set[Tuple[str, str]] = set()
     for s_id, enrolled_cids in student_courses.items():
         c_list = sorted(list(enrolled_cids))
@@ -296,7 +371,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
             for other_cid in grp_cids[1:]:
                 other_sessions = course_sessions[other_cid]
-                # Compare session by session if they share the same structure
                 if len(base_sessions) == len(other_sessions):
                     for idx in range(len(base_sessions)):
                         b_sid = base_sessions[idx]["id"]
@@ -309,11 +383,47 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                                 model.Add(b_dict[slot_key] == o_dict[slot_key])
 
     # ──────────────── Soft Constraints / Objective ────────────────
-    # Minimize penalties:
-    # 1. Period 6 usage penalty (Extended Period Policy)
-    # 2. Single-dept morning preference (P1-P3) / Cross-dept afternoon preference (P4-P5)
+    # Hierarchical / Lexicographic penalty terms:
+    # Priority 1: Period 6 Last Resort (Weight: 50)
+    # Priority 2: Theory Spread (R17 Soft Penalty: Weight 5 per additional session on same day)
+    # Priority 3: Dept Morning / Afternoon Preference (Weight 2)
+    # Priority 4: Semester 1 MDC Day Preference (Thursdays 2h, Fridays 1h) (Weight 2)
     objective_terms = []
 
+    # 1. Period 6 Usage Penalty (Extended Period Policy - Weight 50)
+    for cid, sessions in course_sessions.items():
+        for s in sessions:
+            sid = s["id"]
+            start_dict = session_start_vars[(cid, sid)]
+            for (d, p), var in start_dict.items():
+                if p == 6 or (s["duration"] == 2 and p == 5):
+                    objective_terms.append(var * 50)
+
+    # 2. Theory Spread Soft Penalty (R17):
+    # Penalize scheduling multiple theory sessions of the same course on the same day.
+    # For courses with tight windows (e.g., S1 AEC: 3 hours in 2 allowed days), this allows
+    # 2 hours on one day without becoming INFEASIBLE, incurring only a small penalty (5).
+    for cid, sessions in course_sessions.items():
+        c_meta = courses_by_id[cid]
+        cat = (c_meta.get("category") or "").upper().strip()
+        # MDC in Sem 1 already has its hard 2h/1h separate-day constraint
+        if semester == 1 and cat == "MDC":
+            continue
+
+        th_sessions = [s for s in sessions if not s["is_lab"] and s["duration"] == 1]
+        if len(th_sessions) > 1:
+            for d in DAYS:
+                day_th_vars = []
+                for s in th_sessions:
+                    for p in PERIODS:
+                        if (d, p) in session_start_vars.get((cid, s["id"]), {}):
+                            day_th_vars.append(session_start_vars[(cid, s["id"])][(d, p)])
+                if len(day_th_vars) > 1:
+                    excess = model.NewIntVar(0, len(day_th_vars), f"excess_th_{cid}_d{d}")
+                    model.Add(excess >= sum(day_th_vars) - 1)
+                    objective_terms.append(excess * 5)
+
+    # 3. Department Morning/Afternoon Preference (Weight 2)
     for cid, sessions in course_sessions.items():
         c_meta = courses_by_id[cid]
         is_cross_dept = c_meta.get("isCrossDept", False)
@@ -323,17 +433,28 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
             start_dict = session_start_vars[(cid, sid)]
 
             for (d, p), var in start_dict.items():
-                # Period 6 penalty (weight 10)
-                if p == 6 or (s["duration"] == 2 and p == 5):
-                    objective_terms.append(var * 10)
-
-                # Department preference
                 if not is_cross_dept and p in [4, 5]:
                     # Single dept preferred in morning (penalty for afternoon)
                     objective_terms.append(var * 2)
                 elif is_cross_dept and p in [1, 2, 3]:
                     # Cross dept preferred in afternoon (penalty for morning)
                     objective_terms.append(var * 2)
+
+    # 4. Semester 1 MDC Day Preference (Prefer Thu for 2h, Fri for 1h - Weight 2)
+    if semester == 1:
+        for cid, sessions in course_sessions.items():
+            c_meta = courses_by_id[cid]
+            if (c_meta.get("category") or "").upper().strip() == "MDC":
+                block_s = next((s for s in sessions if s["id"] == "mdc_block_2h"), None)
+                single_s = next((s for s in sessions if s["id"] == "mdc_single_1h"), None)
+                if block_s:
+                    for (d, p), var in session_start_vars[(cid, block_s["id"])].items():
+                        if d != 4:  # Not Thursday
+                            objective_terms.append(var * 2)
+                if single_s:
+                    for (d, p), var in session_start_vars[(cid, single_s["id"])].items():
+                        if d != 5:  # Not Friday
+                            objective_terms.append(var * 2)
 
     if objective_terms:
         model.Minimize(sum(objective_terms))
@@ -394,7 +515,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                             "isLabBlock": False,
                         })
                     elif dur == 2:
-                        # Emits both periods of the block
                         assignments.append({
                             "courseId": cid,
                             "departmentId": dept_id,
@@ -421,6 +541,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
             "branches": solver.NumBranches(),
             "conflicts": solver.NumConflicts(),
             "objective_value": solver.ObjectiveValue() if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None,
+            "rule_hash": rule_hash,
             "total_courses": len(courses_data),
             "total_sessions_assigned": len(assignments),
         },
@@ -429,7 +550,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
 def main():
     try:
-        # Read JSON from stdin or file path arg
         if len(sys.argv) > 1 and sys.argv[1] != "-":
             with open(sys.argv[1], "r", encoding="utf-8") as f:
                 input_data = json.load(f)

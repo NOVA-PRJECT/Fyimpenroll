@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { GripVertical, ChevronDown } from 'lucide-react'
 import styles from './hod-dashboard.module.css'
 
@@ -26,6 +26,7 @@ interface PathwayData {
   slots: SlotData[]
 }
 
+interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; prerequisite_course_ids?: string[]; id: string; course_code: string; title: string; credits: number; category: string; tag: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
 export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint' | 'courses' }) {
   const [semester, setSemester] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -52,11 +53,11 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
   const [fixedOpen, setFixedOpen] = useState<Record<string, boolean>>({})
 
   // Courses state
-  const [courses, setCourses] = useState<any[]>([])
+  const [courses, setCourses] = useState<CatalogueCourse[]>([])
   const [loadingCourses, setLoadingCourses] = useState(false)
   const [showAddCourse, setShowAddCourse] = useState(false)
-  const [editCourse, setEditCourse] = useState<any | null>(null)
-  const [deleteCourse, setDeleteCourse] = useState<any | null>(null)
+  const [editCourse, setEditCourse] = useState<CatalogueCourse | null>(null)
+  const [deleteCourse, setDeleteCourse] = useState<CatalogueCourse | null>(null)
   const [courseCode, setCourseCode] = useState('')
   const [courseTitle, setCourseTitle] = useState('')
   const [courseCredits, setCourseCredits] = useState<number | '' | null>(null)
@@ -80,7 +81,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
   const [newRuleTarget, setNewRuleTarget] = useState('')
 
   // Prior courses selector for COMPLETED_COURSE
-  const [priorCourses, setPriorCourses] = useState<any[]>([])
+  const [priorCourses, setPriorCourses] = useState<CatalogueCourse[]>([])
   const [loadingPriorCourses, setLoadingPriorCourses] = useState(false)
   const [priorCourseSemesterFilter, setPriorCourseSemesterFilter] = useState<number | null>(null)
   const [priorCourseSearch, setPriorCourseSearch] = useState('')
@@ -151,7 +152,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     }
 
     // Check if we have any matching courses in our department as a proxy
-    let matchingCourses: any[] = []
+    let matchingCourses: CatalogueCourse[] = []
     if (slot.rule === 'POOL_RESTRICTED') {
       matchingCourses = courses.filter(c => c.tag === slot.target)
     } else if (slot.rule === 'GLOBAL_BASKET') {
@@ -216,11 +217,12 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     }
   }
 
-  // Fetch on mount
-  useEffect(() => {
+  // Fetch initial data once with the current loader.
+  const loadInitialBlueprint = useEffectEvent(() => {
     fetchBlueprint(1)
     fetchDepartmentsList()
-  }, [])
+  })
+  useEffect(() => { loadInitialBlueprint() }, [])
 
   async function fetchDepartmentsList() {
     try {
@@ -260,6 +262,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
   useEffect(() => {
     if (showAddCourse || editCourse) {
       const targetSem = editCourse?.semester ?? semester
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
       loadPriorCourses(targetSem)
       setPriorCourseSemesterFilter(null)
       setPriorCourseSearch('')
@@ -274,7 +278,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
 
     try {
       const res = await fetch(`/api/hod/blueprint?semester=${sem}`)
-      let data: any = null
+      let data: { id?: string; error?: string; message?: string; [key: `slot_${number}_rule`]: SlotData["rule"]; [key: `slot_${number}_target`]: string; [key: `slot_${number}_name`]: string; min_credits?: number; max_credits?: number; pathways?: PathwayData[] } | null = null
       try {
         const text = await res.text()
         data = text ? JSON.parse(text) : null
@@ -297,10 +301,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
         let loadedPathways: PathwayData[] = []
         // Read from pathways JSONB if available, else create default pathway from flat columns
         if (data.pathways && Array.isArray(data.pathways) && data.pathways.length > 0) {
-          loadedPathways = data.pathways.map((p: any) => ({
+          loadedPathways = data.pathways.map((p: PathwayData) => ({
             id: p.id,
             name: p.name,
-            slots: (p.slots || []).map((s: any) => ({
+            slots: (p.slots || []).map((s: SlotData) => ({
               rule: s.rule ?? '',
               target: s.target ?? '',
               name: s.name ?? '',
@@ -309,7 +313,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
         } else {
           // Legacy: build single pathway from flat columns
           const flatSlots: SlotData[] = []
-          for (let i = 1; i <= 6; i++) {
+          for (let i = 1; i <= 8; i++) {
             const rule = data[`slot_${i}_rule`] ?? ''
             const target = data[`slot_${i}_target`] ?? ''
             const name = data[`slot_${i}_name`] ?? ''
@@ -344,9 +348,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       }
 
       await fetchCourses(sem)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch blueprint:', err)
-      setError(err.message || 'Network error fetching blueprint')
+      setError((err instanceof Error ? err.message : '') || 'Network error fetching blueprint')
     } finally {
       setLoading(false)
     }
@@ -497,7 +501,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.rules) {
         setCourseRules(data.rules)
-        const deptRule = data.rules.find((r: any) => r.rule === 'DEPARTMENT')
+        const deptRule = data.rules.find((r: {rule: string; target: string}) => r.rule === 'DEPARTMENT')
         if (deptRule) {
           setNewRuleTarget(deptRule.target)
         }
@@ -542,8 +546,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
         } else {
           setError(data.error || data.message || 'Failed to add prerequisite rule')
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to add prerequisite rule')
+      } catch (err: unknown) {
+        setError((err instanceof Error ? err.message : '') || 'Failed to add prerequisite rule')
       }
     } else {
       if (newRuleType === 'DEPARTMENT') {
@@ -585,8 +589,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
           const data = await res.json().catch(() => ({}))
           setError(data.error || data.message || 'Failed to delete prerequisite rule')
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to delete prerequisite rule')
+      } catch (err: unknown) {
+        setError((err instanceof Error ? err.message : '') || 'Failed to delete prerequisite rule')
       }
     } else {
       setCourseRules(courseRules.filter((_, i) => i !== idx))
@@ -628,8 +632,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
         } else {
           setError(data.error || data.message || 'Failed to update department constraint')
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to update department constraint')
+      } catch (err: unknown) {
+        setError((err instanceof Error ? err.message : '') || 'Failed to update department constraint')
       }
     } else {
       const existsIdx = courseRules.findIndex(r => r.rule === 'DEPARTMENT')
@@ -671,7 +675,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     const finalPractical = coursePracticalHours !== null && coursePracticalHours !== '' ? Number(coursePracticalHours) : 0
 
     const isEdit = !!editCourse
-    const bodyPayload: any = {
+    const bodyPayload: Record<string, unknown> = {
       course_code: courseCode.trim().toUpperCase(),
       title: courseTitle.trim(),
       credits: courseCredits,

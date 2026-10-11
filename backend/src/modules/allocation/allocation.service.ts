@@ -19,6 +19,8 @@ import {
   evaluateCoursePrerequisites,
   isCourseEligibleForSlot,
 } from '../../core/utils/slotRules'
+import * as crypto from 'crypto'
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 
 export interface CourseItem {
   id: string
@@ -312,13 +314,22 @@ export class AllocationService {
       )
     }
 
-    // F22: Verify timetable has not already been published for this cohort
-    const { count: publishedCount } = await this.supabase.admin
+    // F22 & R15: Verify timetable has not already been published for this campus cohort
+    let timetablePubQuery = this.supabase.admin
       .from('timetable_entries')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', body.academicYear)
       .eq('semester', sem)
       .eq('status', 'published')
+
+    if (campusId && typeof (timetablePubQuery as any)?.eq === 'function') {
+      try {
+        const scoped = (timetablePubQuery as any).eq('campus_id', campusId)
+        if (scoped) timetablePubQuery = scoped
+      } catch (_) {}
+    }
+
+    const { count: publishedCount } = await timetablePubQuery
 
     if ((publishedCount ?? 0) > 0) {
       throw new ConflictException(
@@ -326,7 +337,8 @@ export class AllocationService {
       )
     }
 
-    // F23: Atomically claim allocation run via claim_allocation_run RPC
+    // F23 & R16: Atomically claim allocation run via claim_allocation_run RPC with worker fencing token
+    const fencingToken = crypto.randomUUID()
     let runId: string
     const { data: claimedRunId, error: claimErr } = await this.supabase.admin.rpc(
       'claim_allocation_run',
@@ -336,6 +348,7 @@ export class AllocationService {
         p_semester: sem,
         p_user_id: user.userId,
         p_lease_seconds: 300,
+        p_fencing_token: fencingToken,
       },
     )
 
@@ -362,69 +375,15 @@ export class AllocationService {
         )
       }
 
-      // Fallback for environment/mocks where RPC is not defined
-      const { data: activeRun } = await this.supabase.admin
-        .from('allocation_runs')
-        .select('id')
-        .eq('campus_id', campusId)
-        .eq('academic_year', body.academicYear)
-        .eq('semester', sem)
-        .eq('status', 'running')
-        .maybeSingle()
-
-      if (activeRun) {
-        throw new ConflictException(
-          'An allocation run is already in progress for this academic year and semester',
-        )
-      }
-
-      const { data: completedRun } = await this.supabase.admin
-        .from('allocation_runs')
-        .select('id')
-        .eq('campus_id', campusId)
-        .eq('academic_year', body.academicYear)
-        .eq('semester', sem)
-        .eq('status', 'completed')
-        .maybeSingle()
-
-      if (completedRun) {
-        throw new ConflictException(
-          `Allocation has already been completed for Semester ${body.semester} (${body.academicYear}). In production, allocation can only be executed once per semester per academic year.`,
-        )
-      }
-
-      const { data: fallbackRun, error: runErr } = await this.supabase.admin
-        .from('allocation_runs')
-        .insert({
-          academic_year: body.academicYear,
-          semester: sem,
-          campus_id: campusId,
-          triggered_by: user.userId,
-          status: 'running',
-        })
-        .select('id')
-        .single()
-
-      if (runErr || !fallbackRun) {
-        this.logger.error(`Failed to initialize allocation run: ${runErr?.message}`, runErr?.details)
-        throw new InternalServerErrorException(
-          `Failed to initialize allocation run: ${runErr?.message || 'Unknown database error'}`,
-        )
-      }
-
-      runId = fallbackRun.id
-    } else {
-      runId = claimedRunId
+      throw new InternalServerErrorException(`Allocation claim failed: ${errMsg}`)
     }
+    if (typeof claimedRunId !== 'string' || !claimedRunId) throw new InternalServerErrorException('Allocation claim returned no run ID')
+    runId = claimedRunId
 
     try {
       // Step C: Fetch all courses offered in this semester
-      const { data: coursesData, error: courseErr } = await this.supabase.admin
-        .from('courses')
-        .select('id, course_code, title, semester, department_id, seat_limit')
-        .eq('semester', body.semester)
-
-      if (courseErr) throw courseErr
+      const coursesData = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
+        .select('id, course_code, title, semester, department_id, seat_limit').eq('semester', body.semester).order('id'))
 
       const courses: CourseItem[] = (coursesData ?? []).map((c) => ({
         id: c.id,
@@ -441,12 +400,9 @@ export class AllocationService {
       // Step D: Fetch all prerequisite rules for these courses
       const courseRulesMap = new Map<string, PrerequisiteRule[]>()
       if (courseIds.length > 0) {
-        const { data: rulesData, error: rulesErr } = await this.supabase.admin
-          .from('course_prerequisite_rules')
-          .select('id, course_id, rule, target')
-          .in('course_id', courseIds)
-
-        if (!rulesErr && rulesData) {
+        const rulesData = await fetchByIdChunks<any>(courseIds, ids => this.supabase.admin.from('course_prerequisite_rules')
+          .select('id, course_id, rule, target').in('course_id', ids).order('id'))
+        if (rulesData) {
           for (const r of rulesData) {
             if (!courseRulesMap.has(r.course_id)) {
               courseRulesMap.set(r.course_id, [])
@@ -456,42 +412,24 @@ export class AllocationService {
         }
       }
 
-      // Step E: Fetch all student preference submissions from registration_preferences
+      // Step E & R36: Fetch all student preference submissions from registration_preferences (paginated)
       // Only students who have a row in registration_preferences are processed!
-      const { data: rawPrefList, error: prefErr } = await this.supabase.admin
+      const prefQuery = this.supabase.admin
         .from('registration_preferences')
         .select('id, student_id, campus_id, semester, academic_year, pathway_id, preferences, allocation_metadata, submitted_at')
         .eq('campus_id', campusId)
         .eq('academic_year', body.academicYear)
         .eq('semester', body.semester)
 
-      if (prefErr) {
-        this.logger.error(`Failed to fetch registration preferences: ${prefErr.message}`)
-        throw new InternalServerErrorException(
-          `Failed to fetch registration preferences: ${prefErr.message}`,
-        )
-      }
-
-      const rawPrefs = rawPrefList ?? []
+      const rawPrefs = await fetchAllPaginated<any>(prefQuery.order('id'))
       const studentIds = Array.from(new Set(rawPrefs.map((p) => p.student_id)))
 
       // Fetch student details for all candidates
       const studentMap = new Map<string, any>()
       if (studentIds.length > 0) {
-        const { data: studentsData, error: stuErr } = await this.supabase.admin
-          .from('students')
-          .select(`
-            id,
-            department_id,
-            current_semester,
-            departments (
-              id,
-              code
-            )
-          `)
-          .in('id', studentIds)
-
-        if (!stuErr && studentsData) {
+        const studentsData = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('students')
+          .select('id, department_id, current_semester, departments(id, code)').in('id', ids).order('id'))
+        if (studentsData) {
           for (const s of studentsData) {
             studentMap.set(s.id, s)
           }
@@ -533,11 +471,10 @@ export class AllocationService {
       // We check courses the student was enrolled in prior semesters (semester < body.semester)
       const studentCompletedCourseCodesMap = new Map<string, Set<string>>()
       if (studentIds.length > 0) {
-        const { data: priorRegs } = await this.supabase.admin
+        const priorRegs = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin
           .from('student_registrations')
-          .select('student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-          .in('student_id', studentIds)
-          .lt('semester', body.semester)
+          .select('id, student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+          .in('student_id', ids).lt('semester', body.semester).order('id'))
 
         const priorCourseIds = new Set<string>()
         for (const pr of priorRegs ?? []) {
@@ -549,11 +486,8 @@ export class AllocationService {
 
         const courseCodeLookup = new Map<string, string>()
         if (priorCourseIds.size > 0) {
-          const { data: codeData } = await this.supabase.admin
-            .from('courses')
-            .select('id, course_code')
-            .in('id', Array.from(priorCourseIds))
-
+          const codeData = await fetchByIdChunks<any>([...priorCourseIds], ids => this.supabase.admin.from('courses')
+            .select('id, course_code').in('id', ids).order('id'))
           for (const cd of codeData ?? []) {
             courseCodeLookup.set(cd.id, cd.course_code.toUpperCase())
           }
@@ -584,21 +518,27 @@ export class AllocationService {
         studentSlotState.set(pref.student_id, slotMap)
       }
 
-      // F21: Baseline capacity calculation across all campuses for active academic year & semester
-      const { data: existingRegistrations } = await this.supabase.admin
+      // F21 & R36: Baseline capacity calculation across all campuses for active academic year & semester
+      const existingRegQuery = this.supabase.admin
         .from('student_registrations')
-        .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+        .select('student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
         .eq('academic_year', body.academicYear)
         .eq('semester', body.semester)
 
+      const existingRegistrations = await fetchAllPaginated<any>(existingRegQuery.order('id'))
+
       const existingEnrollmentCounts = new Map<string, number>()
+      const existingStudentFixedCourses = new Map<string, Set<string>>()
       for (const reg of existingRegistrations ?? []) {
+        const studentCourseSet = new Set<string>()
         for (let s = 1; s <= 8; s++) {
           const cid = (reg as any)[`slot_${s}_course_id`]
           if (cid) {
             existingEnrollmentCounts.set(cid, (existingEnrollmentCounts.get(cid) || 0) + 1)
+            studentCourseSet.add(cid)
           }
         }
+        existingStudentFixedCourses.set(reg.student_id, studentCourseSet)
       }
 
       // Track available seats per course initialized with true cross-campus remaining capacity (F21)
@@ -609,54 +549,29 @@ export class AllocationService {
         remainingElectiveSeats.set(course.id, Math.max(0, seatLimit - alreadyEnrolled))
       }
 
-      // Step 1: Fixed Slot Write-Through
-      // Read all fixed slots from registration_preferences and write them directly to student_registrations
-      // Sets allocation_metadata on the slot to { allocated_by: 'fixed' }
-      // Deducts these seats from the course's available capacity before elective allocation begins
+      // Step 1: Fixed Slot Resolution in memory
+      // Deducts fixed seats from the course's available capacity before elective allocation begins.
+      // Fixed course enrollments are committed atomically via the allocation transaction, not via premature pre-run writes (R10).
+      // R13: If this fixed course was ALREADY enrolled by this student in existingRegistrations,
+      // it is already counted in existingEnrollmentCounts! Do NOT deduct it a second time.
       for (const pref of studentPrefList) {
         const slots = extractSlots(pref.preferences)
         const slotMap = studentSlotState.get(pref.student_id)!
-        const fixedPayload: Record<string, any> = {
-          student_id: pref.student_id,
-          campus_id: campusId,
-          semester: body.semester,
-          academic_year: body.academicYear,
-          pathway_id: pref.pathway_id,
-        }
-        const updatedMeta: Record<string, any> = {
-          ...(typeof pref.allocation_metadata === 'object' && pref.allocation_metadata ? pref.allocation_metadata : {}),
-        }
-
-        let hasFixedUpdates = false
+        const alreadyEnrolledCoursesForStudent = existingStudentFixedCourses.get(pref.student_id)
 
         for (const slotItem of slots) {
           const slotKey = `slot_${slotItem.slot}`
           if (slotItem.is_fixed && slotItem.choices.length > 0) {
             const fixedCourseId = slotItem.choices[0].course_id
-            fixedPayload[`${slotKey}_course_id`] = fixedCourseId
-            updatedMeta[slotKey] = { allocated_by: 'fixed' }
             slotMap.set(slotKey, { resolved: true, course_id: fixedCourseId })
 
-            // Deduct seat
-            const curRem = remainingElectiveSeats.get(fixedCourseId) ?? 0
-            remainingElectiveSeats.set(fixedCourseId, Math.max(0, curRem - 1))
-            hasFixedUpdates = true
+            // Deduct seat in memory ONLY if not already counted in existingEnrollmentCounts for this student (R13)
+            const isAlreadyEnrolled = alreadyEnrolledCoursesForStudent?.has(fixedCourseId)
+            if (!isAlreadyEnrolled) {
+              const curRem = remainingElectiveSeats.get(fixedCourseId) ?? 0
+              remainingElectiveSeats.set(fixedCourseId, Math.max(0, curRem - 1))
+            }
           }
-        }
-
-        if (hasFixedUpdates) {
-          fixedPayload.allocation_metadata = updatedMeta
-
-          // Upsert into student_registrations
-          await this.supabase.admin
-            .from('student_registrations')
-            .upsert(fixedPayload, { onConflict: 'student_id,semester,academic_year' })
-
-          // Update registration_preferences allocation_metadata
-          await this.supabase.admin
-            .from('registration_preferences')
-            .update({ allocation_metadata: updatedMeta })
-            .eq('id', pref.id)
         }
       }
 
@@ -940,7 +855,7 @@ export class AllocationService {
         },
       }
 
-      // Step H: Commit allocations atomically via RPC (F24, F70)
+      // Step H: Commit allocations atomically via RPC (F24, F70, R16 Fencing)
       const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc(
         'apply_course_allocation',
         {
@@ -951,39 +866,19 @@ export class AllocationService {
           p_allocations: finalAllocations,
           p_unallocated: unallocatedSlots,
           p_summary: summaryPayload,
+          p_fencing_token: fencingToken,
         },
       )
 
       if (rpcErr) {
         // F24: Fail-fast without partial write fallback; preserve consistent database state
         this.logger.error(`RPC apply_course_allocation failed: ${rpcErr.message}`)
-        await this.supabase.admin
-          .from('allocation_runs')
-          .update({
-            status: 'failed',
-            error_message: `Atomic commit failed: ${rpcErr.message}`,
-          })
-          .eq('id', runId)
-
         throw new InternalServerErrorException(
           `Failed to commit course allocations atomically: ${rpcErr.message}`,
         )
       }
 
-      // Mark allocation run as completed with verified distinct metrics (F26)
-      await this.supabase.admin
-        .from('allocation_runs')
-        .update({
-          status: 'completed',
-          total_students: totalStudents,
-          fully_allocated: fullyAllocatedStudents,
-          partially_allocated: partiallyAllocatedStudents,
-          unallocated: unallocatedStudents,
-          summary: summaryPayload.summary,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', runId)
-
+      // The RPC commits enrollment, summary and completion in one transaction.
       await this.auditLogger.log({
         eventType: AuditEvents.ALLOCATION_RUN_COMPLETED,
         userId: user.userId,
@@ -1014,13 +909,13 @@ export class AllocationService {
       }
     } catch (err: any) {
       if (runId) {
-        await this.supabase.admin
-          .from('allocation_runs')
-          .update({
-            status: 'failed',
-            error_message: err?.message ?? 'Allocation algorithm execution encountered an error',
+        try {
+          const { error } = await this.supabase.admin.rpc('fail_allocation_worker', {
+            p_run_id: runId, p_fencing_token: fencingToken,
+            p_error: err?.message ?? 'Allocation execution failed',
           })
-          .eq('id', runId)
+          if (error) this.logger.warn('Could not record allocation failure; the lease will allow recovery')
+        } catch { this.logger.warn('Allocation failure recording unavailable; the lease will allow recovery') }
       }
 
       this.logger.error(`Allocation run failed: ${err?.message}`, err?.stack)
@@ -1048,7 +943,7 @@ export class AllocationService {
 
     const { data: run, error } = await this.supabase.admin
       .from('allocation_runs')
-      .select('*')
+      .select('id,status,academic_year,semester,campus_id,triggered_at,completed_at,error_message,summary,total_students,fully_allocated,partially_allocated,unallocated')
       .eq('campus_id', campusId)
       .eq('academic_year', academicYear)
       .eq('semester', semester)
@@ -1095,13 +990,22 @@ export class AllocationService {
       )
     }
 
-    // F25: Published cohorts cannot be reallocated or cleared
-    const { count: publishedCount } = await this.supabase.admin
+    // F25 & R15: Published cohorts cannot be reallocated or cleared (scoped to campus)
+    let publishedTimetableQuery = this.supabase.admin
       .from('timetable_entries')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', run.academic_year)
       .eq('semester', run.semester)
       .eq('status', 'published')
+
+    if (run.campus_id && typeof (publishedTimetableQuery as any)?.eq === 'function') {
+      try {
+        const scoped = (publishedTimetableQuery as any).eq('campus_id', run.campus_id)
+        if (scoped) publishedTimetableQuery = scoped
+      } catch (_) {}
+    }
+
+    const { count: publishedCount } = await publishedTimetableQuery
 
     if ((publishedCount ?? 0) > 0) {
       throw new BadRequestException(
@@ -1156,42 +1060,22 @@ export class AllocationService {
     }
 
     // Find students in HOD's department
-    const { data: students, error: studentErr } = await this.supabase.admin
-      .from('students')
+    if (!campusId || !academicYear) throw new BadRequestException('Active campus and academic year are required')
+    const students = await fetchAllPaginated<any>(this.supabase.admin.from('students')
       .select('id, full_name, cap_application_number, current_semester')
-      .eq('department_id', departmentId)
-      .eq('current_semester', sem)
-
-    if (studentErr) throw new InternalServerErrorException('Failed to fetch department students')
+      .eq('department_id', departmentId).eq('campus_id',campusId).eq('current_semester',sem).order('id'))
 
     const studentIds = (students ?? []).map((s) => s.id)
     if (studentIds.length === 0) {
       return { success: true, unresolvedStudents: [] }
     }
 
-    // Fetch preferences from registration_preferences
-    let prefQuery = this.supabase.admin
-      .from('registration_preferences')
-      .select('id, student_id, preferences, allocation_metadata')
-      .in('student_id', studentIds)
-      .eq('semester', sem)
-    if (academicYear) {
-      prefQuery = prefQuery.eq('academic_year', academicYear)
-    }
-    const { data: prefList, error: prefErr } = await prefQuery
-
-    if (prefErr) throw new InternalServerErrorException('Failed to fetch registration preferences')
-
-    // Fetch confirmed registrations from student_registrations across all 8 slots (F15)
-    let regQuery = this.supabase.admin
-      .from('student_registrations')
+    const prefList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('registration_preferences')
+      .select('id, student_id, preferences, allocation_metadata').in('student_id',ids)
+      .eq('semester',sem).eq('academic_year',academicYear).order('id'))
+    const regList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('student_registrations')
       .select('id, student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id, allocation_metadata')
-      .in('student_id', studentIds)
-      .eq('semester', sem)
-    if (academicYear) {
-      regQuery = regQuery.eq('academic_year', academicYear)
-    }
-    const { data: regList } = await regQuery
+      .in('student_id',ids).eq('semester',sem).eq('academic_year',academicYear).order('id'))
 
     const regMap = new Map((regList ?? []).map((r) => [r.student_id, r]))
 
@@ -1342,16 +1226,10 @@ export class AllocationService {
     const results: any[] = []
 
     // Fetch registrations across all campuses for this academic_year and semester (F21 global capacity across 8 slots)
-    const { data: registrations, error: regError } = await this.supabase.admin
+    const registrations = await fetchAllPaginated<any>(this.supabase.admin
       .from('student_registrations')
-      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-      .eq('academic_year', academicYear)
-      .eq('semester', sem)
-
-    if (regError) {
-      this.logger.error(`Failed to fetch student registrations: ${regError.message}`)
-      throw new InternalServerErrorException('Failed to fetch student registrations')
-    }
+      .select('id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+      .eq('academic_year', academicYear).eq('semester', sem).order('id'))
 
     const allocationCounts = new Map<string, number>()
     if (registrations) {
@@ -1466,7 +1344,7 @@ export class AllocationService {
     // Fetch target course
     const { data: course, error: courseErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, department_id, seat_limit, semester, credits, category')
+      .select('id, course_code, title, department_id, seat_limit, semester, credits, category, tag')
       .eq('id', course_id)
       .single()
 
@@ -1474,12 +1352,20 @@ export class AllocationService {
       throw new NotFoundException('Course not found')
     }
 
+    // R12: Course semester must match student's active semester
+    if (course.semester !== student.current_semester) {
+      throw new BadRequestException(
+        `Course belongs to semester ${course.semester}, but student is active in semester ${student.current_semester}`,
+      )
+    }
+    const activeSemester = student.current_semester
+
     // Fetch existing registration record if any
     const { data: reg } = await this.supabase.admin
       .from('student_registrations')
       .select('id, allocation_metadata, pathway_id, campus_id, academic_year, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .eq('student_id', student_id)
-      .eq('semester', course.semester)
+      .eq('semester', activeSemester)
       .eq('academic_year', academicYear)
       .maybeSingle()
 
@@ -1501,6 +1387,56 @@ export class AllocationService {
       }
     }
 
+    // R12: Enforce blueprint pathway slot eligibility
+    const slotNum = parseInt(slot_key.replace('slot_', ''), 10)
+    if (slotNum <= 6) {
+      const { data: blueprint, error: blueprintError } = await this.supabase.admin
+        .from('semester_blueprints')
+        .select('pathways')
+        .eq('department_id', student.department_id)
+        .eq('semester', activeSemester)
+        .maybeSingle()
+
+      if (blueprintError) throw new InternalServerErrorException('Could not verify semester slot rules')
+      if (!blueprint) throw new NotFoundException('Semester blueprint not configured')
+      const pathways = Array.isArray(blueprint.pathways) ? blueprint.pathways : []
+      const pathwayId = reg?.pathway_id
+      const pathway = (pathways.find((p) => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined))
+      if (!pathway || !Array.isArray(pathway.slots) || !pathway.slots[slotNum - 1]?.rule) {
+        throw new BadRequestException('The selected pathway does not define this slot')
+      }
+      {
+        const slotDef = pathway.slots[slotNum - 1]
+        const { data: depts } = await this.supabase.admin.from('departments').select('id, code')
+        const deptMap = new Map((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
+        const isEligible = isCourseEligibleForSlot(
+          course,
+          slotDef.rule,
+          slotDef.target || '',
+          student.department_id,
+          deptMap,
+          slotDef.name,
+        )
+        if (!isEligible) {
+          throw new BadRequestException(
+            `Course ${course.course_code} (${course.title}) is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`,
+          )
+        }
+      }
+    } else {
+      // Minor rule for Paper 7 and Paper 8
+      if (course.department_id === student.department_id) {
+        throw new BadRequestException(
+          `Course ${course.course_code} - ${course.title} is not eligible for ${slot_key}. Minor papers cannot be from the student's own department.`,
+        )
+      }
+      if (course.semester !== activeSemester) {
+        throw new BadRequestException(
+          `Course ${course.course_code} - ${course.title} is for Semester ${course.semester}, but student is active in Semester ${activeSemester}.`,
+        )
+      }
+    }
+
     // F19: Prerequisite check
     const { data: rules } = await this.supabase.admin
       .from('course_prerequisite_rules')
@@ -1511,7 +1447,7 @@ export class AllocationService {
       .from('student_registrations')
       .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .eq('student_id', student_id)
-      .lt('semester', course.semester)
+      .lt('semester', activeSemester)
 
     const priorCourseIds = new Set<string>()
     for (const pr of priorRegs ?? []) {
@@ -1555,7 +1491,7 @@ export class AllocationService {
       .from('student_registrations')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', academicYear)
-      .eq('semester', course.semester)
+      .eq('semester', activeSemester)
       .or(
         `slot_1_course_id.eq.${course.id},slot_2_course_id.eq.${course.id},slot_3_course_id.eq.${course.id},slot_4_course_id.eq.${course.id},slot_5_course_id.eq.${course.id},slot_6_course_id.eq.${course.id},slot_7_course_id.eq.${course.id},slot_8_course_id.eq.${course.id}`,
       )
@@ -1603,80 +1539,167 @@ export class AllocationService {
     }
     const totalCredits = coreCredits + additionalCredits
 
-    if (!reg) {
-      await this.supabase.admin.from('student_registrations').insert({
-        student_id,
-        campus_id: student.campus_id,
-        semester: course.semester,
-        academic_year: academicYear,
-        [`${slot_key}_course_id`]: course_id,
-        allocation_metadata: { [slot_key]: allocMeta },
-        core_credits: coreCredits,
-        additional_credits: additionalCredits,
-        total_credits: totalCredits,
-      })
-    } else {
+    // R10/R09: Try atomic RPC execute_manual_course_allocation first if configured
+    let rpcHandled = false
+    if (typeof (this.supabase.admin as any).rpc === 'function') {
+      try {
+        const { data: rpcRes, error: rpcErr } = await (this.supabase.admin as any).rpc('execute_manual_course_allocation', {
+          p_student_id: student_id,
+          p_campus_id: student.campus_id,
+          p_semester: activeSemester,
+          p_academic_year: academicYear,
+          p_slot_key: slot_key,
+          p_course_id: course_id,
+          p_actor_id: user.userId,
+          p_actor_role: user.role,
+          p_allocated_by: user.role === 'hod' ? 'hod_override' : user.role === 'teacher' ? 'teacher_manual' : 'admin_override',
+        })
+
+        if (!rpcErr && rpcRes?.success) {
+          rpcHandled = true
+          await this.auditLogger.log({
+            eventType: AuditEvents.MANUAL_ALLOCATION,
+            userId: user.userId,
+            userRole: user.role,
+            action: `manually allocated ${course.course_code} to student ${student_id} for ${slot_key}`,
+            resourceType: 'registration',
+            resourceId: reg?.id || student_id,
+            status: 'success',
+            metadata: {
+              student_id,
+              slot_key,
+              course_id,
+              course_code: course.course_code,
+              core_credits: rpcRes.core_credits ?? coreCredits,
+              additional_credits: rpcRes.additional_credits ?? additionalCredits,
+              total_credits: rpcRes.total_credits ?? totalCredits,
+            },
+          })
+          return {
+            success: true,
+            message: rpcRes.message || `Course ${course.course_code} successfully allocated to student`,
+            core_credits: rpcRes.core_credits ?? coreCredits,
+            additional_credits: rpcRes.additional_credits ?? additionalCredits,
+            total_credits: rpcRes.total_credits ?? totalCredits,
+          }
+        } else if (rpcErr) {
+          const errMsg = rpcErr.message || ''
+          if (errMsg.includes('capacity') || errMsg.includes('seat')) {
+            throw new BadRequestException(errMsg)
+          }
+          if (errMsg.includes('already assigned') || errMsg.includes('Invalid') || errMsg.includes('Duplicate') || errMsg.includes('active semester')) {
+            throw new BadRequestException(errMsg)
+          }
+          if (!errMsg.includes('could not find') && !errMsg.includes('function') && !errMsg.includes('does not exist')) {
+            throw new InternalServerErrorException(`Failed to persist manual allocation: ${errMsg}`)
+          }
+        }
+      } catch (e: any) {
+        if (e instanceof BadRequestException || e instanceof ConflictException || e instanceof ForbiddenException || e instanceof InternalServerErrorException) {
+          throw e
+        }
+      }
+    }
+
+    if (!rpcHandled) {
+      // R09: Store breakdown inside allocation_metadata.credit_breakdown, NOT nonexistent columns
       const updatedMeta = {
         ...regMeta,
         [slot_key]: allocMeta,
-      }
-
-      await this.supabase.admin
-        .from('student_registrations')
-        .update({
-          [`${slot_key}_course_id`]: course_id,
-          allocation_metadata: updatedMeta,
+        credit_breakdown: {
           core_credits: coreCredits,
           additional_credits: additionalCredits,
           total_credits: totalCredits,
-        })
-        .eq('id', reg.id)
-    }
-
-    // Also update registration_preferences allocation_metadata if pref row exists
-    const { data: prefRow } = await this.supabase.admin
-      .from('registration_preferences')
-      .select('id, allocation_metadata')
-      .eq('student_id', student_id)
-      .eq('semester', course.semester)
-      .eq('academic_year', academicYear)
-      .maybeSingle()
-
-    if (prefRow) {
-      const updatedPrefMeta = {
-        ...(typeof prefRow.allocation_metadata === 'object' && prefRow.allocation_metadata ? prefRow.allocation_metadata : {}),
-        [slot_key]: allocMeta,
+        },
       }
 
-      await this.supabase.admin
-        .from('registration_preferences')
-        .update({
-          allocation_metadata: updatedPrefMeta,
-          updated_at: new Date().toISOString(),
+      if (!reg) {
+        const { error: insertErr } = await this.supabase.admin.from('student_registrations').insert({
+          student_id,
+          campus_id: student.campus_id,
+          semester: activeSemester,
+          academic_year: academicYear,
+          [`${slot_key}_course_id`]: course_id,
+          allocation_metadata: updatedMeta,
+          total_credits: totalCredits,
         })
-        .eq('id', prefRow.id)
-    }
 
-    // Audit log
-    await this.auditLogger.log({
-      eventType: AuditEvents.MANUAL_ALLOCATION,
-      userId: user.userId,
-      userRole: user.role,
-      action: `manually allocated ${course.course_code} to student ${student_id} for ${slot_key}`,
-      resourceType: 'registration',
-      resourceId: reg?.id || student_id,
-      status: 'success',
-      metadata: {
-        student_id,
-        slot_key,
-        course_id,
-        course_code: course.course_code,
-      },
-    })
+        if (insertErr) {
+          this.logger.error(`Failed to insert student registration: ${insertErr.message}`)
+          throw new InternalServerErrorException(`Failed to persist manual allocation: ${insertErr.message}`)
+        }
+      } else {
+        const { error: updateErr } = await this.supabase.admin
+          .from('student_registrations')
+          .update({
+            [`${slot_key}_course_id`]: course_id,
+            allocation_metadata: updatedMeta,
+            total_credits: totalCredits,
+          })
+          .eq('id', reg.id)
 
-    return {
-      success: true,
-      message: `Course ${course.course_code} successfully allocated to student`,
+        if (updateErr) {
+          this.logger.error(`Failed to update student registration: ${updateErr.message}`)
+          throw new InternalServerErrorException(`Failed to persist manual allocation: ${updateErr.message}`)
+        }
+      }
+
+      // Also update registration_preferences allocation_metadata if pref row exists
+      const { data: prefRow } = await this.supabase.admin
+        .from('registration_preferences')
+        .select('id, allocation_metadata')
+        .eq('student_id', student_id)
+        .eq('semester', activeSemester)
+        .eq('academic_year', academicYear)
+        .maybeSingle()
+
+      if (prefRow) {
+        const updatedPrefMeta = {
+          ...(typeof prefRow.allocation_metadata === 'object' && prefRow.allocation_metadata ? prefRow.allocation_metadata : {}),
+          [slot_key]: allocMeta,
+        }
+
+        const { error: prefErr } = await this.supabase.admin
+          .from('registration_preferences')
+          .update({
+            allocation_metadata: updatedPrefMeta,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', prefRow.id)
+
+        if (prefErr) {
+          this.logger.error(`Failed to update registration preferences: ${prefErr.message}`)
+          throw new InternalServerErrorException(`Failed to persist preference metadata: ${prefErr.message}`)
+        }
+      }
+
+      // R09: Audit log ONLY after authoritative enrollment write commits
+      await this.auditLogger.log({
+        eventType: AuditEvents.MANUAL_ALLOCATION,
+        userId: user.userId,
+        userRole: user.role,
+        action: `manually allocated ${course.course_code} to student ${student_id} for ${slot_key}`,
+        resourceType: 'registration',
+        resourceId: reg?.id || student_id,
+        status: 'success',
+        metadata: {
+          student_id,
+          slot_key,
+          course_id,
+          course_code: course.course_code,
+          core_credits: coreCredits,
+          additional_credits: additionalCredits,
+          total_credits: totalCredits,
+        },
+      })
+
+      return {
+        success: true,
+        message: `Course ${course.course_code} successfully allocated to student`,
+        core_credits: coreCredits,
+        additional_credits: additionalCredits,
+        total_credits: totalCredits,
+      }
     }
   }
 }

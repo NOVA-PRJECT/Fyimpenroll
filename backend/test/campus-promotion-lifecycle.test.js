@@ -43,10 +43,12 @@ function createMockSupabaseService(options = {}) {
     failAuthDeleteIds = new Set(),
   } = options
 
+  const candidates = new Map()
   return {
     admin: {
       auth: {
         admin: {
+          updateUserById: async () => ({ error: null }),
           deleteUser: async (id) => {
             if (failAuthDeleteIds.has(id)) {
               return { data: null, error: { message: `Auth service network failure for ${id}` } }
@@ -60,6 +62,19 @@ function createMockSupabaseService(options = {}) {
           return { data: null, error: failRpc[fnName] }
         }
 
+        if (fnName === 'prepare_graduation') {
+          const rows = params.p_student_ids.map(id => {
+            if (!candidates.has(id)) candidates.set(id, {student_id:id,stage:'pending'})
+            return {...candidates.get(id)}
+          })
+          return {data:rows,error:null}
+        }
+        if (fnName === 'graduate_candidate_database') {
+          students.delete(params.p_student_id); candidates.get(params.p_student_id).stage='database_deleted'; return {error:null}
+        }
+        if (fnName === 'finish_graduation_candidate') {
+          if(!params.p_error_stage)candidates.get(params.p_student_id).stage='completed'; return {error:null}
+        }
         if (fnName === 'promote_campus_students_atomic') {
           const { p_campus_id, p_idempotency_key } = params
           const settings = campusSettings.get(p_campus_id)
@@ -492,13 +507,15 @@ describe('Plan 08: Campus Setup, Promotion, Graduation & Short Retention', () =>
       assert.strictEqual(gradResult.failed_count, 1)
       assert.deepStrictEqual(gradResult.failed_student_ids, ['s-grad-fail'])
       assert.strictEqual(gradResult.errors.length, 1)
-      assert.match(gradResult.errors[0].error, /Auth service network failure/)
+      assert.match(gradResult.errors[0].error, /cleanup pending/)
 
-      // Successful student was removed from DB; failed student is retained in DB for safe retry
+      // In staged FK-compatible graduation: DB deletion commits first, removing both from DB;
+      // failed Auth candidate is tracked in failed_student_ids with stage: 'auth' for safe Auth retry
       assert.strictEqual(mockStudents.has('s-grad-success'), false)
-      assert.strictEqual(mockStudents.has('s-grad-fail'), true)
+      assert.strictEqual(mockStudents.has('s-grad-fail'), false)
+      assert.strictEqual(gradResult.errors[0].stage, 'auth')
 
-      // Safe retry: clear network issue and retry remaining failed candidate
+      // Safe retry: clear network issue and retry remaining failed candidate (Auth stage resumption)
       failAuthDeleteIds.delete('s-grad-fail')
       const retryResult = await adminService.graduateStudents(
         campusId,

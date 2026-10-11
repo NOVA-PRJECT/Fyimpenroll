@@ -118,14 +118,16 @@ export default function PeriodMarkingTab() {
         setSelectedSlotId(null)
         setRosterData(null)
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error while fetching slots.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error while fetching slots.')
     } finally {
       setLoadingSlots(false)
     }
   }, [semesterFilter, dayFilter, attendanceDate, selectedSlotId])
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchSlots()
   }, [fetchSlots])
 
@@ -141,8 +143,8 @@ export default function PeriodMarkingTab() {
         return
       }
       setRosterData(data)
-    } catch (err: any) {
-      setError(err.message || 'Network error while fetching roster.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error while fetching roster.')
     } finally {
       setLoadingRoster(false)
     }
@@ -150,6 +152,8 @@ export default function PeriodMarkingTab() {
 
   useEffect(() => {
     if (selectedSlotId) {
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
       fetchRoster(selectedSlotId)
     } else {
       setRosterData(null)
@@ -179,8 +183,8 @@ export default function PeriodMarkingTab() {
       document.body.removeChild(a)
       setSuccess('Attendance statement downloaded successfully!')
       setTimeout(() => setSuccess(''), 4000)
-    } catch (err: any) {
-      setError(err.message || 'Network error during statement export.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error during statement export.')
     } finally {
       setExporting(false)
     }
@@ -502,7 +506,7 @@ export default function PeriodMarkingTab() {
 
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'present' | 'absent')}
                   style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
                 >
                   <option value="all">All Statuses</option>

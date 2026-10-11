@@ -1,18 +1,21 @@
 'use client'
 
-import BlueprintTab from './BlueprintTab'
-import TeacherAssignmentTab from './TeacherAssignmentTab'
-import PeriodMarkingTab from './PeriodMarkingTab'
-import CampusAttendanceTab from './CampusAttendanceTab'
-import ManualAllocationTab from './ManualAllocationTab'
-import { useState, useEffect, useRef } from 'react'
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
+import dynamic from 'next/dynamic'
+const BlueprintTab = dynamic(() => import('./BlueprintTab'))
+const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'))
+const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'))
+const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'))
+const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'))
+import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import styles from './hod-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import { Eye, EyeOff, LogOut, Menu, ChevronDown } from 'lucide-react'
-import { downloadStudentsExcel } from '@/core/utils/exportExcel'
+import { downloadBlob } from '@/core/utils/downloadFile'
 
 // ── Types ──
 interface HodInfo {
@@ -131,20 +134,12 @@ export default function HodDashboard() {
     const targetSem = sem ?? (activeTab === 'students' ? studentSemester : defaulterSemester)
     setExportingExcel(true)
     try {
-      const semParam = targetSem === 'all' ? 'all' : targetSem
-      const response = await fetch(`/api/hod/export-students-excel?semester=${semParam}`)
-      const result = await response.json()
-
-      if (!response.ok) {
-        setStudentError(result.error ?? 'Failed to export Excel')
-      } else {
-        const rows = Array.isArray(result) ? result : (result?.rows || [])
-        if (rows.length === 0) {
-          alert('No student records found to export.')
-        } else {
-          await downloadStudentsExcel(rows, targetSem === 'all' ? 'All_Semesters' : `Sem_${targetSem}`)
-        }
-      }
+      const params = new URLSearchParams({ format: 'xlsx' })
+      if (targetSem !== 'all') params.set('semester', String(targetSem))
+      if (deptData?.academic_year) params.set('academic_year', deptData.academic_year)
+      const response = await fetch(`/api/export/registrations?${params}`)
+      if (!response.ok) throw new Error('Export failed')
+      await downloadBlob(await response.blob(), `Registrations_${targetSem}.xlsx`)
     } catch {
       setStudentError('Failed to export Excel file')
     } finally {
@@ -167,13 +162,15 @@ export default function HodDashboard() {
       setLoadingHod(false)
     }
     loadHodInfo()
-  }, [])
+  }, [router])
 
   // Load active tab from sessionStorage on mount (hydration-safe)
   useEffect(() => {
     const storedTab = sessionStorage.getItem('hod_active_tab') as Tab | null
     const validTabs: Tab[] = ['defaulters', 'upload', 'students', 'blueprint', 'courses', 'assignments', 'period-marking', 'campus-attendance', 'manual-allocation']
     if (storedTab && validTabs.includes(storedTab)) {
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
       setActiveTab(storedTab)
     }
   }, [])
@@ -237,14 +234,15 @@ export default function HodDashboard() {
     sessionStorage.setItem('hod_active_tab', tab)
   }
 
-  // Auto-load views on tab switch
-  useEffect(() => {
+  // Use the latest filters without a changing function identity.
+  const loadTab = useEffectEvent(() => {
     if (activeTab === 'defaulters') {
       handleFetch(defaulterSemester)
     } else if (activeTab === 'students') {
       fetchStudents(studentSemester)
     }
-  }, [activeTab])
+  })
+  useEffect(() => { loadTab() }, [activeTab, defaulterSemester, studentSemester])
 
   // ── Upload Tab Functions ──
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -506,11 +504,10 @@ export default function HodDashboard() {
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   const notSubmittedStudents = deptData?.students.filter(s => !s.submitted) ?? []

@@ -8,13 +8,9 @@ import {
 import * as ExcelJS from 'exceljs';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuthUser } from '../../core/auth/types';
-
-function sanitizeSpreadsheetCell(value: any): any {
-  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(value)) {
-    return `'${value}`;
-  }
-  return value;
-}
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util';
+import { registrationSlots } from '../credit-ledger/enrollment-reporting';
+import { sanitizeSpreadsheetValue } from '../credit-ledger/export.service';
 
 @Injectable()
 export class AttendanceExportService {
@@ -31,155 +27,38 @@ export class AttendanceExportService {
     semester: number,
     requestedDeptId?: string
   ): Promise<{ buffer: Buffer; filename: string }> {
-    // 1. Scoping validation
+    if (!['hod','campus_director','superadmin'].includes(user.role)) throw new ForbiddenException('Role cannot export department statements');
     const deptId = requestedDeptId || user.department_id;
-    if (!deptId) {
-      throw new ForbiddenException('Department affiliation is required to export attendance statements');
+    if (!deptId || (user.role === 'hod' && deptId !== user.department_id)) throw new ForbiddenException('Department outside scope');
+    const { data: department, error: deptError } = await this.supabase.admin.from('departments').select('id, name, code, campus_id').eq('id', deptId).single();
+    if (deptError || !department) throw new NotFoundException('Department not found');
+    if (user.role !== 'superadmin' && (!user.campus_id || department.campus_id !== user.campus_id)) throw new ForbiddenException('Campus outside scope');
+    const { data: settings, error: settingsError } = await this.supabase.admin.from('campus_settings').select('academic_year').eq('campus_id', department.campus_id).single();
+    if (settingsError || !settings?.academic_year) throw new InternalServerErrorException('Active academic year unavailable');
+    const studentList = await fetchAllPaginated<any>(this.supabase.admin.from('students')
+      .select('id, full_name, cap_application_number, current_semester').eq('department_id',deptId)
+      .eq('campus_id',department.campus_id).eq('current_semester',semester).order('id'));
+    const studentIds = studentList.map(s => s.id);
+    const registrations = studentIds.length ? await fetchByIdChunks<any>(studentIds, chunk => this.supabase.admin.from('student_registrations')
+      .select('*').eq('semester',semester).eq('academic_year',settings.academic_year).in('student_id',chunk).order('id')) : [];
+    const enrolledCourseSet = new Set<string>();
+    const ids = new Set<string>();
+    for (const reg of registrations) for (const slot of registrationSlots(reg)) {
+      enrolledCourseSet.add(reg.student_id + '_' + slot.courseId); ids.add(slot.courseId!);
     }
-
-    if (user.role === 'hod' && user.department_id && user.department_id !== deptId) {
-      throw new ForbiddenException('HOD can only export attendance statements for their own department');
-    }
-
-    // 2. Fetch Department Details
-    const { data: department, error: deptError } = await this.supabase.admin
-      .from('departments')
-      .select('id, name, code')
-      .eq('id', deptId)
-      .single();
-
-    if (deptError || !department) {
-      throw new NotFoundException(`Department not found for id ${deptId}`);
-    }
-
-    // 3. Fetch courses offered by the department for that semester
-    const { data: courses, error: coursesError } = await this.supabase.admin
-      .from('courses')
-      .select('id, course_code, title')
-      .eq('department_id', deptId)
-      .eq('semester', semester)
-      .order('course_code', { ascending: true });
-
-    if (coursesError) {
-      throw new InternalServerErrorException(`Failed to fetch department courses: ${coursesError.message}`);
-    }
-
-    const courseList = courses || [];
-
-    // 4. Fetch department students enrolled in that semester
-    const { data: students, error: studentsError } = await this.supabase.admin
-      .from('students')
-      .select('id, full_name, cap_application_number, current_semester')
-      .eq('department_id', deptId)
-      .eq('current_semester', semester)
-      .order('cap_application_number', { ascending: true });
-
-    if (studentsError) {
-      throw new InternalServerErrorException(`Failed to fetch department students: ${studentsError.message}`);
-    }
-
-    const studentList = students || [];
-
-    // 5. Fetch student registrations to determine enrollment per course
-    const studentIds = studentList.map((s) => s.id);
-    const enrolledCourseSet = new Set<string>(); // key: `${studentId}_${courseId}`
-
-    if (studentIds.length > 0) {
-      let { data: registrations, error: regError } = await this.supabase.admin
-        .from('student_registrations')
-        .select(`
-          student_id,
-          slot_1_course_id,
-          slot_2_course_id,
-          slot_3_course_id,
-          slot_4_course_id,
-          slot_5_course_id,
-          slot_6_course_id,
-          slot_7_course_id,
-          slot_8_course_id,
-          selections
-        `)
-        .eq('semester', semester)
-        .in('student_id', studentIds);
-
-      if (regError && (regError.message?.includes('slot_7_course_id') || regError.message?.includes('slot_8_course_id'))) {
-        const fallbackRes = await this.supabase.admin
-          .from('student_registrations')
-          .select(`
-            student_id,
-            slot_1_course_id,
-            slot_2_course_id,
-            slot_3_course_id,
-            slot_4_course_id,
-            slot_5_course_id,
-            slot_6_course_id,
-            selections
-          `)
-          .eq('semester', semester)
-          .in('student_id', studentIds);
-        registrations = fallbackRes.data as any;
-        regError = fallbackRes.error;
-      }
-
-      if (regError) {
-        throw new InternalServerErrorException(`Failed to fetch registrations: ${regError.message}`);
-      }
-
-      for (const reg of registrations || []) {
-        const sId = reg.student_id;
-        for (let i = 1; i <= 8; i++) {
-          const cid = (reg as any)[`slot_${i}_course_id`];
-          if (cid) {
-            enrolledCourseSet.add(`${sId}_${cid}`);
-          }
-        }
-        const rawSel = (reg as any).selections;
-        const selected = (Array.isArray(rawSel) ? rawSel : Array.isArray(rawSel?.courses) ? rawSel.courses : []) as any[];
-        for (const item of selected) {
-          const cid = typeof item === 'string' ? item : item?.id || item?.course_id;
-          if (cid) {
-            enrolledCourseSet.add(`${sId}_${cid}`);
-          }
-        }
-      }
-    }
-
-    // 6. Total periods conducted per course:
-    // "count of distinct timetable slots for that course that have at least one submitted attendance record"
+    const courseList = await fetchByIdChunks<any>([...ids], chunk => this.supabase.admin.from('courses').select('id, course_code, title').in('id',chunk).order('id'));
     const courseConductedMap = new Map<string, number>();
-    const studentCoursePresentMap = new Map<string, number>(); // key: `${studentId}_${courseId}`
-
-    if (courseList.length > 0) {
-      const courseIds = courseList.map((c) => c.id);
-
-      // Query period attendance for these courses
-      const { data: attendanceRows, error: attError } = await this.supabase.admin
-        .from('period_attendance')
-        .select('timetable_slot_id, student_id, course_id, status, attendance_date')
-        .in('course_id', courseIds);
-
-      if (attError) {
-        throw new InternalServerErrorException(`Failed to fetch period attendance records: ${attError.message}`);
-      }
-
-      // Compute distinct timetable sessions per course (slot + attendance_date)
-      const courseSlotsMap = new Map<string, Set<string>>();
-      for (const row of attendanceRows || []) {
-        if (!courseSlotsMap.has(row.course_id)) {
-          courseSlotsMap.set(row.course_id, new Set<string>());
-        }
-        const sessionKey = `${row.timetable_slot_id}_${row.attendance_date || ''}`;
-        courseSlotsMap.get(row.course_id)!.add(sessionKey);
-
-        if (row.status === 'present') {
-          const key = `${row.student_id}_${row.course_id}`;
-          studentCoursePresentMap.set(key, (studentCoursePresentMap.get(key) || 0) + 1);
-        }
-      }
-
-      for (const [cId, slotsSet] of courseSlotsMap.entries()) {
-        courseConductedMap.set(cId, slotsSet.size);
-      }
+    const studentCoursePresentMap = new Map<string, number>();
+    // Denominator = this student's explicitly marked published dated periods.
+    // Unmarked/cancelled periods and pre-enrollment periods are not fabricated absences.
+    const counts = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.rpc('attendance_student_course_counts', {
+      p_student_ids: ids, p_campus_id: department.campus_id, p_academic_year: settings.academic_year, p_semester: semester,
+    }).order('student_id').order('course_id'));
+    for (const row of counts) {
+      const key = row.student_id + '_' + row.course_id;
+      if (!enrolledCourseSet.has(key)) continue;
+      courseConductedMap.set(key, Number(row.conducted));
+      studentCoursePresentMap.set(key, Number(row.present));
     }
 
     // 7. Build XLSX using exceljs
@@ -227,7 +106,7 @@ export class AttendanceExportService {
     const headerRow = worksheet.getRow(4);
     headerRow.height = 28;
 
-    const headers = ['#', 'Reg No', 'Student Name', ...courseList.map((c) => c.course_code), 'Average APC'];
+    const headers = ['#', 'Reg No', 'Student Name', ...courseList.map((c) => c.course_code), 'Overall marked-period %'];
     headerRow.values = headers;
 
     headerRow.eachCell((cell) => {
@@ -258,11 +137,12 @@ export class AttendanceExportService {
       const row = worksheet.getRow(rowIndex);
       row.height = 22;
 
-      const nonNaPercentages: number[] = [];
+      let totalPeriods = 0;
+      let presentPeriods = 0;
       const rowValues: any[] = [
         i + 1,
-        sanitizeSpreadsheetCell(student.cap_application_number || '—'),
-        sanitizeSpreadsheetCell(student.full_name),
+        sanitizeSpreadsheetValue(student.cap_application_number || '—'),
+        sanitizeSpreadsheetValue(student.full_name),
       ];
 
       for (const course of courseList) {
@@ -270,20 +150,17 @@ export class AttendanceExportService {
         if (!isEnrolled) {
           rowValues.push('NA');
         } else {
-          const totalConducted = courseConductedMap.get(course.id) || 0;
+          const totalConducted = courseConductedMap.get(`${student.id}_${course.id}`) || 0;
           const present = studentCoursePresentMap.get(`${student.id}_${course.id}`) || 0;
-          const percentage = totalConducted > 0 ? Number(((present / totalConducted) * 100).toFixed(2)) : 100.0;
+          const percentage = totalConducted > 0 ? Number(((present / totalConducted) * 100).toFixed(2)) : 'NA';
           rowValues.push(percentage);
-          nonNaPercentages.push(percentage);
+          totalPeriods += totalConducted;
+          presentPeriods += present;
         }
       }
 
       // Calculate Average APC
-      const averageApc =
-        nonNaPercentages.length > 0
-          ? Number((nonNaPercentages.reduce((a, b) => a + b, 0) / nonNaPercentages.length).toFixed(2))
-          : 'NA';
-
+      const averageApc = totalPeriods > 0 ? Number((100 * presentPeriods / totalPeriods).toFixed(2)) : 'NA';
       rowValues.push(averageApc);
       row.values = rowValues;
 
@@ -351,6 +228,7 @@ export class AttendanceExportService {
       rowIndex++;
     }
 
+    worksheet.getCell('A' + (rowIndex + 1)).value = 'Denominator: explicitly marked published periods in ' + settings.academic_year + '. Unmarked periods excluded; NA means no data. Optional-paper and cancellation policy pending.';
     // Auto-fit column widths
     worksheet.getColumn(1).width = 6; // #
     worksheet.getColumn(2).width = 18; // Reg No

@@ -77,8 +77,8 @@ export default function ManualAllocationTab() {
 
       setUnresolvedStudents(unresolvedData.unresolvedStudents || [])
       setRemainingCourses(remainingData.courses || [])
-    } catch (err: any) {
-      setError(err.message || 'Error loading manual allocation data')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Error loading manual allocation data')
     } finally {
       setLoading(false)
     }
@@ -111,8 +111,8 @@ export default function ManualAllocationTab() {
       setSelectedCourseId('')
       // Refresh list
       fetchData(selectedSemester)
-    } catch (err: any) {
-      setError(err.message || 'Failed to allocate course')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Failed to allocate course')
     } finally {
       setSubmitting(false)
     }

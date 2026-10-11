@@ -369,6 +369,13 @@ describe('Plan 04: Registration, eligibility, credits and global seats', () => {
                 }
               })
             }
+            if (table === 'semester_blueprints') {
+              return createChain(() => ({ data: { pathways: [{ id: 'p-1', slots: [
+                { slot: 1, rule: 'FIXED', target: 'FULL101' },
+                { slot: 2, rule: 'FIXED', target: 'FULL101' },
+                { slot: 3, rule: 'FIXED', target: 'FULL101' },
+              ] }] }, error: null }))
+            }
             if (table === 'course_prerequisite_rules') {
               return createChain(() => ({ data: [], error: null }))
             }
@@ -390,6 +397,17 @@ describe('Plan 04: Registration, eligibility, credits and global seats', () => {
           return true
         },
       )
+      const originalFrom = mockSupabase.admin.from
+      for (const [result, message] of [
+        [{data:null,error:{message:'provider unavailable'}}, /Could not verify semester slot rules/],
+        [{data:null,error:null}, /Semester blueprint not configured/],
+        [{data:{pathways:[{id:'p-1',slots:[]},{id:'p-2',slots:[]}]},error:null}, /selected pathway does not define this slot/],
+      ]) {
+        mockSupabase.admin.from = table => table === 'semester_blueprints'
+          ? createChain(() => result) : originalFrom(table)
+        await assert.rejects(service.updateSlot({slot_key:'slot_3',course_id:'c-full'},user),message)
+      }
+
     })
   })
 
@@ -484,6 +502,13 @@ describe('Plan 04: Registration, eligibility, credits and global seats', () => {
                 }
                 return { data: null, error: null }
               })
+            }
+            if (table === 'semester_blueprints') {
+              return createChain(() => ({ data: { pathways: [{ id: 'p-1', slots: [
+                { slot: 1, rule: 'FIXED', target: 'HIST101' },
+                { slot: 2, rule: 'FIXED', target: 'HIST101' },
+                { slot: 3, rule: 'FIXED', target: 'HIST101' },
+              ] }] }, error: null }))
             }
             if (table === 'course_prerequisite_rules') {
               return createChain(() => ({ data: [], error: null }))

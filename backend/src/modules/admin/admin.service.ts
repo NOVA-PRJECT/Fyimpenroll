@@ -1,3 +1,4 @@
+import { fetchAllPaginated } from '../../core/database/pagination.util'
 import {
   BadRequestException,
   ConflictException,
@@ -553,114 +554,57 @@ export class AdminService {
     }
   }
 
-  // ──────────────── Graduate Students (F55 Explicit & Recoverable) ────────────────
+  // ──────────────── Graduate Students (R27 Staged & Recoverable) ────────────────
   async graduateStudents(campusId: string, studentIds: string[], user: AuthUser) {
-    if (!studentIds || studentIds.length === 0) {
-      return {
-        success: true,
-        total_candidates: 0,
-        graduated_count: 0,
-        failed_count: 0,
-        failed_student_ids: [],
-        errors: [],
-      }
+    if (user.role !== 'superadmin' && (user.role !== 'campus_director' || !user.campus_id || user.campus_id !== campusId)) {
+      throw new BadRequestException('Directors can only graduate students for their own campus')
     }
-
-    // Verify candidates belong to this campus and are in semester 10
-    const { data: candidateStudents, error: fetchError } = await this.supabase.admin
-      .from('students')
-      .select('id, current_semester, campus_id')
-      .in('id', studentIds)
-      .eq('campus_id', campusId)
-
-    if (fetchError) {
-      throw new InternalServerErrorException('Failed to fetch candidate graduating students')
-    }
-
-    const validStudents = (candidateStudents ?? []).filter((s) => s.current_semester === 10)
-    const validIds = validStudents.map((s) => s.id)
-
-    if (validIds.length === 0) {
-      return {
-        success: true,
-        total_candidates: 0,
-        graduated_count: 0,
-        failed_count: 0,
-        failed_student_ids: [],
-        errors: [],
-      }
-    }
-
-    // External Auth deletion cannot participate in PostgreSQL transaction atomicity.
-    // Concurrently de-auth candidates and inspect Promise.allSettled outcomes.
-    const authResults = await Promise.allSettled(
-      validIds.map((id) => this.supabase.admin.auth.admin.deleteUser(id)),
-    )
-
-    const successfulDeAuthIds: string[] = []
-    const failedStudentIds: string[] = []
-    const errors: { student_id: string; error: string }[] = []
-
-    authResults.forEach((res, idx) => {
-      const studentId = validIds[idx]
-      const isSuccess =
-        res.status === 'fulfilled' &&
-        (!res.value.error || res.value.error.message?.toLowerCase().includes('user not found'))
-
-      if (isSuccess) {
-        successfulDeAuthIds.push(studentId)
-      } else {
-        const errorMsg =
-          res.status === 'rejected'
-            ? String(res.reason?.message || res.reason)
-            : res.value?.error?.message || 'Auth deletion failed'
-        failedStudentIds.push(studentId)
-        errors.push({ student_id: studentId, error: errorMsg })
-      }
+    const ids = [...new Set(studentIds || [])].sort()
+    if (!ids.length) return { success: true, total_candidates: 0, graduated_count: 0, failed_count: 0, failed_student_ids: [], errors: [] }
+    const { data: candidates, error: preparationError } = await this.supabase.admin.rpc('prepare_graduation', {
+      p_campus_id: campusId, p_student_ids: ids, p_actor_id: user.userId,
     })
-
-    // Delete successfully de-authed students from DB records
-    let deletedDbCount = 0
-    if (successfulDeAuthIds.length > 0) {
-      const { error: dbDeleteError, count } = await this.supabase.admin
-        .from('students')
-        .delete({ count: 'exact' })
-        .in('id', successfulDeAuthIds)
-
-      if (dbDeleteError) {
-        this.serverLogger.error(
-          'Failed to delete graduating students from DB after Auth deletion',
-          dbDeleteError.message || JSON.stringify(dbDeleteError),
-        )
-      } else {
-        deletedDbCount = count ?? successfulDeAuthIds.length
+    if (preparationError) throw new BadRequestException('Invalid graduation candidates or graduation preparation failed')
+    if (!Array.isArray(candidates) || candidates.length !== ids.length) throw new InternalServerErrorException('Incomplete graduation operation')
+    const completed: string[] = []
+    const errors: { student_id: string; stage: string; error: string }[] = []
+    for (const candidate of candidates) {
+      if (candidate.stage === 'completed') { completed.push(candidate.student_id); continue }
+      let stage = 'account_restriction'
+      try {
+        if (candidate.stage === 'pending') {
+          // Restrict login before deleting the application row; a failed Auth delete remains recoverable.
+          const restricted = await this.supabase.admin.auth.admin.updateUserById(candidate.student_id, { ban_duration: '876000h' })
+          if (restricted.error) throw restricted.error
+          stage = 'database'
+          const deleted = await this.supabase.admin.rpc('graduate_candidate_database', { p_campus_id: campusId, p_student_id: candidate.student_id })
+          if (deleted.error) throw deleted.error
+        }
+        stage = 'auth'
+        const deleted = await this.supabase.admin.auth.admin.deleteUser(candidate.student_id)
+        if (deleted.error && deleted.error.code !== 'user_not_found' && deleted.error.status !== 404) throw deleted.error
+        stage = 'checkpoint'
+        const saved = await this.supabase.admin.rpc('finish_graduation_candidate', { p_campus_id: campusId, p_student_id: candidate.student_id, p_error_stage: null })
+        if (saved.error) throw saved.error
+        completed.push(candidate.student_id)
+      } catch {
+        errors.push({ student_id: candidate.student_id, stage, error: 'Graduation cleanup pending; retry this recorded candidate.' })
+        await Promise.resolve(this.supabase.admin.rpc('finish_graduation_candidate', { p_campus_id: campusId, p_student_id: candidate.student_id, p_error_stage: stage })).catch(() => undefined)
       }
     }
+    const result = { success: errors.length === 0, total_candidates: ids.length, graduated_count: completed.length,
+      failed_count: errors.length, failed_student_ids: errors.map(e => e.student_id), errors }
+    await this.auditLogger.log({ eventType: AuditEvents.CAMPUS_UPDATED, userId: user.userId, userRole: user.role,
+      action: 'graduated students for campus ' + campusId, resourceType: 'campus', resourceId: campusId,
+      status: result.success ? 'success' : 'failure', metadata: result })
+    return result
+  }
 
-    await this.auditLogger.log({
-      eventType: AuditEvents.CAMPUS_UPDATED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `graduated students for campus ${campusId}`,
-      resourceType: 'campus',
-      resourceId: campusId,
-      status: failedStudentIds.length === 0 ? 'success' : 'failure',
-      metadata: {
-        total_candidates: validIds.length,
-        graduated_count: deletedDbCount,
-        failed_count: failedStudentIds.length,
-        failed_student_ids: failedStudentIds,
-      },
-    })
-
-    return {
-      success: failedStudentIds.length === 0,
-      total_candidates: validIds.length,
-      graduated_count: deletedDbCount,
-      failed_count: failedStudentIds.length,
-      failed_student_ids: failedStudentIds,
-      errors,
-    }
+  async pendingGraduations(user: AuthUser) {
+    if (user.role !== 'campus_director' || !user.campus_id) throw new BadRequestException('Campus director required')
+    const rows = await fetchAllPaginated<any>(this.supabase.admin.from('graduation_candidates')
+      .select('student_id, stage, last_error_stage').eq('campus_id', user.campus_id).neq('stage', 'completed').order('student_id'))
+    return { candidates: rows, failed_student_ids: rows.map(r => r.student_id) }
   }
 
   // ──────────────── Concluded-Semester Attendance Retention Purge ────────────────
@@ -670,7 +614,7 @@ export class AdminService {
     semester: number,
     user: AuthUser,
   ) {
-    if (user.role === 'campus_director' && user.campus_id && user.campus_id !== campusId) {
+    if (user.role !== 'superadmin' && (user.role !== 'campus_director' || !user.campus_id || user.campus_id !== campusId)) {
       throw new BadRequestException('Directors can only clean up attendance for their own campus')
     }
 

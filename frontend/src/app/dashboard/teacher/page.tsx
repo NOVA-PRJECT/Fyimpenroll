@@ -1,5 +1,7 @@
 'use client'
 
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
@@ -8,18 +10,15 @@ import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import Image from 'next/image';
 
 interface Course {
+  delivery_id: string
+  campus_id: string
+  academic_year: string
   id: string
   course_code: string
   title: string
   semester?: number
   department_id?: string
   enrolled_count?: number
-}
-
-interface Department {
-  id: string
-  name: string
-  code: string
 }
 
 interface Student {
@@ -129,7 +128,7 @@ function CustomPaperSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const selectedCourse = courses.find(c => c.id === selectedCourseId)
+  const selectedCourse = courses.find(c => c.delivery_id === selectedCourseId)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -183,10 +182,10 @@ function CustomPaperSelect({
               )}
               {courses.map(course => (
                 <div
-                  key={course.id}
-                  className={`${styles.customOption} ${selectedCourseId === course.id ? styles.selected : ''}`}
+                  key={course.delivery_id}
+                  className={`${styles.customOption} ${selectedCourseId === course.delivery_id ? styles.selected : ''}`}
                   onClick={() => {
-                    onSelect(course.id)
+                    onSelect(course.delivery_id)
                     setIsOpen(false)
                   }}
                 >
@@ -247,6 +246,8 @@ export default function TeacherDashboard() {
   const [submittingAttendance, setSubmittingAttendance] = useState(false)
   const [markingError, setMarkingError] = useState('')
   const [lastMarkedAt, setLastMarkedAt] = useState<string | null>(null)
+  const [sessionRevision, setSessionRevision] = useState<number | null>(null)
+  const [conflictRevision, setConflictRevision] = useState<number | null>(null)
   const [copyingPractical, setCopyingPractical] = useState<string | null>(null)
 
   // Tab 2: Assigned Papers & Rosters State
@@ -296,7 +297,7 @@ export default function TeacherDashboard() {
         setWeeklySchedule(data.weeklySchedule || [])
         setScheduleMessage(data.message || '')
       } else {
-        setGlobalError((data as any).message || 'Failed to fetch schedule for the selected date.')
+        setGlobalError((data as {message?: string}).message || 'Failed to fetch schedule for the selected date.')
       }
     } catch {
       setGlobalError('Network error while fetching teacher schedule.')
@@ -306,6 +307,8 @@ export default function TeacherDashboard() {
   }, [])
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchTeacherCourses()
     fetchTeacherSchedule(scheduleDate)
   }, [fetchTeacherCourses, fetchTeacherSchedule, scheduleDate])
@@ -328,7 +331,9 @@ export default function TeacherDashboard() {
 
   // Reset selected course if filter changed
   useEffect(() => {
-    if (selectedCourseId && !filteredAssignedCourses.some(c => c.id === selectedCourseId)) {
+    if (selectedCourseId && !filteredAssignedCourses.some(c => c.delivery_id === selectedCourseId)) {
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clears a selection invalidated by a refreshed external roster.
       setSelectedCourseId('')
       setRosterData(null)
     }
@@ -352,7 +357,9 @@ export default function TeacherDashboard() {
     setGlobalError('')
     setTableDeptFilter('all')
     try {
-      const res = await fetch(`/api/faculty/attendance?course_id=${courseId}`)
+      const selected = assignedCourses.find(c => c.delivery_id === courseId)
+      if (!selected) throw new Error('Select an assigned delivery')
+      const res = await fetch(`/api/faculty/attendance?course_id=${selected.id}&delivery_id=${selected.delivery_id}`)
       const data = await res.json()
       if (res.ok) {
         setRosterData(data)
@@ -366,13 +373,15 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Open Marking Modal for a slot (F47, F48: Loads persisted marks for scheduleDate)
+  // Open Marking Modal for a slot (F47, F48, R29: Loads persisted marks and session revision for scheduleDate)
   async function handleOpenMarkingModal(slot: PeriodSlot) {
     setActiveSlotForMarking(slot)
     setMarkingError('')
     setLoadingMarkingRoster(true)
     setAbsentStudentIds(new Set())
     setLastMarkedAt(null)
+    setSessionRevision(null)
+    setConflictRevision(null)
 
     try {
       const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`)
@@ -380,6 +389,7 @@ export default function TeacherDashboard() {
       if (res.ok && data.students) {
         setMarkingRoster(data.students)
         setLastMarkedAt(data.last_marked_at || null)
+        setSessionRevision(data.revision !== undefined ? data.revision : (data.is_marked ? 1 : 0))
 
         // Preserve already marked absent students (F47)
         const absents = new Set<string>()
@@ -420,11 +430,15 @@ export default function TeacherDashboard() {
     setAbsentStudentIds(new Set(markingRoster.map(s => s.id)))
   }
 
-  // Submit Period Attendance (F48: Send explicit scheduleDate & lastMarkedAt for conflict check)
-  async function handleSubmitAttendance() {
+  // Submit Period Attendance (F48, R29: Send explicit scheduleDate, lastMarkedAt, and expected_revision for CAS conflict check)
+  async function handleSubmitAttendance(overrideRevision?: number) {
     if (!activeSlotForMarking) return
     setSubmittingAttendance(true)
     setMarkingError('')
+
+    const revToSend = overrideRevision !== undefined
+      ? overrideRevision
+      : (sessionRevision !== null ? sessionRevision : undefined)
 
     try {
       const res = await fetch('/api/attendance/period/submit', {
@@ -435,6 +449,7 @@ export default function TeacherDashboard() {
           attendance_date: scheduleDate,
           absent_student_ids: Array.from(absentStudentIds),
           last_marked_at: lastMarkedAt || undefined,
+          expected_revision: revToSend,
           client_timestamp: new Date().toISOString(),
         }),
       })
@@ -443,11 +458,24 @@ export default function TeacherDashboard() {
       if (res.ok) {
         setGlobalSuccess(`✓ Period ${activeSlotForMarking.period_number} attendance for ${scheduleDate} saved successfully!`)
         setActiveSlotForMarking(null)
+        setSessionRevision(null)
+        setConflictRevision(null)
         // Refresh schedule to update marked badge and counts
         await fetchTeacherSchedule(scheduleDate)
         setTimeout(() => setGlobalSuccess(''), 4000)
       } else if (res.status === 409) {
         setMarkingError(result.message || 'Concurrent edit detected. Another teacher modified this record.')
+        // R29: Preserve teacher's current absentStudentIds selections so inputs aren't wiped
+        try {
+          const checkRes = await fetch(`/api/attendance/period/slot-marks?slotId=${activeSlotForMarking.timetable_slot_id}&date=${scheduleDate}`)
+          const checkData = await checkRes.json()
+          if (checkRes.ok && checkData.revision !== undefined) {
+            setConflictRevision(checkData.revision)
+            if (checkData.last_marked_at) setLastMarkedAt(checkData.last_marked_at)
+          }
+        } catch {
+          // ignore background fetch failure
+        }
       } else {
         setMarkingError(result.message || 'Failed to submit period attendance.')
       }
@@ -458,7 +486,7 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Copy Practical Attendance to Next Period (F49)
+  // Copy Practical Attendance to Next Period (F49, R03, R29: Strict pair authorization & target revision CAS)
   async function handleCopyPractical(period: PeriodSlot) {
     if (!period.adjacent_practical_slot_id) return
     setCopyingPractical(period.timetable_slot_id)
@@ -470,6 +498,7 @@ export default function TeacherDashboard() {
           source_slot_id: period.timetable_slot_id,
           target_slot_id: period.adjacent_practical_slot_id,
           attendance_date: scheduleDate,
+          expected_target_revision: 0,
           overwrite: false,
         }),
       })
@@ -479,6 +508,17 @@ export default function TeacherDashboard() {
           `Next practical period already has attendance marks recorded for ${scheduleDate}. Overwrite existing marks?`
         )
         if (confirmed) {
+          let targetRev: number | undefined = undefined
+          try {
+            const marksRes = await fetch(`/api/attendance/period/slot-marks?slotId=${period.adjacent_practical_slot_id}&date=${scheduleDate}`)
+            const marksData = await marksRes.json()
+            if (marksRes.ok && marksData.revision !== undefined) {
+              targetRev = marksData.revision
+            }
+          } catch {
+            // fallback
+          }
+
           res = await fetch('/api/attendance/period/copy-to-next-period', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -486,6 +526,7 @@ export default function TeacherDashboard() {
               source_slot_id: period.timetable_slot_id,
               target_slot_id: period.adjacent_practical_slot_id,
               attendance_date: scheduleDate,
+              expected_target_revision: targetRev,
               overwrite: true,
             }),
           })
@@ -580,11 +621,10 @@ export default function TeacherDashboard() {
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   return (
@@ -1275,6 +1315,11 @@ export default function TeacherDashboard() {
             </div>
 
             {markingError && <div className={styles.errorBanner} style={{ margin: '0.75rem 1.25rem 0' }}>{markingError}</div>}
+            {conflictRevision !== null && (
+              <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.75rem', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '0.375rem', color: '#92400e', fontSize: '0.875rem' }}>
+                <strong>⚠️ Concurrent edit detected:</strong> Another teacher modified this record (now at revision {conflictRevision}). Your entered selections above are preserved. Click <strong>Overwrite with My Marks</strong> to submit your selections, or <strong>Cancel</strong> to discard.
+              </div>
+            )}
 
             <div className={styles.attendanceModalControls}>
               <div className={styles.attendanceStatsLive}>
@@ -1358,16 +1403,30 @@ export default function TeacherDashboard() {
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className={styles.submitAttendanceBtn}
-                onClick={handleSubmitAttendance}
-                disabled={submittingAttendance || loadingMarkingRoster}
-              >
-                {submittingAttendance
-                  ? 'Submitting...'
-                  : `Save & Submit (${markingRoster.length - absentStudentIds.size} Present, ${absentStudentIds.size} Absent)`}
-              </button>
+              {conflictRevision !== null ? (
+                <button
+                  type="button"
+                  className={styles.submitAttendanceBtn}
+                  onClick={() => handleSubmitAttendance(conflictRevision)}
+                  disabled={submittingAttendance || loadingMarkingRoster}
+                  style={{ backgroundColor: '#d97706' }}
+                >
+                  {submittingAttendance
+                    ? 'Submitting...'
+                    : `Overwrite with My Marks (Revision ${conflictRevision})`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.submitAttendanceBtn}
+                  onClick={() => handleSubmitAttendance()}
+                  disabled={submittingAttendance || loadingMarkingRoster}
+                >
+                  {submittingAttendance
+                    ? 'Submitting...'
+                    : `Save & Submit (${markingRoster.length - absentStudentIds.size} Present, ${absentStudentIds.size} Absent)`}
+                </button>
+              )}
             </div>
           </div>
         </div>

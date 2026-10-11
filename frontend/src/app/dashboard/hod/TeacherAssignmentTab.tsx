@@ -9,7 +9,6 @@ import {
   Position,
   Node,
   Edge,
-  addEdge,
   Connection,
   useNodesState,
   useEdgesState,
@@ -18,15 +17,12 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   UserCheck,
-  BookOpen,
   AlertTriangle,
   RefreshCw,
   Trash2,
   Edit2,
   Plus,
   Search,
-  Layers,
-  ChevronRight,
   Sparkles,
   UserPlus,
   User,
@@ -379,7 +375,6 @@ export default function TeacherAssignmentTab({
   // Manual Add Modal State (for list view)
   const [assignCourseTarget, setAssignCourseTarget] = useState<Course | null>(null)
   const [assignTeacherId, setAssignTeacherId] = useState('')
-  const [assigning, setAssigning] = useState(false)
 
   // Add Teacher Modal State
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false)
@@ -438,14 +433,16 @@ export default function TeacherAssignmentTab({
       }
       setCourses(data.courses || [])
       setFaculty(data.faculty || [])
-    } catch (err: any) {
-      setError(err.message || 'Network error fetching assignments.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error fetching assignments.')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchData()
   }, [fetchData])
 
@@ -506,8 +503,8 @@ export default function TeacherAssignmentTab({
       setTimeout(() => setSuccess(''), 4000)
       setStagedAssignments(new Map())
       await fetchData()
-    } catch (err: any) {
-      setError(err.message || 'Network error saving assignments.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error saving assignments.')
     } finally {
       setSavingBatch(false)
     }
@@ -617,7 +614,7 @@ export default function TeacherAssignmentTab({
 
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [eligibleFaculty, courses, filteredCourses, isMobileView, searchQuery, stagedAssignments, handleCancelStaged])
+  }, [eligibleFaculty, courses, filteredCourses, isMobileView, searchQuery, stagedAssignments, handleCancelStaged, setNodes, setEdges])
 
   // ── Handle Connection Drag on Canvas (Stages locally) ──
   const onConnect = useCallback(
@@ -675,8 +672,8 @@ export default function TeacherAssignmentTab({
       setTimeout(() => setSuccess(''), 3000)
       setReassignTarget(null)
       await fetchData()
-    } catch (err: any) {
-      setError(err.message || 'Network error.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error.')
     } finally {
       setReassigning(false)
     }
@@ -701,8 +698,8 @@ export default function TeacherAssignmentTab({
       setTimeout(() => setSuccess(''), 4000)
       setRemoveTarget(null)
       await fetchData()
-    } catch (err: any) {
-      setRemoveModalError(err.message || 'Network error removing assignment.')
+    } catch (err: unknown) {
+      setRemoveModalError((err instanceof Error ? err.message : '') || 'Network error removing assignment.')
     } finally {
       setRemoving(false)
     }
@@ -768,8 +765,8 @@ export default function TeacherAssignmentTab({
       setShowPassword(false)
       setTeacherModalError('')
       await fetchData()
-    } catch (err: any) {
-      setTeacherModalError(err.message || 'Network error creating teacher.')
+    } catch (err: unknown) {
+      setTeacherModalError((err instanceof Error ? err.message : '') || 'Network error creating teacher.')
     } finally {
       setAddingTeacher(false)
     }
@@ -794,8 +791,8 @@ export default function TeacherAssignmentTab({
       setSuccess(`Teacher "${teacherName}" removed successfully.`)
       setTimeout(() => setSuccess(''), 4000)
       await fetchData()
-    } catch (err: any) {
-      setError(err.message || 'Network error removing teacher.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error removing teacher.')
     } finally {
       setDeletingTeacherId(null)
     }
@@ -1637,7 +1634,7 @@ export default function TeacherAssignmentTab({
             <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', margin: '1rem 0' }}>
               {eligibleFaculty.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '13px' }}>
-                  No teachers found in your department. Click "+ Add Teacher" to add your first faculty member.
+                  No teachers found in your department. Click &quot;+ Add Teacher&quot; to add your first faculty member.
                 </div>
               ) : (
                 eligibleFaculty.map((t) => {

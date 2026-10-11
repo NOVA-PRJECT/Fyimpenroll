@@ -19,7 +19,7 @@ export default function Home() {
       setChecking(false)
     }, 2500)
 
-    async function checkSession(isBfcache: boolean) {
+    async function checkSession() {
       try {
         const response = await fetch('/api/auth/profile', {
           signal: controller.signal,
@@ -34,8 +34,8 @@ export default function Home() {
             return
           }
         }
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
+      } catch (err: unknown) {
+        if ((err instanceof Error ? err.name : '') !== 'AbortError') {
           console.error('Session check failed:', err)
         }
       } finally {
@@ -44,12 +44,12 @@ export default function Home() {
       }
     }
 
-    checkSession(false)
+    checkSession()
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
         setChecking(true)
-        checkSession(true)
+        checkSession()
       }
     }
 

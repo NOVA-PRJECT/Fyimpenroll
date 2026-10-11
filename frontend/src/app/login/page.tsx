@@ -1,5 +1,7 @@
 'use client'
 
+import { navigateAfterSessionChange } from '@/core/security/session-navigation'
+
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, Suspense } from 'react'
@@ -23,13 +25,10 @@ function LoginForm() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [successMsg, setSuccessMsg] = useState(searchParams.get('message') || '')
+  const [messageOverride, setSuccessMsg] = useState<string | null>(null)
+  const successMsg = messageOverride ?? searchParams.get('message') ?? ''
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
 
-  useEffect(() => {
-    const msg = searchParams.get('message')
-    if (msg) setSuccessMsg(msg)
-  }, [searchParams])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -38,7 +37,7 @@ function LoginForm() {
       setChecking(false)
     }, 2500)
 
-    async function checkSession(isBfcache: boolean) {
+    async function checkSession() {
       try {
         const response = await fetch('/api/auth/profile', {
           signal: controller.signal,
@@ -66,8 +65,8 @@ function LoginForm() {
             return
           }
         }
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
+      } catch (err: unknown) {
+        if ((err instanceof Error ? err.name : '') !== 'AbortError') {
           console.error('Session check failed:', err)
         }
       } finally {
@@ -76,12 +75,12 @@ function LoginForm() {
       }
     }
 
-    checkSession(false)
+    checkSession()
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
         setChecking(true)
-        checkSession(true)
+        checkSession()
       }
     }
 
@@ -148,12 +147,12 @@ function LoginForm() {
       if (consentCheck && consentCheck.ok) {
         const cData = await consentCheck.json()
         if (!cData.accepted) {
-          window.location.href = '/consent'
+          navigateAfterSessionChange('/consent')
           return
         }
       }
 
-      window.location.href = data.redirectTo
+      navigateAfterSessionChange(data.redirectTo)
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)

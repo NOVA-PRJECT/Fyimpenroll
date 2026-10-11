@@ -1,4 +1,4 @@
-﻿import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { AuthUser } from './types'
 
 /**
@@ -167,5 +167,55 @@ export class AuthorizationPolicy {
     }
 
     throw new ForbiddenException(`Role '${user.role}' cannot access timetable operations`)
+  }
+
+  /**
+   * Asserts that a teacher is actively assigned to teach a specific course (R04).
+   * Supports cross-campus / visiting faculty assignments.
+   */
+  static assertTeacherAssignedToCourse(user: AuthUser, courseId: string, assignedCourseIds: string[]): void {
+    this.assertAuthenticated(user)
+    if (user.role === 'superadmin') return
+    if (user.role === 'teacher') {
+      if (!assignedCourseIds.includes(courseId)) {
+        throw new ForbiddenException('Teacher is not assigned to teach this course/class')
+      }
+      return
+    }
+  }
+
+  /**
+   * Asserts authority to record or copy attendance marks for a timetable entry / class (R03).
+   * - Superadmin: university scope.
+   * - HOD: can manage classes belonging to their own department.
+   * - Teacher: can only manage classes for courses actively assigned to them.
+   * - Teaching staff / Student / Director: forbidden.
+   */
+  static assertClassAttendanceAuthority(
+    user: AuthUser,
+    classDepartmentId: string,
+    classCourseId: string,
+    teacherAssignedCourseIds: string[],
+  ): void {
+    this.assertAuthenticated(user)
+    this.assertNotRosterOnly(user, 'record or copy attendance')
+
+    if (user.role === 'superadmin') return
+
+    if (user.role === 'hod') {
+      if (!user.department_id || user.department_id !== classDepartmentId) {
+        throw new ForbiddenException('HOD cannot manage attendance for another department')
+      }
+      return
+    }
+
+    if (user.role === 'teacher') {
+      if (!teacherAssignedCourseIds.includes(classCourseId)) {
+        throw new ForbiddenException('Teacher is not assigned to teach this course/class')
+      }
+      return
+    }
+
+    throw new ForbiddenException(`Role '${user.role}' is not authorized to manage attendance marks`)
   }
 }

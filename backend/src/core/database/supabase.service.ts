@@ -2,6 +2,13 @@
 import { ConfigService } from '@nestjs/config'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
+const boundedFetch: typeof fetch = (input, init) => fetch(input, {
+  ...init,
+  signal: init?.signal
+    ? AbortSignal.any([init.signal, AbortSignal.timeout(15000)])
+    : AbortSignal.timeout(15000),
+})
+
 @Injectable()
 export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name)
@@ -21,6 +28,7 @@ export class SupabaseService {
 
     this.adminClientInstance = createClient(this.supabaseUrl, this.supabaseServiceRoleKey, {
       global: {
+        fetch: boundedFetch,
         headers: {
           Authorization: `Bearer ${this.supabaseServiceRoleKey}`,
         },
@@ -38,6 +46,7 @@ export class SupabaseService {
 
   createAuthClient(): SupabaseClient {
     return createClient(this.supabaseUrl, this.supabaseAnonKey, {
+      global: { fetch: boundedFetch },
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -48,6 +57,7 @@ export class SupabaseService {
   getClientForToken(token: string): SupabaseClient {
     return createClient(this.supabaseUrl, this.supabaseAnonKey, {
       global: {
+        fetch: boundedFetch,
         headers: {
           Authorization: `Bearer ${token}`,
         },

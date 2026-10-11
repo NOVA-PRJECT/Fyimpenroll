@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -16,6 +17,7 @@ import { CurrentUser } from '../../core/auth/decorators/current-user.decorator'
 import { AuthUser } from '../../core/auth/types'
 import { RateLimitGuard } from '../../core/security/rate-limit.guard'
 import { RateLimit } from '../../core/security/rate-limit.decorator'
+import { GenerateRequestSchema, PublishRequestSchema } from './solver/schemas'
 
 @Controller('api/timetable')
 @UseGuards(AuthGuard, RolesGuard)
@@ -67,10 +69,12 @@ export class TimetableController {
   @RateLimit('timetable')
   @UseGuards(RateLimitGuard)
   async generate(
-    @Body() body: { academicYear: string; semester: number; dynamicConstraints?: any[] },
+    @Body() body: unknown,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.timetableService.generate(body.academicYear, body.semester, body.dynamicConstraints, user)
+    const parsed = GenerateRequestSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.timetableService.generate(parsed.data.academicYear, parsed.data.semester, parsed.data.dynamicConstraints, user, parsed.data.rules)
   }
 
   // ──────────────── Job Status ────────────────
@@ -88,9 +92,11 @@ export class TimetableController {
   @Post('publish')
   @Roles('superadmin', 'campus_director')
   async publish(
-    @Body() body: { academicYear: string; semester: number; force?: boolean },
+    @Body() body: unknown,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.timetableService.publish(body.academicYear, Number(body.semester), user, body.force)
+    const parsed = PublishRequestSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.timetableService.publish(parsed.data.academicYear, parsed.data.semester, user, parsed.data.force)
   }
 }

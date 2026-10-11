@@ -281,135 +281,14 @@ describe('Plan 05: Deterministic Allocation and Atomic Jobs', () => {
   // 4. F24: Removal of Partial-Write Fallback
   // ──────────────────────────────────────────────────────────────────────────
   describe('4. F24: Fail-Fast Without Partial Write Fallback', () => {
-    it('marks run failed and throws InternalServerErrorException if apply_course_allocation fails', async () => {
-      const pastDeadline = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      let runStatusUpdatedTo = ''
-      let studentRegistrationsUpdated = false
-
-      const mockSupabase = {
-        admin: {
-          from: (table) => {
-            if (table === 'campus_settings') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    maybeSingle: async () => ({ data: { deadline: pastDeadline }, error: null }),
-                  }),
-                }),
-              }
-            }
-            if (table === 'timetable_entries') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    eq: () => ({
-                      eq: async () => ({ count: 0, error: null }),
-                    }),
-                  }),
-                }),
-              }
-            }
-            if (table === 'courses') {
-              return {
-                select: () => ({
-                  eq: async () => ({ data: [{ id: 'course-1', course_code: 'ENG101', title: 'English', semester: 1, seat_limit: 60 }], error: null }),
-                }),
-              }
-            }
-            if (table === 'course_prerequisite_rules') {
-              return {
-                select: () => ({
-                  in: async () => ({ data: [], error: null }),
-                }),
-              }
-            }
-            if (table === 'registration_preferences') {
-              return {
-                select: () => ({
-                  eq: () => ({
-                    eq: () => ({
-                      eq: async () => ({
-                        data: [{
-                          id: 'pref-1',
-                          student_id: 'stu-1',
-                          campus_id: 'campus-1',
-                          semester: 1,
-                          academic_year: '2026-27',
-                          preferences: [{ slot: 1, choices: [{ course_id: 'course-1', rank: 1 }] }],
-                          submitted_at: '2026-10-01T10:00:00Z',
-                        }],
-                        error: null,
-                      }),
-                    }),
-                  }),
-                }),
-              }
-            }
-            if (table === 'students') {
-              return {
-                select: () => ({
-                  in: async () => ({ data: [{ id: 'stu-1', department_id: 'dept-1', current_semester: 1, departments: { code: 'ENG' } }], error: null }),
-                }),
-              }
-            }
-            if (table === 'student_registrations') {
-              return {
-                select: () => ({
-                  in: () => ({
-                    lt: async () => ({ data: [], error: null }),
-                  }),
-                  eq: () => ({
-                    eq: async () => ({ data: [], error: null }),
-                  }),
-                }),
-                update: () => {
-                  studentRegistrationsUpdated = true
-                  return { eq: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) }
-                },
-              }
-            }
-            if (table === 'allocation_runs') {
-              return {
-                update: (payload) => {
-                  if (payload.status) runStatusUpdatedTo = payload.status
-                  return {
-                    eq: async () => ({ error: null }),
-                  }
-                },
-              }
-            }
-            return {}
-          },
-          rpc: async (fnName) => {
-            if (fnName === 'claim_allocation_run') {
-              return { data: 'run-uuid-1', error: null }
-            }
-            if (fnName === 'apply_course_allocation') {
-              return { data: null, error: { message: 'Database transaction lock timeout' } }
-            }
-            return { data: null, error: null }
-          },
-        },
-      }
-
-      const service = new AllocationService(mockSupabase, mockAuditLogger, mockServerLogger)
-      await assert.rejects(
-        async () => {
-          await service.runAllocation(
-            { academicYear: '2026-27', semester: 1 },
-            { userId: 'u1', role: 'director', campus_id: 'campus-1' },
-          )
-        },
-        (err) => {
-          assert.strictEqual(err.name, 'InternalServerErrorException')
-          assert.ok(err.message.includes('Database transaction lock timeout') || err.message.includes('commit course allocations'))
-          return true
-        },
-      )
-
-      assert.strictEqual(runStatusUpdatedTo, 'failed')
-      assert.strictEqual(studentRegistrationsUpdated, false) // F24: NEVER executed partial fallback updates
-    })
+    it('marks the claimed run failed without partial enrollment writes when the commit aborts', async()=>{
+ let failed=false,committed=false
+ const rows={campus_settings:{deadline:'2026-01-01T00:00:00Z'},courses:[{id:'course',course_code:'ENG101',semester:1,seat_limit:60}],registration_preferences:[{id:'pref',student_id:'student',preferences:[{slot:1,choices:[{course_id:'course',rank:1}]}]}],students:[{id:'student',department_id:'dept',current_semester:1,departments:{code:'ENG'}}]}
+ const supabase={admin:{from(table){const q={select:()=>q,eq:()=>q,in:()=>q,lt:()=>q,order:()=>q,maybeSingle:async()=>({data:rows[table]}),update:()=>assert.fail('Job state must be committed through the fenced RPC'),insert:()=>assert.fail('Direct enrollment insertion'),upsert:()=>assert.fail('Direct enrollment upsert'),then:resolve=>resolve({data:rows[table]||[],count:0,error:null})};return q},rpc:async(name)=>{if(name==='claim_allocation_run')return {data:'run'};if(name==='fail_allocation_worker'){failed=true;return {data:true}};assert.equal(name,'apply_course_allocation');committed=true;return {error:{message:'Database transaction lock timeout'}}}}}
+ const service=new AllocationService(supabase,mockAuditLogger,mockServerLogger)
+ await assert.rejects(service.runAllocation({academicYear:'2026-27',semester:1},{userId:'director',role:'campus_director',campus_id:'campus'}),/Database transaction lock timeout/)
+ assert.equal(committed,true);assert.equal(failed,true)
+})
   })
 
   // ──────────────────────────────────────────────────────────────────────────

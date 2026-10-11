@@ -29,7 +29,11 @@ function createMockSupabaseService(options = {}) {
               user: {
                 id,
                 email: 'test@kannur.edu',
-                app_metadata: { role: 'student', must_change_password: true },
+                app_metadata: {
+                  role: 'student',
+                  must_change_password: true,
+                  pending_profile_sync: options.pendingProfileSync ?? false,
+                },
               },
             },
             error: null,
@@ -305,14 +309,14 @@ describe('Plan 02: Accounts, Sessions, Consent & Security (F07, F08, F09, F10, F
         { warn: () => {} },
       )
 
-      const result = await authService.completePasswordReset('u1', { passwordUpdated: true })
+      const result = await authService.completePasswordReset('u1', { newPassword: 'NewPassword123!', passwordUpdated: true })
       assert.equal(result.success, false)
       assert.equal(result.code, 'SYNC_FAILED')
       assert.equal(result.canRetrySync, true)
     })
 
     it('syncPasswordStatus allows safe retry of synchronization after partial failure', async () => {
-      const supabase = createMockSupabaseService({ failProfileUpdate: false })
+      const supabase = createMockSupabaseService({ failProfileUpdate: false, pendingProfileSync: true })
       const authService = new AuthService(
         supabase,
         { checkLimit: async () => ({ success: true }) },
@@ -380,8 +384,8 @@ describe('Plan 02: Accounts, Sessions, Consent & Security (F07, F08, F09, F10, F
         { warn: () => {} },
       )
 
-      await authService.logout({ userId: 'u1', role: 'student' }, '127.0.0.1')
-      assert.equal(revokedUserId, 'u1')
+      await authService.logout({ userId: 'u1', role: 'student', token: 'access-jwt' }, '127.0.0.1')
+      assert.equal(revokedUserId, 'access-jwt')
     })
   })
 

@@ -18,6 +18,7 @@ export default function ConsentGate({ children }: { children: React.ReactNode })
       pathname.startsWith('/reset-password') ||
       pathname === '/dashboard/student/change-password'
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the client view with fetched data, browser storage, or the selected resource.
       setConsentPassed(true)
       return
     }

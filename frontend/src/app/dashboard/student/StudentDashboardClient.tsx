@@ -1,7 +1,8 @@
 'use client'
 
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -87,11 +88,10 @@ export default function StudentDashboardClient({
   registrationWindow,
 }: StudentDashboardClientProps) {
   useBfcacheGuard()
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState<StudentTab>('overview')
   const [selectedDay, setSelectedDay] = useState<number | 'all'>('all')
   const [loggingOut, setLoggingOut] = useState(false)
-  const [timetableEntries, setTimetableEntries] = useState<any[]>([])
+  const [timetableEntries, setTimetableEntries] = useState<{ day: number; period: number; courseId: string; courseCode: string; courseName: string; category: string; isLabBlock: boolean; id: string; course_id: string; day_of_week: number; period_number: number; start_time: string; end_time: string; course_title: string; course_code: string; teacher_name: string; time_slots?: {day_of_week: number; period_number: number}; courses?: {title: string; course_code: string} }[]>([])
   const [loadingTimetable, setLoadingTimetable] = useState(false)
 
   // Fetch timetable entries when switching to timetable tab
@@ -120,11 +120,10 @@ export default function StudentDashboardClient({
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   // Set of enrolled course IDs & codes for timetable filtering

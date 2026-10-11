@@ -508,60 +508,10 @@ describe('Plan 03: Schema alignment, class identity and ten-semester foundation'
       assert.match(sqlContent, /F38 \(Withdrawn\)/i)
     })
 
-    it('exportStudentsExcel queries up to 8 slots with qualified inner join', async () => {
-      let executedQuery = ''
-
-      const mockSupabase = {
-        admin: {
-          from: (table) => {
-            if (table === 'courses') {
-              return {
-                select: () => ({
-                  in: async () => ({
-                    data: [
-                      { id: 'c-1', title: 'Course 1', course_code: 'CS1' },
-                      { id: 'c-7', title: 'Course 7', course_code: 'CS7' },
-                      { id: 'c-8', title: 'Course 8', course_code: 'CS8' },
-                    ],
-                    error: null,
-                  }),
-                }),
-              }
-            }
-            assert.strictEqual(table, 'student_registrations')
-            return {
-              select: (cols) => {
-                executedQuery = cols
-                return {
-                  eq: () => ({
-                    eq: async () => ({
-                      data: [
-                        {
-                          student_id: 's-1',
-                          slot_1_course_id: 'c-1',
-                          slot_7_course_id: 'c-7',
-                          slot_8_course_id: 'c-8',
-                          students: [{ full_name: 'Student One', department_id: 'dept-1' }],
-                        },
-                      ],
-                      error: null,
-                    }),
-                  }),
-                }
-              },
-            }
-          },
-        },
-      }
-
-      const hodService = new HodService(mockSupabase, mockAuditLogger, mockServerLogger)
-      const hodUser = { userId: 'hod-1', role: 'hod', department_id: 'dept-1' }
-
-      await hodService.exportStudentsExcel(1, hodUser)
-
-      assert.match(executedQuery, /slot_7_course_id/)
-      assert.match(executedQuery, /slot_8_course_id/)
-      assert.match(executedQuery, /students!inner\(full_name, department_id\)/)
-    })
+    it('legacy HOD export delegates to the canonical scoped eight-slot exporter', async()=>{
+ let seen;const exporter={exportFinalRegistrations:async(query,user)=>{seen={query,user};return {rows:[{'Paper 7':'Elective','Paper 8':'Additional'}]}}}
+ const service=new HodService({},mockAuditLogger,mockServerLogger,exporter),user={userId:'hod',role:'hod',department_id:'dept',campus_id:'campus'}
+ const result=await service.exportStudentsExcel(1,user);assert.deepEqual(seen,{query:{semester:1,format:'json'},user});assert.equal(result.rows[0]['Paper 8'],'Additional')
+})
   })
 })

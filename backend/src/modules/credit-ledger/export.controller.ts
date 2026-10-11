@@ -1,5 +1,7 @@
+import { ExportBudgetInterceptor } from '../../core/security/export-budget.interceptor'
 import {
   Controller,
+  UseInterceptors,
   Get,
   Query,
   Param,
@@ -15,6 +17,7 @@ import { AuthUser } from '../../core/auth/types'
 import { ExportService } from './export.service'
 
 @Controller('api/export')
+@UseInterceptors(ExportBudgetInterceptor)
 @UseGuards(AuthGuard, RolesGuard)
 export class ExportController {
   constructor(private readonly exportService: ExportService) {}

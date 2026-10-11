@@ -1,5 +1,7 @@
 'use client'
 
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -206,6 +208,8 @@ export default function TeachingStaffDashboard() {
   // Reset selected paper if it is no longer valid under new filters
   useEffect(() => {
     if (selectedCourseId && !filteredCourses.some(c => c.id === selectedCourseId)) {
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clears a selection invalidated by a refreshed external roster.
       setSelectedCourseId('')
       setRosterData(null)
     }
@@ -277,11 +281,10 @@ export default function TeachingStaffDashboard() {
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   return (

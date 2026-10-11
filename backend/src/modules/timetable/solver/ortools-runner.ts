@@ -37,6 +37,7 @@ export interface OrtoolsInputPayload {
   parallel_groups: OrtoolsParallelGroup[]
   teacher_reservations: OrtoolsTeacherReservation[]
   constraints: Record<string, any>
+  rules?: any[]
   config?: {
     max_time_in_seconds?: number
     num_workers?: number
@@ -62,6 +63,7 @@ export interface OrtoolsSolverResult {
     branches?: number
     conflicts?: number
     objective_value?: number | null
+    rule_hash?: string
     total_courses: number
     total_sessions_assigned: number
   }

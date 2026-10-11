@@ -1,137 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import styles from '../student-dashboard.module.css'
-import ResourceBanner from '@/components/ResourceBanner'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
+import { useCurrentTime } from '@/core/hooks/useCurrentTime'
 import { Link } from 'lucide-react'
-interface Course {
-  id: string
-  course_code: string
-  title: string
-  credits: number
-  department_name?: string
-  remaining_seats?: number
-  seat_limit?: number
-}
-
-function CustomSelect({
-  options,
-  value,
-  onChange,
-  disabled,
-  placeholder = '— Select a paper —',
-}: {
-  options: Course[]
-  value: string
-  onChange: (val: string) => void
-  disabled?: boolean
-  placeholder?: string
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const selectedCourse = options.find((c) => c.id === value)
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
-
-  return (
-    <div ref={containerRef} className={styles.customSelectWrapper}>
-      <button
-        type="button"
-        className={styles.customSelectTrigger}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-      >
-        {selectedCourse ? (
-          <div className={styles.triggerContent}>
-            <span className={styles.triggerTitle}>{selectedCourse.title}</span>
-            <span className={styles.triggerMeta}>
-              {selectedCourse.course_code ? `${selectedCourse.course_code} • ` : ''}
-              {selectedCourse.department_name || 'General'} • {selectedCourse.credits} cr
-              {selectedCourse.remaining_seats !== undefined && (
-                <> • <strong style={{ color: selectedCourse.remaining_seats > 5 ? '#059669' : '#d97706' }}>{selectedCourse.remaining_seats} seats left</strong></>
-              )}
-            </span>
-          </div>
-        ) : (
-          <span className={styles.placeholderText}>{placeholder}</span>
-        )}
-        <span className={styles.triggerArrow} />
-      </button>
-
-      {isOpen && (
-        <div className={styles.customSelectDropdown}>
-          {options.length === 0 ? (
-            <div className={styles.customOptionNoData}>No options available</div>
-          ) : (
-            <>
-              {placeholder && (
-                <div
-                  className={`${styles.customOption} ${!value ? styles.selected : ''}`}
-                  onClick={() => {
-                    onChange('')
-                    setIsOpen(false)
-                  }}
-                >
-                  <span className={styles.placeholderOption}>{placeholder}</span>
-                </div>
-              )}
-              {options.map((course) => (
-                <div
-                  key={course.id}
-                  className={`${styles.customOption} ${value === course.id ? styles.selected : ''}`}
-                  onClick={() => {
-                    onChange(course.id)
-                    setIsOpen(false)
-                  }}
-                >
-                  <div className={styles.optionUpper}>{course.title}</div>
-                  <div className={styles.optionLower} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className={styles.optionDept}>
-                      {course.course_code ? `${course.course_code} • ` : ''}
-                      {course.department_name || 'General'}
-                    </span>
-                    <span className={styles.optionCredits} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      {course.credits} cr
-                      {course.remaining_seats !== undefined && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '0.1rem 0.4rem',
-                            borderRadius: '4px',
-                            background: course.remaining_seats > 5 ? '#ecfdf5' : '#fffbeb',
-                            color: course.remaining_seats > 5 ? '#059669' : '#d97706',
-                            border: `1px solid ${course.remaining_seats > 5 ? '#a7f3d0' : '#fde68a'}`,
-                          }}
-                        >
-                          {course.remaining_seats} seat{course.remaining_seats === 1 ? '' : 's'} left
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
+import CustomSelect, { Course } from './CourseSelect'
 interface BlueprintSlot {
   slot: number
   rule: string
@@ -158,7 +36,7 @@ interface BlueprintData {
   pathways?: PathwaySummary[]
   pathway_id?: string
   existingPreferences?: Record<string, { course_id: string; rank: number }[]>
-  allocationMetadata?: Record<string, any>
+  allocationMetadata?: Record<string, { status?: string; allocated_by?: string; reason?: string; allocated_course_id?: string; rank?: number }>
   allocationCompleted?: boolean
   allocationCompletedAt?: string | null
   availableSeats?: Record<string, number>
@@ -195,6 +73,7 @@ export default function RegisterPage() {
   const [pageState, setPageState] = useState<PageState>('loading_blueprint')
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [blueprint, setBlueprint] = useState<BlueprintData | null>(null)
+  const currentTime = useCurrentTime(60000, blueprint?.deadline)
   const [resolvedSlots, setResolvedSlots] = useState<BlueprintSlot[]>([])
   const [selectedPathwayId, setSelectedPathwayId] = useState<string | null>(null)
 
@@ -205,13 +84,12 @@ export default function RegisterPage() {
   // Scored model preferences per slot
   const [rankedPreferences, setRankedPreferences] = useState<Record<number, SlotRankedPreferences>>({})
   const [existingSlots, setExistingSlots] = useState<Record<string, string | null>>({})
-  const [allocationMetadata, setAllocationMetadata] = useState<Record<string, any>>({})
-  const [existingSubmission, setExistingSubmission] = useState<any | null>(null)
-  const [windowIsOpen, setWindowIsOpen] = useState<boolean>(true)
+  const [allocationMetadata, setAllocationMetadata] = useState<Record<string, { status?: string; allocated_by?: string; reason?: string; allocated_course_id?: string; rank?: number }>>({})
+  const [existingSubmission, setExistingSubmission] = useState<Record<string, unknown> | null>(null)
+  const [serverWindowIsOpen, setWindowIsOpen] = useState<boolean>(true)
 
   // Post-allocation direct slot update states
   const [allocationCompleted, setAllocationCompleted] = useState<boolean>(false)
-  const [allocationCompletedAt, setAllocationCompletedAt] = useState<string | null>(null)
   const [availableSeats, setAvailableSeats] = useState<Record<string, number>>({})
   const [allocatedCourses, setAllocatedCourses] = useState<Record<string, Course>>({})
   const [editingSlot, setEditingSlot] = useState<number | null>(null)
@@ -219,6 +97,8 @@ export default function RegisterPage() {
   const [updatingSlot, setUpdatingSlot] = useState<boolean>(false)
   const [slotChangesRemaining, setSlotChangesRemaining] = useState<number>(3)
   const [slotChangesNextReset, setSlotChangesNextReset] = useState<string | null>(null)
+
+  const windowIsOpen = serverWindowIsOpen && (!blueprint?.deadline || currentTime < Date.parse(blueprint.deadline))
 
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
@@ -242,7 +122,6 @@ export default function RegisterPage() {
 
       const isAllocCompleted = !!rawBp.allocationCompleted
       setAllocationCompleted(isAllocCompleted)
-      setAllocationCompletedAt(rawBp.allocationCompletedAt || null)
       if (rawBp.availableSeats) {
         setAvailableSeats(rawBp.availableSeats)
       }
@@ -288,9 +167,9 @@ export default function RegisterPage() {
           const list = existingPrefs[`slot_${i}`] || []
           const existingSlotCid = rawBp.existingSlots?.[`slot_${i}`] || ''
           initialPrefs[i] = {
-            rank1: list.find((p: any) => p.rank === 1)?.course_id || existingSlotCid || '',
-            rank2: list.find((p: any) => p.rank === 2)?.course_id || '',
-            rank3: list.find((p: any) => p.rank === 3)?.course_id || '',
+            rank1: list.find((p: { rank: number; course_id: string }) => p.rank === 1)?.course_id || existingSlotCid || '',
+            rank2: list.find((p: { rank: number; course_id: string }) => p.rank === 2)?.course_id || '',
+            rank3: list.find((p: { rank: number; course_id: string }) => p.rank === 3)?.course_id || '',
           }
         }
         setRankedPreferences(initialPrefs)
@@ -335,13 +214,15 @@ export default function RegisterPage() {
       }
 
       setPageState('ready')
-    } catch (err) {
+    } catch {
       setError('Error loading registration blueprint. Please try again.')
       setPageState('error')
     }
   }
 
   useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     loadBlueprint()
   }, [])
 
@@ -397,8 +278,8 @@ export default function RegisterPage() {
       setEditingSlot(null)
       setSelectedCourseForSlot('')
       await loadBlueprint()
-    } catch (err: any) {
-      setError(err.message || 'Failed to update course registration')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Failed to update course registration')
     } finally {
       setUpdatingSlot(false)
     }
@@ -424,8 +305,8 @@ export default function RegisterPage() {
       const slots = data.data?.slots as BlueprintSlot[]
       setResolvedSlots(slots || [])
       setPageState('ready')
-    } catch (err: any) {
-      setError(err?.message || 'Network error while loading pathway courses. Please try again.')
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Network error while loading pathway courses. Please try again.')
       setPageState('pathway_picker')
     }
   }
@@ -659,9 +540,7 @@ export default function RegisterPage() {
     setPageState('submitting')
     setError('')
 
-    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `sub-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const idempotencyKey = crypto.randomUUID()
 
     try {
       const response = await fetch('/api/registrations/submit', {
@@ -704,8 +583,8 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push('/dashboard/student')
       }, 1500)
-    } catch (err: any) {
-      const msg = err?.message || 'Network connection failed. Your course preferences have been preserved. Please check your connection and click Submit again.'
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : '') || 'Network connection failed. Your course preferences have been preserved. Please check your connection and click Submit again.'
       setError(msg)
       setPageState('ready')
     }
@@ -714,11 +593,10 @@ export default function RegisterPage() {
   async function handleLogout() {
     setLoggingOut(true)
     if (typeof window !== 'undefined') {
-      sessionStorage.clear()
-      localStorage.clear()
+      clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
+    navigateAfterSessionChange('/login')
   }
 
   function handleChangeTrack() {
@@ -996,14 +874,14 @@ export default function RegisterPage() {
               ) : (() => {
                 const isClosingSoon =
                   windowIsOpen && blueprint.deadline
-                    ? new Date(blueprint.deadline).getTime() - Date.now() <= 24 * 60 * 60 * 1000 &&
-                      new Date(blueprint.deadline).getTime() > Date.now()
+                    ? new Date(blueprint.deadline).getTime() - currentTime <= 24 * 60 * 60 * 1000 &&
+                      new Date(blueprint.deadline).getTime() > currentTime
                     : false
                 const hoursLeft =
                   isClosingSoon && blueprint.deadline
                     ? Math.max(
                         0,
-                        Math.floor((new Date(blueprint.deadline).getTime() - Date.now()) / (1000 * 60 * 60)),
+                        Math.floor((new Date(blueprint.deadline).getTime() - currentTime) / (1000 * 60 * 60)),
                       )
                     : null
 
