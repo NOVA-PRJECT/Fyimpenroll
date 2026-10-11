@@ -14,7 +14,7 @@ function formatSolverErrorMessage(raw: string): string {
     return `Timetable generation is mathematically infeasible under current constraints. Check contact hours, teacher availability, and time slot restrictions. ${raw}`;
   }
   if (raw.includes('UNKNOWN') || raw.includes('timed out')) {
-    return 'Solver reached its execution time limit without finding a complete schedule. You may retry or relax conflicting soft preferences.';
+    return `Solver reached its execution time limit without finding a complete schedule. This does not prove the schedule is impossible. Review enrollment conflicts, contact hours and available periods. ${raw}`;
   }
   if (raw.includes('Independent validator rejected')) {
     return raw;
@@ -180,7 +180,7 @@ export async function runGenerationJob(
       },
       rules: effectiveDoc.rules,
       config: {
-        max_time_in_seconds: 30,
+        max_time_in_seconds: 300,
         num_workers: 4,
         random_seed: 42,
       },
@@ -194,7 +194,7 @@ export async function runGenerationJob(
     await reportProgress(
       70,
       `🔍 Solver completed in ${solverResult.stats.wall_time_seconds.toFixed(2)}s with status ${solverResult.status}. Validating output independently...`,
-      { solverStatus: solverResult.status, wallTime: solverResult.stats.wall_time_seconds }
+      { ...solverResult.stats, solverStatus: solverResult.status, wallTime: solverResult.stats.wall_time_seconds }
     );
 
     // 5. Handle solver status
@@ -207,7 +207,7 @@ export async function runGenerationJob(
         );
       } else if (solverResult.status === 'UNKNOWN') {
         throw new Error(
-          'OR-Tools solver execution timed out without proving a feasible schedule (UNKNOWN). Retry or review constraint density.'
+          `OR-Tools returned UNKNOWN after ${solverResult.stats.wall_time_seconds}s. Diagnostics: ${solverResult.diagnostics.join('; ') || 'No complete schedule found before the limit.'}`
         );
       } else {
         throw new Error(
@@ -343,6 +343,7 @@ export async function runGenerationJob(
         progress: 0,
         stepMessage: `Generation failed: ${friendlyError}`,
         errorMessage: friendlyError,
+        stats: currentStats,
         jobId,
       };
       await redis.set(redisKey, JSON.stringify(failPayload), { ex: 3600 });

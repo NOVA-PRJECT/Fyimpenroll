@@ -35,6 +35,39 @@ def compute_rule_hash(rules_data: List[Dict[str, Any]], schedule_data: Dict[str,
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def find_overloaded_conflict_group(courses: List[Dict[str, Any]], available_periods: int):
+    """Find a sufficient capacity contradiction without an exponential clique search.
+
+    Every pair in the returned group shares a student, so their occupied periods
+    must all be distinct even when no single student takes the entire group.
+    Greedy searches can miss a contradiction, but never reject a feasible group.
+    """
+    hours = [int(c.get("theoryHours", 0)) + int(c.get("practicalHours", 0)) for c in courses]
+    order = sorted((i for i, h in enumerate(hours) if h > 0),
+                   key=lambda i: (-hours[i], courses[i].get("courseCode", ""), courses[i]["courseId"]))
+    if sum(hours[i] for i in order) <= available_periods:
+        return None
+    students = [set(c.get("studentIds", [])) for c in courses]
+    neighbors = {i: set() for i in order}
+    for offset, i in enumerate(order):
+        for j in order[offset + 1:]:
+            if not students[i].isdisjoint(students[j]):
+                neighbors[i].add(j)
+                neighbors[j].add(i)
+    for seed in order:
+        group, required = [seed], hours[seed]
+        candidates = [i for i in order if i in neighbors[seed]]
+        while required <= available_periods and candidates:
+            chosen = candidates[0]
+            group.append(chosen)
+            required += hours[chosen]
+            candidates = [i for i in candidates[1:] if i in neighbors[chosen]]
+        if required > available_periods:
+            return {"required": required,
+                    "courses": [courses[i].get("courseCode") or courses[i]["courseId"] for i in group]}
+    return None
+
+
 def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
     academic_year = input_data.get("academic_year", "")
     semester = int(input_data.get("semester", 1))
@@ -45,7 +78,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
     constraints = input_data.get("constraints", {})
     config = input_data.get("config", {})
 
-    max_seconds = float(config.get("max_time_in_seconds", 30))
+    max_seconds = float(config.get("max_time_in_seconds", 300))
     num_workers = int(config.get("num_workers", 4))
 
     diagnostics: List[str] = []
@@ -155,6 +188,30 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "total_sessions_assigned": 0,
                 },
             }
+
+    capacity_conflict = find_overloaded_conflict_group(courses_data, len(campus_allowed_slots))
+    if capacity_conflict:
+        required = capacity_conflict["required"]
+        available = len(campus_allowed_slots)
+        return {
+            "status": "INFEASIBLE",
+            "assignments": [],
+            "diagnostics": [
+                f"Insufficient weekly timetable capacity: mutually conflicting courses "
+                f"{', '.join(capacity_conflict['courses'])} require {required} distinct periods, "
+                f"but only {available} periods are allowed. Every pair shares at least one student "
+                f"and cannot overlap. Review course registrations and contact hours, or obtain "
+                f"approval to increase timetable capacity. Increasing solver time cannot resolve this shortage."
+            ],
+            "stats": {
+                "wall_time_seconds": 0.0,
+                "rule_hash": rule_hash,
+                "total_courses": len(courses_data),
+                "total_sessions_assigned": 0,
+                "capacity_required_periods": required,
+                "capacity_available_periods": available,
+            },
+        }
 
     model = cp_model.CpModel()
 

@@ -66,6 +66,8 @@ export interface OrtoolsSolverResult {
     rule_hash?: string
     total_courses: number
     total_sessions_assigned: number
+    capacity_required_periods?: number
+    capacity_available_periods?: number
   }
 }
 
@@ -101,7 +103,7 @@ export async function runOrtoolsSolver(payload: OrtoolsInputPayload): Promise<Or
   const pythonBin = resolvePythonBinary()
   const scriptPath = resolveSolverScriptPath()
 
-  const maxSeconds = payload.config?.max_time_in_seconds ?? 30
+  const maxSeconds = payload.config?.max_time_in_seconds ?? 300
   const timeoutMs = (maxSeconds + 15) * 1000
 
   return new Promise<OrtoolsSolverResult>((resolve) => {
