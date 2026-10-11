@@ -15,6 +15,7 @@ export interface CourseNode {
   isCrossDept: boolean;
   studentIds: Set<string>;
   teacherId?: string;
+  campusPaper?: number; // Corresponding paper ordinal within its campus-wide category.
   // Human-readable conflict summary: "Conflicts with CS302 (12 students), PHY201 (3 students)"
   conflictSummary: string;
 }

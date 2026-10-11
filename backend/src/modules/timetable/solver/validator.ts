@@ -8,6 +8,7 @@ import type {
   EffectiveRuleDocument,
   RuleDefinition,
 } from './types';
+import { buildCampusPaperGroups, CAMPUS_WIDE_CATEGORIES } from './campus-paper-groups';
 
 export function validateTimetable(
   response: AIGeneratorResponse,
@@ -387,8 +388,12 @@ export function validateTimetable(
   }
 
   // ── Parallel Groups Synchronization & Category Purity Checks (F71) ────────
-  if (parallelGroups.length > 0) {
-    for (const group of parallelGroups) {
+  let mandatoryGroups: ParallelGroup[] = [];
+  try { mandatoryGroups = buildCampusPaperGroups(courses); }
+  catch (error) { violations.push({ type: 'category_slot_mismatch', detail: (error as Error).message }); }
+  const departmentGroups = parallelGroups.filter(group =>
+    !group.courseIds.some(id => CAMPUS_WIDE_CATEGORIES.has((courseMap.get(id)?.category || '').toUpperCase().trim())));
+  for (const group of [...mandatoryGroups, ...departmentGroups]) {
       const grpAssignments = response.assignments.filter((a) =>
         group.courseIds.includes(a.courseId)
       );
@@ -417,43 +422,6 @@ export function validateTimetable(
           });
         }
       }
-    }
-  } else {
-    // Fallback: Campus-wide category slot consistency
-    const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC']);
-    const categoryAssignments = new Map<string, Array<{ course: CourseNode; slots: string[] }>>();
-
-    for (const assignment of response.assignments) {
-      const course = courseMap.get(assignment.courseId);
-      if (!course) continue;
-      const cat = (course.category || '').toUpperCase().trim();
-      if (!CAMPUS_WIDE_CATEGORIES.has(cat)) continue;
-
-      const key = `${cat}:T${course.theoryHours}:P${course.practicalHours}`;
-      if (!categoryAssignments.has(key)) categoryAssignments.set(key, []);
-
-      const slotKeys = assignment.slots.map((s) => `${s.day}-${s.period}`).sort();
-      categoryAssignments.get(key)!.push({ course, slots: slotKeys });
-    }
-
-    for (const [key, group] of categoryAssignments) {
-      if (group.length < 2) continue;
-      const [cat] = key.split(':');
-      const reference = group[0];
-      const refSlotsStr = reference.slots.join(',');
-
-      for (let i = 1; i < group.length; i++) {
-        const current = group[i];
-        const curSlotsStr = current.slots.join(',');
-        if (curSlotsStr !== refSlotsStr) {
-          violations.push({
-            type: 'category_slot_mismatch',
-            courseId: current.course.courseId,
-            detail: `Campus-wide [${cat}] synchronization mismatch: Course ${current.course.courseCode} slots [${current.slots.join(', ')}] do not match standard ${cat} slots [${reference.slots.join(', ')}] used by ${reference.course.courseCode}.`,
-          });
-        }
-      }
-    }
   }
 
   // Category Purity in Parallel Slots: Ensure courses running at the same slot for the same cohort have identical category

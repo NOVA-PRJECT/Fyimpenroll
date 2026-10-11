@@ -13,6 +13,7 @@ export interface OrtoolsCourseItem {
   isCrossDept: boolean
   studentIds: string[]
   teacherId?: string
+  campusPaper?: number
 }
 
 export interface OrtoolsParallelGroup {

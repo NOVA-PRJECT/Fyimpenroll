@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CourseNode, ParallelGroup, SlotId, SlotLookup, SlotMap, TeacherReservation } from './types';
 import { fetchAllPaginated, fetchByIdChunks } from '../../../core/database/pagination.util';
+import { buildCampusPaperGroups, CAMPUS_WIDE_CATEGORIES, resolveCampusPapers } from './campus-paper-groups';
 
 /**
  * Build human-readable conflict summary in plain English for each course.
@@ -49,40 +50,23 @@ export function validatePreflightRules(courses: CourseNode[], semester: number):
   }
 }
 
-const CAMPUS_WIDE_CATEGORIES = new Set(['MDC', 'VAC', 'SEC', 'AEC']);
-
 /**
- * Auto-detect parallel groups from live registration data.
- * For campus-wide categories (MDC, VAC, SEC, AEC), courses are grouped campus-wide
- * by category and matching session hour structures.
- * For department-specific categories (DSC, DSE), courses are grouped by student department.
- * Category purity is strictly enforced: courses with different categories are NEVER mixed.
- * F71: Separates AEC-1 and AEC-2 compulsory parallel baskets (and any other multi-basket
- * categories) so that mutually disjoint options can run in parallel without student collisions.
+ * Campus papers have mandatory groups. Department electives retain automatic baskets.
  */
 export function detectParallelGroups(
   courses: CourseNode[],
   studentDeptMap: Map<string, string> = new Map(),
   courseSlotMap?: Map<string, Set<number>>
 ): ParallelGroup[] {
-  const parallelGroups: ParallelGroup[] = [];
+  const parallelGroups: ParallelGroup[] = buildCampusPaperGroups(courses);
 
   // Group courses by scope + category + matching hours structure
   const buckets = new Map<string, CourseNode[]>();
 
   for (const course of courses) {
     const rawCategory = (course.category || '').toUpperCase().trim();
-    const isCampusWide = CAMPUS_WIDE_CATEGORIES.has(rawCategory);
-
-    if (isCampusWide) {
-      // Campus-wide grouping: all departments share identical slots for this category
-      const key = `campus:${rawCategory}:T${course.theoryHours}:P${course.practicalHours}`;
-      if (!buckets.has(key)) buckets.set(key, []);
-      const list = buckets.get(key)!;
-      if (!list.some((c) => c.courseId === course.courseId)) {
-        list.push(course);
-      }
-    } else {
+    if (CAMPUS_WIDE_CATEGORIES.has(rawCategory)) continue;
+    {
       // Department-level grouping: by student batch department + category + hours
       const studentDepts = new Set<string>();
       for (const studentId of course.studentIds) {
@@ -109,10 +93,9 @@ export function detectParallelGroups(
     const parts = key.split(':');
     const scopeOrDept = parts[0];
     const category = parts[1];
-    const isCampusWide = scopeOrDept === 'campus';
 
     // Partition bucket into disjoint baskets with zero student overlap (F71)
-    // E.g., for AEC, separating English AEC-1 from Second Language AEC-2
+    // This automatic partitioning applies only to department electives.
     const zeroOverlapBaskets: CourseNode[][] = [];
     const sortedBucket = [...bucket].sort((a, b) => a.courseCode.localeCompare(b.courseCode));
 
@@ -157,9 +140,9 @@ export function detectParallelGroups(
       if (b.length >= 2) {
         parallelGroups.push({
           groupId: crypto.randomUUID(), // runtime only — never stored in DB
-          departmentId: isCampusWide ? 'CAMPUS_WIDE' : scopeOrDept,
+          departmentId: scopeOrDept,
           category,
-          isCampusWide,
+          isCampusWide: false,
           courseIds: b.map((c) => c.courseId),
           courseCodes: b.map((c) => c.courseCode),
         });
@@ -349,6 +332,7 @@ export async function loadGenerationInput(
   }
 
   // Group student enrollments by course_id
+  const campusPapers = resolveCampusPapers(rawRegistrations, courseMetaMap);
   const courseGroupMap = new Map<
     string,
     {
@@ -409,6 +393,7 @@ export async function loadGenerationInput(
       isCrossDept: group.studentDeptIds.size > 1,
       studentIds: group.studentIds,
       teacherId: courseTeacherMap.get(courseId),
+      campusPaper: campusPapers.get(courseId),
       conflictSummary: '', // computed below once all courses are populated
     });
   }

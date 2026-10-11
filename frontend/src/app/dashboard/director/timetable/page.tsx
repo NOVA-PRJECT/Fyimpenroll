@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 import type { SchedulingRule } from './BrowserRulesEditor';
 const BrowserRulesEditor = dynamic(() => import('./BrowserRulesEditor'));
 import { downloadBlob } from '@/core/utils/downloadFile';
+import { entriesForDepartment } from '@/core/utils/campusTimetable';
 import styles from './timetable.module.css';
 
 interface TimetableEntry {
@@ -17,6 +18,7 @@ interface TimetableEntry {
   courseId: string;
   courseName: string;
   courseCode: string;
+  category?: string;
   departmentId: string;
   departmentName: string;
   departmentCode?: string;
@@ -546,7 +548,7 @@ export default function CampusDirectorTimetablePage() {
         ];
 
         deptsToExport.forEach((dept, idx) => {
-          const deptEntries = allEntries.filter((e) => e.departmentId === dept.id);
+          const deptEntries = entriesForDepartment(allEntries, dept.id, departments.find(d => d.id === dept.id)?.code);
 
           allSheetRows.push([`DEPARTMENT: ${dept.name.toUpperCase()} (${dept.code || dept.name})`]);
           allSheetRows.push(['Day / Period', ...PERIODS.map((p) => `${p.label} (${p.time})`)]);
@@ -579,7 +581,7 @@ export default function CampusDirectorTimetablePage() {
       }
 
       deptsToExport.forEach((dept) => {
-        const deptEntries = allEntries.filter((e) => e.departmentId === dept.id);
+        const deptEntries = entriesForDepartment(allEntries, dept.id, dept.code);
         const sheetData: string[][] = [
           [`KANNUR UNIVERSITY — ${dept.name.toUpperCase()} TIMETABLE`],
           [`Academic Year: ${academicYear} | Semester: ${semester}`],
@@ -625,15 +627,9 @@ export default function CampusDirectorTimetablePage() {
   }
 
   // Flexible Department Filter (matches both UUID and Department Code)
-  const visibleEntries = allEntries.filter((e) => {
-    if (!selectedDeptId || selectedDeptId === 'VIEW_ALL_CONFLICTS') return true;
-    if (e.departmentId === selectedDeptId) return true;
-    const activeDept = departments.find((d) => d.id === selectedDeptId);
-    if (activeDept && activeDept.code && e.departmentCode) {
-      return activeDept.code.toUpperCase() === e.departmentCode.toUpperCase();
-    }
-    return false;
-  });
+  const visibleEntries = !selectedDeptId || selectedDeptId === 'VIEW_ALL_CONFLICTS'
+    ? allEntries
+    : entriesForDepartment(allEntries, selectedDeptId, departments.find(d => d.id === selectedDeptId)?.code);
 
   function handleDeptChange(deptId: string) {
     setSelectedDeptId(deptId);
@@ -1263,7 +1259,7 @@ export default function CampusDirectorTimetablePage() {
           ? (departments.length > 0 ? departments : Array.from(new Set(allEntries.map((e) => e.departmentId))).map((id) => ({ id, name: allEntries.find((e) => e.departmentId === id)?.departmentName || 'Department' })))
           : departments.filter((d) => d.id === printTargetDept)
         ).map((dept) => {
-          const deptEntries = allEntries.filter((e) => e.departmentId === dept.id);
+          const deptEntries = entriesForDepartment(allEntries, dept.id, departments.find(d => d.id === dept.id)?.code);
           return (
             <div key={dept.id} className={styles.printDeptSection}>
               <div className={styles.printHeader}>

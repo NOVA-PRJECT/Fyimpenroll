@@ -184,6 +184,7 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
         },
         {
           courseId: 'aec-mal',
+          campusPaper: 2,
           courseCode: 'KU01AECMAL101',
           courseTitle: 'Malayalam Literature',
           departmentId: 'dept-mal',
@@ -196,6 +197,7 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
         },
         {
           courseId: 'aec-hin',
+          campusPaper: 2,
           courseCode: 'KU01AECHIN101',
           courseTitle: 'Hindi Literature',
           departmentId: 'dept-hin',
@@ -208,6 +210,7 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
         },
         {
           courseId: 'aec-ara',
+          campusPaper: 2,
           courseCode: 'KU01AECARA101',
           courseTitle: 'Arabic Literature',
           departmentId: 'dept-ara',
@@ -255,6 +258,7 @@ describe('Plan 06: Local OR-Tools Timetables, JSON Constraints & Recovery', () =
         },
         {
           courseId: 'aec-mal',
+          campusPaper: 2,
           courseCode: 'KU01AECMAL101',
           departmentId: 'dept-mal',
           category: 'AEC',

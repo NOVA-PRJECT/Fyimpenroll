@@ -159,6 +159,7 @@ export async function runGenerationJob(
         isCrossDept: c.isCrossDept,
         studentIds: Array.from(c.studentIds),
         teacherId: c.teacherId,
+        campusPaper: c.campusPaper,
       })),
       parallel_groups: parallelGroups.map((g) => ({
         groupId: g.groupId,

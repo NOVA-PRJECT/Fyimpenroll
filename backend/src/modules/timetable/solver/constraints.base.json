@@ -143,7 +143,7 @@
       "scope": "global",
       "isHard": true,
       "version": 1,
-      "description": "Campus-wide category synchronization: All courses with categories MDC, VAC, SEC, and AEC must share identical days and time slots across all departments",
+      "description": "Corresponding MDC, VAC, SEC and AEC papers must occupy identical periods across all departments. Different paper positions, including AEC 1 and AEC 2, use separate campus blocks.",
       "parameters": {
         "campusWideCategories": [
           "MDC",
@@ -248,7 +248,7 @@
     "Assign exactly the required theory and practical hours per course (no more, no less)",
     "Use Period 6 only as a last resort",
     "Parallel electives for a batch must occupy identical time slots for the full block duration (never pair 1-hour theory with half of a 2-hour lab)",
-    "Campus-wide category synchronization: All courses with categories MDC, VAC, SEC, and AEC must share the exact same days and time slots across all departments campus-wide",
+    "Corresponding MDC, VAC, SEC and AEC papers share identical periods campus-wide; distinct paper positions retain separate blocks",
     "Category-pure parallelization: Only parallelize courses belonging to the exact same category. Never mix multiple categories (e.g. never combine MDC with VAC, SEC, AEC, or DSC in parallel slots)"
   ],
   "soft_constraints": [

@@ -29,6 +29,39 @@ SUPPORTED_RULE_KINDS = {
     "CAMPUS_TIME_LIMIT",
 }
 
+CAMPUS_WIDE_CATEGORIES = {"MDC", "VAC", "SEC", "AEC"}
+
+
+def build_campus_paper_groups(courses):
+    buckets = {}
+    for c in courses:
+        category = (c.get("category") or "").upper().strip()
+        if category not in CAMPUS_WIDE_CATEGORIES:
+            continue
+        fixed_paper = {"KU01AECENG101": 1, "KU01AECENG102": 2}.get(c.get("courseCode"))
+        paper = c.get("campusPaper", fixed_paper or 1)
+        if type(paper) is not int or not 1 <= paper <= 8 or (fixed_paper and paper != fixed_paper):
+            raise ValueError(f"[Campus Paper Conflict] {c.get('courseCode')} has an inconsistent paper position.")
+        buckets.setdefault((category, paper), []).append(c)
+    groups = []
+    for (category, paper), bucket in sorted(buckets.items()):
+        expected = int(bucket[0].get("theoryHours", 0)) + int(bucket[0].get("practicalHours", 0))
+        students = set()
+        for c in bucket:
+            hours = int(c.get("theoryHours", 0)) + int(c.get("practicalHours", 0))
+            if hours != expected:
+                raise ValueError(f"[Campus Paper Conflict] {category} paper {paper} requires identical total contact hours "
+                                 "across departments. Correct the catalogue; this common paper cannot be split.")
+            members = set(c.get("studentIds", []))
+            if students.intersection(members):
+                raise ValueError(f"[Campus Paper Conflict] {category} paper {paper} contains overlapping student "
+                                 "enrollments across course options. Correct the selections; this common paper cannot be split.")
+            students.update(members)
+        if len(bucket) > 1:
+            groups.append({"groupId": f"campus:{category}:paper:{paper}", "category": category,
+                           "courseIds": [c["courseId"] for c in bucket]})
+    return groups
+
 
 def compute_rule_hash(rules_data: List[Dict[str, Any]], schedule_data: Dict[str, Any]) -> str:
     normalized = json.dumps({"rules": rules_data, "schedule": schedule_data}, sort_keys=True)
@@ -222,6 +255,24 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "total_sessions_assigned": 0,
                 },
             }
+
+    try:
+        campus_groups = build_campus_paper_groups(courses_data)
+        department_groups = []
+        for group in parallel_groups_data:
+            members = [courses_by_id[cid] for cid in group.get("courseIds", []) if cid in courses_by_id]
+            campus_members = [c for c in members if (c.get("category") or "").upper().strip() in CAMPUS_WIDE_CATEGORIES]
+            if campus_members:
+                if len(campus_members) != len(members):
+                    raise ValueError("[Campus Paper Conflict] A parallel basket mixes campus papers with department courses.")
+                # Campus groups are reconstructed from authoritative paper identities, never caller partitions.
+                continue
+            department_groups.append(group)
+        parallel_groups_data = department_groups + campus_groups
+    except ValueError as error:
+        return {"status": "MODEL_INVALID", "assignments": [], "diagnostics": [str(error)],
+                "stats": {"wall_time_seconds": 0.0, "rule_hash": rule_hash,
+                          "total_courses": len(courses_data), "total_sessions_assigned": 0}}
 
     capacity_conflict = find_overloaded_conflict_group(courses_data, len(campus_allowed_slots))
     if capacity_conflict:
@@ -462,20 +513,11 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
         grp_cids = [cid for cid in group.get("courseIds", []) if cid in courses_by_id]
         if len(grp_cids) >= 2:
             base_cid = grp_cids[0]
-            base_sessions = course_sessions[base_cid]
-
             for other_cid in grp_cids[1:]:
-                other_sessions = course_sessions[other_cid]
-                if len(base_sessions) == len(other_sessions):
-                    for idx in range(len(base_sessions)):
-                        b_sid = base_sessions[idx]["id"]
-                        o_sid = other_sessions[idx]["id"]
-                        b_dict = session_start_vars.get((base_cid, b_sid), {})
-                        o_dict = session_start_vars.get((other_cid, o_sid), {})
-
-                        for slot_key in b_dict:
-                            if slot_key in o_dict:
-                                model.Add(b_dict[slot_key] == o_dict[slot_key])
+                for d, p in ALL_SLOTS:
+                    # Compare complete occupancy, including slots absent from either domain.
+                    # This also synchronizes different theory/lab session structures of equal total hours.
+                    model.Add(sum(active_vars[(base_cid, d, p)]) == sum(active_vars[(other_cid, d, p)]))
 
     # ──────────────── Soft Constraints / Objective ────────────────
     # Hierarchical / Lexicographic penalty terms:
