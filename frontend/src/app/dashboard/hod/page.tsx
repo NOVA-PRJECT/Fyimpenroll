@@ -3,11 +3,13 @@
 import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
 
 import dynamic from 'next/dynamic'
-const BlueprintTab = dynamic(() => import('./BlueprintTab'))
-const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'))
-const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'))
-const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'))
-const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'))
+import PageLoading from '@/components/PageLoading'
+import { sessionRedirect } from '@/core/security/session-response'
+const BlueprintTab = dynamic(() => import('./BlueprintTab'), { loading: () => <PageLoading message="Loading section…" /> })
+const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'), { loading: () => <PageLoading message="Loading section…" /> })
+const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'), { loading: () => <PageLoading message="Loading section…" /> })
+const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'), { loading: () => <PageLoading message="Loading section…" /> })
+const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'), { loading: () => <PageLoading message="Loading section…" /> })
 import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -79,6 +81,8 @@ export default function HodDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('defaulters')
   const [hodInfo, setHodInfo] = useState<HodInfo | null>(null)
   const [loadingHod, setLoadingHod] = useState(true)
+  const [profileError, setProfileError] = useState('')
+  const [profileRetry, setProfileRetry] = useState(0)
 
 
   // ── Upload Tab State ──
@@ -148,21 +152,25 @@ export default function HodDashboard() {
   }
 
   useEffect(() => {
+    const controller = new AbortController()
     async function loadHodInfo() {
-      const response = await fetch('/api/auth/profile')
-      const data = await response.json()
-      if (!response.ok) { router.push('/login'); return }
-
-      if (data.profile) {
-        setHodInfo({
-          full_name: data.profile.full_name,
-          department_name: data.profile.departments?.name ?? 'Unknown',
-        })
+      try {
+        const response = await fetch('/api/auth/profile', { signal: controller.signal })
+        const data = await response.json().catch(() => ({}))
+        const destination = sessionRedirect(response.status, data)
+        if (destination) { router.replace(destination); return }
+        if (!response.ok || !data.profile) throw new Error('Your profile couldn’t be loaded. Please try again.')
+        setHodInfo({ full_name: data.profile.full_name, department_name: data.profile.departments?.name ?? 'Unknown' })
+        setProfileError('')
+      } catch (error) {
+        if (!controller.signal.aborted) setProfileError(error instanceof Error ? error.message : 'Your profile couldn’t be loaded.')
+      } finally {
+        if (!controller.signal.aborted) setLoadingHod(false)
       }
-      setLoadingHod(false)
     }
     loadHodInfo()
-  }, [router])
+    return () => controller.abort()
+  }, [router, profileRetry])
 
   // Load active tab from sessionStorage on mount (hydration-safe)
   useEffect(() => {
@@ -507,7 +515,7 @@ export default function HodDashboard() {
       clearSessionStorage()
     }
     await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    navigateAfterSessionChange('/login')
   }
 
   const notSubmittedStudents = deptData?.students.filter(s => !s.submitted) ?? []
@@ -645,6 +653,7 @@ export default function HodDashboard() {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
+        {profileError && <div role="alert" className={styles.errorBanner}>{profileError} <button onClick={() => { setLoadingHod(true); setProfileRetry(value => value + 1) }}>Try again</button></div>}
 
         {/* ══ BULK UPLOAD TAB ══ */}
         {activeTab === 'upload' && (

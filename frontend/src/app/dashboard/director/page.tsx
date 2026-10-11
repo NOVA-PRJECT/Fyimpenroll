@@ -1,5 +1,8 @@
 'use client'
 
+import NavigationLink from '@/components/NavigationLink'
+import { sessionRedirect } from '@/core/security/session-response'
+
 import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -26,6 +29,8 @@ export default function DirectorDashboard() {
   const [campusName, setCampusName] = useState('')
   const [campusId, setCampusId] = useState('')
   const [loadingDirector, setLoadingDirector] = useState(true)
+  const [settingsReady, setSettingsReady] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
 
   // Window settings state
   const [currentDeadline, setCurrentDeadline] = useState<string | null>(null)
@@ -77,11 +82,12 @@ export default function DirectorDashboard() {
   const loadSettingsData = useCallback(async (isBackground = false) => {
     try {
       const response = await fetch('/api/director/settings')
-      if (!response.ok) {
-        if (!isBackground) router.push('/login')
-        return
-      }
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
+      const destination = sessionRedirect(response.status, data)
+      if (destination) { router.replace(destination); return }
+      if (!response.ok || !data.settings) throw new Error('Campus settings couldn’t be loaded. Please try again.')
+      setSettingsError('')
+      setSettingsReady(true)
 
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(data))
@@ -96,10 +102,11 @@ export default function DirectorDashboard() {
         setDeadline(utcIsoToKolkataInput(data.settings.deadline))
         setLastPromotedAt(data.settings.last_promoted_at ?? null)
       }
-    } catch {
-      // In background refresh, ignore transient network drops
+    } catch (error) {
+      setSettingsReady(false)
+      setSettingsError(error instanceof Error ? error.message : 'Campus settings couldn’t be loaded. Please try again.')
     } finally {
-      setLoadingDirector(false)
+      if (!isBackground) setLoadingDirector(false)
     }
   }, [router])
 
@@ -521,6 +528,9 @@ export default function DirectorDashboard() {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
+        {settingsError && <div role="alert" className={styles.errorBanner}>{settingsError} <button onClick={() => loadSettingsData()}>Try again</button></div>}
+        {loadingDirector && <p role="status">Loading campus settings…</p>}
+        <fieldset disabled={!settingsReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
 
         {/* ── TAB 1: REGISTRATION WINDOW ── */}
         {activeTab === 'registration' && (
@@ -709,13 +719,13 @@ export default function DirectorDashboard() {
               <p style={{ fontSize: '0.85rem', color: '#44474e', margin: '0 0 1rem 0' }}>
                 Generate, publish, and re-validate automated timetables for all departments in {campusName || 'this campus'}.
               </p>
-              <button
+              <NavigationLink
                 className={styles.primaryBtn}
-                onClick={() => router.push('/dashboard/director/timetable')}
+                href="/dashboard/director/timetable"
                 style={{ background: '#002147' }}
               >
                 Open Timetable Generator Dashboard →
-              </button>
+              </NavigationLink>
             </div>
           </div>
         )}
@@ -1324,6 +1334,7 @@ export default function DirectorDashboard() {
           </div>
         )}
 
+        </fieldset>
       </div>
     </div>
   )

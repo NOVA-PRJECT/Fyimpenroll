@@ -1,8 +1,11 @@
-'use client';
+'use client'
+
+import NavigationLink from '@/components/NavigationLink';
+import { sessionRedirect } from '@/core/security/session-response';
+import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { SchedulingRule } from './BrowserRulesEditor';
 const BrowserRulesEditor = dynamic(() => import('./BrowserRulesEditor'));
@@ -68,7 +71,10 @@ export default function CampusDirectorTimetablePage() {
 
   const [academicYear, setAcademicYear] = useState('2026-27');
   const [semester, setSemester] = useState(1);
-  const [registrationClosed, setRegistrationClosed] = useState(true);
+  const [registrationClosed, setRegistrationClosed] = useState(false);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsRetry, setSettingsRetry] = useState(0);
   const [currentDeadline, setCurrentDeadline] = useState<string | null>(null);
   const [closingWindow, setClosingWindow] = useState(false);
   const [showCloseWindowConfirmModal, setShowCloseWindowConfirmModal] = useState(false);
@@ -76,6 +82,9 @@ export default function CampusDirectorTimetablePage() {
   // Dynamic Constraints & Base Rules Modal State
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [baseConstraints, setBaseConstraints] = useState<BaseConstraintsData | null>(null);
+  const [rulesReady, setRulesReady] = useState(false);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const constraintsRequest = useRef(0);
 
   // Generation Overlay & Job status state
   const [showGenerationOverlay, setShowGenerationOverlay] = useState(false);
@@ -116,10 +125,15 @@ export default function CampusDirectorTimetablePage() {
 
   // Fetch base constraints for the active semester
   const fetchBaseConstraints = useCallback(async () => {
+    const request = ++constraintsRequest.current;
+    setRulesReady(false);
+    setRulesError(null);
     try {
       const res = await fetch(`/api/timetable/constraints?semester=${semester}`);
+      if (!res.ok) throw new Error('Scheduling rules couldn’t be loaded. Please try again.');
       if (res.ok) {
         const data = await res.json();
+        if (request !== constraintsRequest.current) return;
         const key = `fyimp:rules:${data.campusId}`;
         const saved = localStorage.getItem(key);
         let rules = data.rules;
@@ -127,8 +141,11 @@ export default function CampusDirectorTimetablePage() {
           try { const parsed = JSON.parse(saved); if (Array.isArray(parsed)) rules = parsed; } catch { localStorage.removeItem(key); }
         }
         setBaseConstraints({ ...data, rules });
+        setRulesReady(true);
       }
-    } catch {}
+    } catch (error) {
+      if (request === constraintsRequest.current) setRulesError(error instanceof Error ? error.message : 'Scheduling rules couldn’t be loaded.');
+    }
   }, [semester]);
 
   useEffect(() => {
@@ -234,23 +251,28 @@ export default function CampusDirectorTimetablePage() {
 
   // Check live registration status from campus settings
   useEffect(() => {
-    fetch('/api/director/settings')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.settings?.deadline) {
-          setCurrentDeadline(data.settings.deadline);
-          const isClosed = new Date() >= new Date(data.settings.deadline);
-          setRegistrationClosed(isClosed);
-        } else {
-          setCurrentDeadline(null);
-          setRegistrationClosed(true);
+    const controller = new AbortController();
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/director/settings', { signal: controller.signal });
+        const data = await res.json().catch(() => ({}));
+        const destination = sessionRedirect(res.status, data);
+        if (destination) { router.replace(destination); return; }
+        if (!res.ok || !data.settings) throw new Error('Campus settings couldn’t be loaded. Please try again.');
+        setCurrentDeadline(data.settings.deadline ?? null);
+        setRegistrationClosed(!data.settings.deadline || new Date() >= new Date(data.settings.deadline));
+        setSettingsReady(true);
+        setSettingsError(null);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSettingsReady(false);
+          setSettingsError(error instanceof Error ? error.message : 'Campus settings couldn’t be loaded.');
         }
-      })
-      .catch(() => {
-        setCurrentDeadline(null);
-        setRegistrationClosed(true);
-      });
-  }, []);
+      }
+    }
+    loadSettings();
+    return () => controller.abort();
+  }, [router, settingsRetry]);
 
   // Set default selected department once data loads (prefer first department with active entries)
   useEffect(() => {
@@ -373,6 +395,7 @@ export default function CampusDirectorTimetablePage() {
 
   // Handle Generate Timetable
   async function handleGenerate() {
+    if (!settingsReady || !rulesReady || !baseConstraints) return;
     if (!registrationClosed) {
       setShowCloseWindowConfirmModal(true);
       return;
@@ -381,6 +404,7 @@ export default function CampusDirectorTimetablePage() {
   }
 
   async function executeGeneration() {
+    if (!settingsReady || !rulesReady || !baseConstraints) return;
     setErrorMsg(null);
     setSuccessMsg(null);
     setJobError(null);
@@ -418,6 +442,7 @@ export default function CampusDirectorTimetablePage() {
   }
 
   async function handlePublish(force = false) {
+    if (!settingsReady || loading || error) return;
     setPublishing(true);
     setPublishModalError(null);
     setPublishConflicts(null);
@@ -645,14 +670,18 @@ export default function CampusDirectorTimetablePage() {
             <p className={styles.topBarSubtitle}>Campus Director Dashboard (AI-Powered Engine)</p>
           </div>
         </div>
-        <button className={styles.backBtn} onClick={() => router.push('/dashboard/director')}>
+        <NavigationLink className={styles.backBtn} href="/dashboard/director">
           ← Back to Dashboard
-        </button>
+        </NavigationLink>
       </div>
 
       <div className={styles.mainContent}>
+        {!rulesReady && !rulesError && <p role="status">Loading scheduling rules…</p>}
+        {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-800">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
+        {!settingsReady && !settingsError && <p role="status">Loading campus settings…</p>}
+        {settingsError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-800">{settingsError}<button onClick={() => setSettingsRetry(value => value + 1)}>Try again</button></div>}
         {/* Registration Window Warning Banner */}
-        {!registrationClosed && (
+        {settingsReady && !registrationClosed && (
           <div className={styles.registrationWarningBanner}>
             <div className={styles.registrationWarningContent}>
               <span className={styles.registrationWarningIcon}>⚠️</span>
@@ -665,13 +694,13 @@ export default function CampusDirectorTimetablePage() {
                 </p>
               </div>
             </div>
-            <button
+            <NavigationLink
               type="button"
               className={styles.closeWindowQuickBtn}
-              onClick={() => router.push('/dashboard/director')}
+              href="/dashboard/director"
             >
               Go to Registration Window →
-            </button>
+            </NavigationLink>
           </div>
         )}
 
@@ -722,7 +751,7 @@ export default function CampusDirectorTimetablePage() {
               <button
                 className={styles.generateBtn}
                 onClick={handleGenerate}
-                disabled={jobStatus === 'running' || jobStatus === 'queued'}
+                disabled={!settingsReady || !rulesReady || !baseConstraints || jobStatus === 'running' || jobStatus === 'queued'}
                 title={
                   !registrationClosed
                     ? 'Registration window must be closed before generation'
@@ -757,6 +786,7 @@ export default function CampusDirectorTimetablePage() {
                       setPublishConflicts(null);
                       setShowPublishModal(true);
                     }}
+                    disabled={!settingsReady || loading || !!error}
                     title="Publish timetable for students and faculty"
                     style={{ background: '#059669' }}
                   >

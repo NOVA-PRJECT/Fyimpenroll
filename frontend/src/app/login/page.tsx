@@ -1,24 +1,20 @@
 'use client'
 
-import { navigateAfterSessionChange } from '@/core/security/session-navigation'
+import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
 
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import styles from './login.module.css'
-import { ROLE_DASHBOARD_MAP } from '@/core/security/routeConfig'
-import { Role } from '@/core/constants/roles'
 import PortalHeader from '@/components/portal/PortalHeader'
 import PortalFooter from '@/components/portal/PortalFooter'
 
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const [checking, setChecking] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -31,74 +27,12 @@ function LoginForm() {
 
 
   useEffect(() => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => {
-      controller.abort()
-      setChecking(false)
-    }, 2500)
-
-    async function checkSession() {
-      try {
-        const response = await fetch('/api/auth/profile', {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          if (data.role) {
-            // Check consent status before redirecting to dashboard
-            const consentRes = await fetch('/api/consent/status', {
-              signal: controller.signal,
-              cache: 'no-store',
-            })
-            if (consentRes.ok) {
-              const consentData = await consentRes.json()
-              if (!consentData.accepted) {
-                clearTimeout(timeoutId)
-                router.replace('/consent')
-                return
-              }
-            }
-            clearTimeout(timeoutId)
-            const target = ROLE_DASHBOARD_MAP[data.role as Role] || '/dashboard/student'
-            router.replace(target)
-            return
-          }
-        }
-      } catch (err: unknown) {
-        if ((err instanceof Error ? err.name : '') !== 'AbortError') {
-          console.error('Session check failed:', err)
-        }
-      } finally {
-        clearTimeout(timeoutId)
-        setChecking(false)
-      }
-    }
-
-    checkSession()
-
     const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        setChecking(true)
-        checkSession()
-      }
+      if (event.persisted) window.location.reload()
     }
-
     window.addEventListener('pageshow', handlePageShow)
-    return () => {
-      clearTimeout(timeoutId)
-      controller.abort()
-      window.removeEventListener('pageshow', handlePageShow)
-    }
-  }, [router])
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-[#082042] flex items-center justify-center">
-        <div className="w-12 h-12 border-3 border-[#E0A92C]/20 border-t-[#E0A92C] rounded-full animate-spin" />
-      </div>
-    )
-  }
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [])
 
   function validate() {
     const errors: { email?: string; password?: string } = {}
@@ -142,16 +76,7 @@ function LoginForm() {
         return
       }
 
-      // Verify consent status before landing on dashboard
-      const consentCheck = await fetch('/api/consent/status').catch(() => null)
-      if (consentCheck && consentCheck.ok) {
-        const cData = await consentCheck.json()
-        if (!cData.accepted) {
-          navigateAfterSessionChange('/consent')
-          return
-        }
-      }
-
+      clearSessionStorage()
       navigateAfterSessionChange(data.redirectTo)
     } catch {
       setError('Something went wrong. Please try again.')

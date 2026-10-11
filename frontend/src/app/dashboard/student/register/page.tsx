@@ -1,14 +1,16 @@
 'use client'
 
+import NavigationLink from '@/components/NavigationLink'
+import { sessionRedirect } from '@/core/security/session-response'
+
 import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import styles from '../student-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import { useCurrentTime } from '@/core/hooks/useCurrentTime'
-import { Link } from 'lucide-react'
 import CustomSelect, { Course } from './CourseSelect'
 interface BlueprintSlot {
   slot: number
@@ -108,6 +110,8 @@ export default function RegisterPage() {
     try {
       const response = await fetch('/api/registrations/blueprint')
       const data = await response.json()
+      const destination = sessionRedirect(response.status, data)
+      if (destination) { router.replace(destination); return }
 
       if (!response.ok) {
         const errMsg = data.message || data.error || 'Failed to load courses. Please try again.'
@@ -220,10 +224,10 @@ export default function RegisterPage() {
     }
   }
 
+  const loadInitialBlueprint = useEffectEvent(() => { loadBlueprint() })
   useEffect(() => {
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
-    loadBlueprint()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts the registration API read for this mounted view.
+    loadInitialBlueprint()
   }, [])
 
   async function handleUpdateSlot(slotNumber: number, courseId: string) {
@@ -645,7 +649,7 @@ export default function RegisterPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <Link
+          <NavigationLink
             href="/dashboard/student"
             className={styles.logoutBtn}
             style={{
@@ -658,7 +662,7 @@ export default function RegisterPage() {
             }}
           >
             ← Back to Dashboard
-          </Link>
+          </NavigationLink>
           <button className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
             {loggingOut ? 'Logging out...' : 'Logout'}
           </button>
@@ -669,7 +673,8 @@ export default function RegisterPage() {
 
         {/* Loading Blueprint */}
         {pageState === 'loading_blueprint' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+          <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            <p>Loading course registration…</p>
             <div style={{ height: '3.5rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
             <div style={{ height: '10rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
             <div style={{ height: '10rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
@@ -685,12 +690,12 @@ export default function RegisterPage() {
               {error || 'Your department course blueprint or campus registration settings are not currently available.'}
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem' }}>
-              <button
+              <NavigationLink
                 className={styles.closedBackBtn}
-                onClick={() => router.push('/dashboard/student')}
+                href="/dashboard/student"
               >
                 ← Back to Dashboard
-              </button>
+              </NavigationLink>
               <button
                 className={styles.closedBackBtn}
                 style={{ background: '#0284c7', color: '#ffffff', borderColor: '#0284c7' }}
@@ -727,12 +732,12 @@ export default function RegisterPage() {
                 })}
               </div>
             )}
-            <button
+            <NavigationLink
               className={styles.closedBackBtn}
-              onClick={() => router.push('/dashboard/student')}
+              href="/dashboard/student"
             >
               ← Go Back
-            </button>
+            </NavigationLink>
           </div>
         )}
 

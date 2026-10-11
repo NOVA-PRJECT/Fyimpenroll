@@ -4,7 +4,7 @@ import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
+import NavigationLink from '@/components/NavigationLink'
 import {
   LogOut,
   LayoutDashboard,
@@ -390,12 +390,12 @@ export default function StudentDashboardClient({
 
                       <p className={styles.regDescription}>{regDescription}</p>
 
-                      <Link
+                      <NavigationLink
                         href="/dashboard/student/register"
                         className={styles.regCtaBtn}
                       >
                         {regCtaText}
-                      </Link>
+                      </NavigationLink>
 
                       <p className={styles.regHintText}>
                         {isWindowOpen
@@ -531,7 +531,7 @@ export default function StudentDashboardClient({
                     )}
                   </span>
                   {registrationWindow.isOpen && (
-                    <Link
+                    <NavigationLink
                       href="/dashboard/student/register"
                       style={{
                         background: registrationWindow.isClosingSoon ? '#e11d48' : '#002147',
@@ -545,7 +545,7 @@ export default function StudentDashboardClient({
                       }}
                     >
                       {hasSubmission ? 'Update Preferences →' : 'Register Electives Now →'}
-                    </Link>
+                    </NavigationLink>
                   )}
                 </div>
               </div>
@@ -683,13 +683,13 @@ export default function StudentDashboardClient({
                     ? `Your course preferences for Semester ${studentInfo?.current_semester ?? 1} have been received. Official course allocations will appear here once finalized by the administration.`
                     : `You have not submitted course preferences for Semester ${studentInfo?.current_semester ?? 1}. Please select your academic track and submit your ranked choices.`}
                 </p>
-                <Link
+                <NavigationLink
                   href="/dashboard/student/register"
                   className={styles.registerLink}
                   style={{ display: 'inline-flex', padding: '0.65rem 1.25rem', marginTop: '0.25rem' }}
                 >
                   {hasSubmission ? 'Review / Update Preferences →' : 'Select Track & Register Courses →'}
-                </Link>
+                </NavigationLink>
               </div>
             )}
           </div>

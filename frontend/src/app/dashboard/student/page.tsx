@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import StudentDashboardClient from './StudentDashboardClient'
 import styles from './student-dashboard.module.css'
+import NavigationLink from '@/components/NavigationLink'
+import { sessionRedirect } from '@/core/security/session-response'
 
 interface StudentInfo {
   id?: string
@@ -48,7 +50,11 @@ export default function StudentDashboardPage() {
   const [registrationWindow, setRegistrationWindow] = useState<RegistrationWindow | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [summaryError, setSummaryError] = useState('')
+  const [retry, setRetry] = useState(0)
+
   useEffect(() => {
+    const controller = new AbortController()
     // 1. Instant hydration from sessionStorage for zero-flash page back/forth transitions
     if (typeof window !== 'undefined') {
       try {
@@ -76,25 +82,12 @@ export default function StudentDashboardPage() {
     // 2. Background fresh revalidation
     async function loadSummary() {
       try {
-        const res = await fetch('/api/student/dashboard-summary')
-        if (res.status === 401) {
-          router.replace('/login')
-          return
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          if (err.must_change_password) {
-            router.replace('/dashboard/student/change-password')
-            return
-          }
-          router.replace('/login')
-          return
-        }
-        const data = await res.json()
-        if (data.must_change_password) {
-          router.replace('/dashboard/student/change-password')
-          return
-        }
+        const res = await fetch('/api/student/dashboard-summary', { signal: controller.signal })
+        const data = await res.json().catch(() => ({}))
+        const destination = sessionRedirect(res.status, data)
+        if (destination) { router.replace(destination); return }
+        if (!res.ok || !data.studentInfo) throw new Error('Your dashboard data couldn’t be loaded. Please try again.')
+        setSummaryError('')
         setStudentInfo(data.studentInfo)
         setHasSubmission(data.hasSubmission)
         setHasRegistration(data.hasRegistration ?? false)
@@ -109,17 +102,24 @@ export default function StudentDashboardPage() {
         } catch {
           // Ignore storage quota error
         }
-      } catch {
-        router.replace('/login')
+      } catch (error) {
+        if (!controller.signal.aborted) setSummaryError(error instanceof Error ? error.message : 'Your dashboard data couldn’t be loaded. Please try again.')
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
     loadSummary()
-  }, [router])
+    return () => controller.abort()
+  }, [router, retry])
+
+  function retrySummary() {
+    setSummaryError('')
+    setLoading(true)
+    setRetry(value => value + 1)
+  }
 
   // Modern Skeleton Loading Screen (Theme-matched, zero white page flash)
-  if (loading && !studentInfo) {
+  if (!studentInfo && (loading || summaryError)) {
     return (
       <div className={styles.pageWrapper}>
         {/* Executive Top Bar Skeleton */}
@@ -147,6 +147,11 @@ export default function StudentDashboardPage() {
           <div style={{ width: '70px', height: '28px', borderRadius: '0.45rem' }} className={styles.skeletonPulse} />
         </header>
 
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4" role={summaryError ? 'alert' : 'status'}>
+          <p>{summaryError || 'Loading your dashboard data…'}</p>
+          {summaryError && <button onClick={retrySummary} className="rounded-lg bg-[#002147] px-4 py-2 text-white">Try again</button>}
+          <NavigationLink href="/dashboard/student/register" className={styles.regCtaBtn}>Open course registration →</NavigationLink>
+        </div>
         {/* Tab Bar Skeleton */}
         <div className={styles.tabBar} style={{ padding: '0.75rem 1rem', gap: '1rem' }}>
           <div style={{ width: '5rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
@@ -188,6 +193,10 @@ export default function StudentDashboardPage() {
   }
 
   return (
+    <>
+      {summaryError && <div role="alert" className="flex items-center gap-3 bg-amber-50 p-4">
+        <p>{summaryError}</p><button onClick={retrySummary}>Try again</button>
+      </div>}
     <StudentDashboardClient
       studentInfo={studentInfo}
       hasSubmission={hasSubmission}
@@ -197,5 +206,6 @@ export default function StudentDashboardPage() {
       totalRegisteredCredits={totalRegisteredCredits}
       registrationWindow={registrationWindow}
     />
+    </>
   )
 }

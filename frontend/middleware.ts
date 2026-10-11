@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { DASHBOARD_ROLE_MAP, ROLE_DASHBOARD_MAP, SHARED_DASHBOARD_ROUTES } from '@/core/security/routeConfig'
-import { Role, ROLES } from '@/core/constants/roles'
+import { DASHBOARD_ROLE_MAP, ROLE_DASHBOARD_MAP, SHARED_DASHBOARD_ROUTES } from './src/core/security/routeConfig'
+import { Role, ROLES } from './src/core/constants/roles'
 
 type ProfileCheck =
-  | { kind: 'authorized'; role: Role; mustChangePassword?: boolean }
+  | { kind: 'authorized'; role: Role; consentAccepted: boolean; mustChangePassword?: boolean }
   | { kind: 'restricted'; role: Role; mustChangePassword: true }
   | { kind: 'unauthorized' }
   | { kind: 'unavailable' }
@@ -12,7 +12,7 @@ async function resolveRoleFromBackend(token: string): Promise<ProfileCheck> {
   const backendUrl = (process.env.BACKEND_URL || 'http://127.0.0.1:4000').replace(/\/$/, '')
 
   try {
-    const response = await fetch(`${backendUrl}/api/auth/profile`, {
+    const response = await fetch(`${backendUrl}/api/auth/session`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       cache: 'no-store',
       signal: AbortSignal.timeout(10000),
@@ -40,15 +40,15 @@ async function resolveRoleFromBackend(token: string): Promise<ProfileCheck> {
 
     const payload = await response.json()
     const validRoles = Object.values(ROLES) as string[]
-    if (!validRoles.includes(payload?.role)) {
-      return { kind: 'unauthorized' }
+    if (!validRoles.includes(payload?.role) || typeof payload?.consent?.accepted !== 'boolean') {
+      return { kind: 'unavailable' }
     }
 
     if (payload.must_change_password) {
       return { kind: 'restricted', role: payload.role as Role, mustChangePassword: true }
     }
 
-    return { kind: 'authorized', role: payload.role as Role, mustChangePassword: false }
+    return { kind: 'authorized', role: payload.role as Role, consentAccepted: payload.consent.accepted, mustChangePassword: false }
   } catch {
     return { kind: 'unavailable' }
   }
@@ -159,26 +159,24 @@ export async function middleware(request: NextRequest) {
     } else if (refreshed) {
       token = refreshed.token
       refreshedTokens = { token: refreshed.token, refreshToken: refreshed.refreshToken }
-      profile = refreshed.mustChangePassword
-        ? { kind: 'restricted', role: refreshed.role, mustChangePassword: true }
-        : { kind: 'authorized', role: refreshed.role, mustChangePassword: false }
+      // Refresh rotates credentials; verify consent before allowing dashboard entry.
+      profile = await resolveRoleFromBackend(refreshed.token)
     }
   }
 
   // Handle unavailable backend
   if (profile.kind === 'unavailable') {
-    if (isDashboardRoute || isConsentRoute) {
-      return NextResponse.json(
-        { message: 'Authentication service is temporarily unavailable. Please retry.' },
-        { status: 503 },
-      )
+    if (isDashboardRoute || isConsentRoute || isSharedChangePasswordRoute) {
+      const response = NextResponse.rewrite(new URL('/service-unavailable', request.url), { status: 503 })
+      if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
+      return response
     }
     return NextResponse.next()
   }
 
   // Handle unauthorized (no valid session and refresh failed)
   if (profile.kind === 'unauthorized') {
-    if (isDashboardRoute || isConsentRoute) {
+    if (isDashboardRoute || isConsentRoute || isSharedChangePasswordRoute) {
       const response = NextResponse.redirect(new URL('/login', request.url))
       return clearAuthCookies(response)
     }
@@ -195,7 +193,7 @@ export async function middleware(request: NextRequest) {
       isLoginRoute ||
       pathname.startsWith('/auth/logout')
 
-    if (!isAllowedRestrictedPage && isDashboardRoute) {
+    if ((!isAllowedRestrictedPage && isDashboardRoute) || isLoginRoute || isHomeRoute) {
       // R32: Route both student and teacher to shared authenticated /change-password route
       const dest = '/change-password'
       const response = NextResponse.redirect(new URL(dest, request.url))
@@ -211,8 +209,9 @@ export async function middleware(request: NextRequest) {
   // User is authorized
   const role = profile.role
 
-  if (isLoginRoute || isHomeRoute) {
-    const response = NextResponse.redirect(new URL(ROLE_DASHBOARD_MAP[role] || '/login', request.url))
+  if ((isDashboardRoute && !isStudentChangePasswordRoute && !profile.consentAccepted) || isLoginRoute || isHomeRoute || (isConsentRoute && profile.consentAccepted)) {
+    const destination = profile.consentAccepted ? ROLE_DASHBOARD_MAP[role] || '/login' : '/consent'
+    const response = NextResponse.redirect(new URL(destination, request.url))
     if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
     return response
   }

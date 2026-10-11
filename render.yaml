@@ -4,13 +4,15 @@ services:
     runtime: node
     rootDir: .
     plan: free
-    buildCommand: pip install -r requirements.txt && npm ci --workspace=backend --include-workspace-root --include=dev && npm run build:backend && npm prune --omit=dev --workspace=backend --include-workspace-root
+    buildCommand: python3 -m pip install -r requirements.txt && python3 -c "from ortools.sat.python import cp_model" && npm ci --workspace=backend --include-workspace-root --include=dev && npm run build:backend && npm prune --omit=dev --workspace=backend --include-workspace-root
     startCommand: npm run start:prod --workspace=backend
     autoDeploy: true
     healthCheckPath: /api/health/ready
     envVars:
       - key: NODE_VERSION
         value: 24.19.0
+      - key: PYTHON_VERSION
+        value: 3.12.14
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
