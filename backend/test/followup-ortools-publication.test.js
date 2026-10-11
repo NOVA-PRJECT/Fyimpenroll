@@ -22,7 +22,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
   // 1. R17: Semester 1 AEC Feasibility & Soft Theory Spread
   // ──────────────────────────────────────────────────────────────────────────
   describe('1. R17: Semester 1 AEC Feasibility & Soft Theory Spread', () => {
-    it('schedules a 3-hour Semester 1 AEC course entirely within Tuesday/Wednesday P4-P6 with 2 hours on one day', async () => {
+    it('spreads an AEC option without a fixed paper day within Tuesday/Wednesday P4-P6', async () => {
       const payload = {
         academic_year: '2025-2026',
         semester: 1,
@@ -30,7 +30,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
         courses: [
           {
             courseId: 'aec-eng-101',
-            courseCode: 'KU01AECENG101',
+            courseCode: 'KU01AECENG103',
             courseTitle: 'English for Communication',
             departmentId: 'dept-eng',
             category: 'AEC',
@@ -70,7 +70,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
       const courseNodes = [
         {
           courseId: 'aec-eng-101',
-          courseCode: 'KU01AECENG101',
+          courseCode: 'KU01AECENG103',
           departmentId: 'dept-eng',
           category: 'AEC',
           theoryHours: 3,

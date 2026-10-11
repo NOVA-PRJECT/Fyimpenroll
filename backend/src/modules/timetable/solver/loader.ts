@@ -30,6 +30,10 @@ function buildConflictSummary(
 
 export function validatePreflightRules(courses: CourseNode[], semester: number): void {
   for (const c of courses) {
+    if ((c.category || '').toUpperCase().trim() === 'MDC' &&
+        (c.practicalHours !== 0 || (semester === 1 && c.theoryHours !== 3))) {
+      throw new Error(`[Preflight Rule Conflict] Course ${c.courseCode} (MDC) has ${c.theoryHours} theory and ${c.practicalHours} practical hours. MDC courses have no practical hours; Semester 1 requires 3 theory hours. Correct the course catalogue before generation.`);
+    }
     // R21: Practical contact hours must be in exact 2-period consecutive blocks
     if (c.practicalHours % 2 !== 0) {
       throw new Error(

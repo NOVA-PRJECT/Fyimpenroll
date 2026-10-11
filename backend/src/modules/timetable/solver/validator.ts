@@ -63,6 +63,16 @@ export function validateTimetable(
     if (!course) continue;
 
     const category = (course.category || '').toUpperCase().trim();
+    if (category === 'MDC' && (course.practicalHours !== 0 || (semester === 1 && course.theoryHours !== 3))) {
+      violations.push({ type: 'hours_mismatch', courseId: course.courseId,
+        detail: `Course ${course.courseCode} (MDC) must have no practical hours; Semester 1 requires 3 theory hours. Correct the course catalogue before publication.` });
+    }
+    const categoryWindows = rulesList.filter(r => r.kind === 'CATEGORY_WINDOW' && r.isHard &&
+      (!r.targetSemester || r.targetSemester === semester) &&
+      (!r.targetCategory || r.targetCategory.toUpperCase().trim() === category) &&
+      (!r.targetCourseId || r.targetCourseId === course.courseId) &&
+      (!r.targetDepartmentId || r.targetDepartmentId === course.departmentId) &&
+      (!r.parameters?.courseCodes || r.parameters.courseCodes.includes(course.courseCode)));
     let theoryCount = 0;
     let practicalCount = 0;
     const seenSlotsInCourse = new Set<string>();
@@ -109,8 +119,19 @@ export function validateTimetable(
       }
 
       // R17: Semester 1 AEC restriction — strictly on Tuesdays (2) and/or Wednesdays (3) during afternoon (P4, P5, P6)
+      for (const rule of categoryWindows) {
+        const params = rule.parameters || {};
+        const days: number[] | undefined = params.days || params.allowed_days;
+        const periods: number[] | undefined = params.periods || params.allowed_periods;
+        if ((days && !days.includes(slot.day)) || (periods && !periods.includes(slot.period))) {
+          violations.push({ type: 'invalid_window', courseId: course.courseId, day: slot.day, period: slot.period,
+            detail: `Course ${course.courseCode} violates hard category window "${rule.id}" at Day ${slot.day} Period ${slot.period}.` });
+        }
+      }
+
       if (semester === 1 && category === 'AEC') {
-        const isAllowedDay = slot.day === 2 || slot.day === 3;
+        const paperDay = course.courseCode === 'KU01AECENG101' ? 2 : course.courseCode === 'KU01AECENG102' ? 3 : undefined;
+        const isAllowedDay = paperDay ? slot.day === paperDay : slot.day === 2 || slot.day === 3;
         const isAllowedPeriod = slot.period >= 4 && slot.period <= 6;
         if (!isAllowedDay || !isAllowedPeriod) {
           violations.push({
@@ -118,7 +139,7 @@ export function validateTimetable(
             courseId: assignment.courseId,
             day: slot.day,
             period: slot.period,
-            detail: `Course ${course.courseCode} (AEC) slot Day ${slot.day} Period ${slot.period} violates Semester 1 mandatory window (strictly Tuesday/Wednesday P4-P6).`,
+            detail: `Course ${course.courseCode} (AEC) slot Day ${slot.day} Period ${slot.period} violates Semester 1 mandatory window (${paperDay ? (paperDay === 2 ? 'Tuesday' : 'Wednesday') : 'Tuesday/Wednesday'} P4-P6).`,
           });
         }
       }

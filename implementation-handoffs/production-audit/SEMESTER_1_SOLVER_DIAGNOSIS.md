@@ -2,7 +2,15 @@
 
 For academic year 2026-27, Semester 1, the latest failed generation job lasted approximately 310 seconds. It used the shipped rules. Read-only diagnosis loaded 126 registrations, 18 courses, five departments and three parallel baskets. Real student and teacher identifiers stayed in memory; the local solver reproduction used anonymized identifiers. No production registrations, course hours, rules or timetable entries were changed.
 
-## Confirmed capacity contradiction
+**Academic clarification:** Both AEC papers are common campus sessions. KU01AECENG101 must occupy Tuesday 13:30-16:30 and KU01AECENG102 Wednesday 13:30-16:30. Both already have all 126 students in one course node each; neither was multiplied by department in the capacity calculation. The shipped rule previously allowed either afternoon without fixing the paper order. The solver and independent validator now enforce the confirmed order, including when a browser supplies older saved rules.
+
+Semester 1 MDC courses have **3 theory hours and zero practical hours**, confirmed by the user. The live catalogue instead has 2 theory + 2 practical hours for KU01MDCCSE101, KU01MDCPSY101 and KU01MDCSTA101. The guarded, idempotent [catalogue correction SQL](correct_semester_1_mdc_hours.sql) is prepared for manual application; it has not been applied to production. The backend now rejects contradictory MDC catalogue hours rather than silently scheduling or discarding practicals.
+
+With all MDC courses corrected locally to 3+0, the anonymized cohort still has a pairwise-conflicting group requiring **32 periods against 30 available**. In the nine-course group below, changing KU01MDCPSY101 from 4 total periods to 3 reduces the total from 33 to 32. Fixed shared AEC afternoons do not remove those six hours from the students' schedules. At least two extra periods are necessary if the remaining memberships and contact hours are correct; this is not proof that adding two periods would satisfy every other constraint. Review the remaining DSC course memberships and hours before changing timetable capacity.
+
+The confirmed-rule backend build passed, followed by the complete backend suite: 265 passed, zero failed, one separate-connection PostgreSQL test skipped locally. Added tests cover fixed shared AEC sessions, stale browser rules, impossible slot domains, MDC catalogue rejection and valid theory-only sessions, and actual execution/rollback of the correction SQL in a disposable PostgreSQL engine. The former flexible-AEC spread fixture now uses an option without a fixed paper day; the confirmed common papers have explicit fixed-day coverage.
+
+## Initial capacity contradiction using the stored catalogue hours
 
 The following nine courses require 33 weekly periods. Every pair shares at least one student, verified against the live cohort. Therefore no pair can run at the same time, even though no individual student necessarily takes all nine courses. The shipped timetable provides only 30 periods (five days, six periods per day).
 
@@ -44,4 +52,4 @@ After Render restarted for the capacity-check release, public readiness returned
 
 Readiness now checks Python asynchronously with a thirty-second timeout, checks the database concurrently, logs a failed import or invalid rules, and retries failures after the existing fifteen-second readiness cache expires. Concurrent callers share one probe. A successful Python/rules check remains cached for the process lifetime. Missing dependencies, invalid rules and database failures still return HTTP 503; errors are logged rather than exposed in the public response.
 
-The backend build and three targeted recovery tests passed. A real local Python import and rule check returned ready in 2.046 seconds. The complete backend suite passed 257 tests with one PostgreSQL integration test skipped locally. Deployment readiness and CI must be checked after pushing this follow-up.
+The backend build and three targeted recovery tests passed. A real local Python import and rule check returned ready in 2.046 seconds. The complete backend suite passed 257 tests with one PostgreSQL integration test skipped locally. Commit 00b9c9c passed production CI; Render restarted and two subsequent public readiness checks returned HTTP 200 with database=true and solverAndRules=true.

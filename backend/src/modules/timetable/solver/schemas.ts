@@ -30,6 +30,7 @@ export const RuleDefinitionSchema = z.object({
   isHard: z.boolean(),
   weight: z.number().min(0).max(1000).optional(),
   parameters: z.object({
+    courseCodes: z.array(z.string().trim().min(1).max(100)).min(1).max(100).optional(),
     days: z.array(z.number().int().min(1).max(5)).min(1).max(5).optional(),
     periods: z.array(z.number().int().min(1).max(6)).min(1).max(6).optional(),
     allowed_days: z.array(z.number().int().min(1).max(5)).min(1).max(5).optional(),

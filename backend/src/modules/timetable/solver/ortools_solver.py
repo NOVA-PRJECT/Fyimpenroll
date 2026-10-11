@@ -146,12 +146,46 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
     # Data structures for courses
     courses_by_id: Dict[str, Dict[str, Any]] = {c["courseId"]: c for c in courses_data}
 
+    # Compile hard category/course windows, including the two fixed campus AEC papers.
+    course_allowed_slots = {}
+    for c in courses_data:
+        allowed = set(campus_allowed_slots)
+        for r in rules_list:
+            if r.get("kind") != "CATEGORY_WINDOW" or not r.get("isHard", True):
+                continue
+            if r.get("targetSemester") and r["targetSemester"] != semester:
+                continue
+            if r.get("targetCategory") and r["targetCategory"].upper().strip() != (c.get("category") or "").upper().strip():
+                continue
+            if r.get("targetCourseId") and r["targetCourseId"] != c["courseId"]:
+                continue
+            if r.get("targetDepartmentId") and r["targetDepartmentId"] != c.get("departmentId"):
+                continue
+            params = r.get("parameters") or {}
+            if params.get("courseCodes") and c.get("courseCode") not in params["courseCodes"]:
+                continue
+            days = params.get("days") or params.get("allowed_days")
+            periods = params.get("periods") or params.get("allowed_periods")
+            allowed = {(d, p) for d, p in allowed
+                       if (days is None or d in days) and (periods is None or p in periods)}
+        course_allowed_slots[c["courseId"]] = allowed
+
     # Preflight data conflict checks (R18 & R21)
     for c in courses_data:
         cid = c["courseId"]
         t_hours = int(c.get("theoryHours", 0))
         p_hours = int(c.get("practicalHours", 0))
         category = (c.get("category") or "").upper().strip()
+
+        if category == "MDC" and (p_hours != 0 or (semester == 1 and t_hours != 3)):
+            return {
+                "status": "MODEL_INVALID", "assignments": [],
+                "diagnostics": [f"Course {c.get('courseCode')} (MDC) has {t_hours} theory and {p_hours} practical hours. "
+                                "MDC courses have no practical hours; Semester 1 requires 3 theory hours. "
+                                "Correct the course catalogue before generation."],
+                "stats": {"wall_time_seconds": 0.0, "rule_hash": rule_hash,
+                          "total_courses": len(courses_data), "total_sessions_assigned": 0},
+            }
 
         # R21: Odd practical hours check - strictly prohibited under 2-period lab block rule
         if p_hours % 2 != 0:
@@ -286,12 +320,13 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
             if dur == 1:
                 for d, p in ALL_SLOTS:
                     # Enforce campus allowed slots (R19)
-                    if (d, p) not in campus_allowed_slots:
+                    if (d, p) not in course_allowed_slots[cid]:
                         continue
 
                     # R17: Semester 1 AEC restriction: strictly on Tuesdays (2) and/or Wednesdays (3) during afternoon (P4, P5, P6)
                     if semester == 1 and category == "AEC":
-                        if d not in [2, 3] or p not in [4, 5, 6]:
+                        paper_day = {"KU01AECENG101": 2, "KU01AECENG102": 3}.get(c_meta.get("courseCode"))
+                        if (paper_day is not None and d != paper_day) or d not in [2, 3] or p not in [4, 5, 6]:
                             continue
 
                     # R18: Semester 3 VAC restriction: applied to EVERY occupied period, including single-hour theory!
@@ -307,18 +342,20 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     model.AddExactlyOne(list(start_dict.values()))
                 else:
                     diagnostics.append(f"Domain for course {cid} session {sid} is empty under constraints.")
+                    model.AddBoolOr([])
 
             elif dur == 2:
                 # 2-hour continuous block
                 for d in DAYS:
                     for p in LAB_START_PERIODS:
                         # Enforce campus allowed slots (R19)
-                        if (d, p) not in campus_allowed_slots or (d, p + 1) not in campus_allowed_slots:
+                        if (d, p) not in course_allowed_slots[cid] or (d, p + 1) not in course_allowed_slots[cid]:
                             continue
 
                         # Semester 1 AEC restriction for 2-hour blocks if any
                         if semester == 1 and category == "AEC":
-                            if d not in [2, 3] or p not in [4, 5]:
+                            paper_day = {"KU01AECENG101": 2, "KU01AECENG102": 3}.get(c_meta.get("courseCode"))
+                            if (paper_day is not None and d != paper_day) or d not in [2, 3] or p not in [4, 5]:
                                 continue
 
                         # R18: Semester 3 VAC restriction: strictly on Mondays (1) during Periods 5 and 6 (P5+P6)
@@ -336,6 +373,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     model.AddExactlyOne(list(start_dict.values()))
                 else:
                     diagnostics.append(f"Domain for 2-hour block {cid} session {sid} is empty under constraints.")
+                    model.AddBoolOr([])
 
             session_start_vars[(cid, sid)] = start_dict
 
