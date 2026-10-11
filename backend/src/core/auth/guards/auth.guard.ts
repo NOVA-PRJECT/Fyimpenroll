@@ -21,7 +21,10 @@ export class AuthGuard implements CanActivate {
     const token = this.extractToken(request)
 
     if (!token) {
-      throw new UnauthorizedException('Authentication token missing')
+      throw new UnauthorizedException({
+        message: 'Authentication token missing',
+        code: 'AUTH_SESSION_REJECTED',
+      })
     }
 
     this.validateMutatingOrigin(request)
@@ -29,7 +32,12 @@ export class AuthGuard implements CanActivate {
     const { data: authData, error: authError } = await authProviderCall(this.supabaseService.admin.auth.getUser(token))
     assertAuthProviderAvailable(authError)
     if (authError || !authData?.user) {
-      throw new UnauthorizedException('Invalid or expired authentication session')
+      // This marker is emitted only before a protected handler can run. The web
+      // client can renew cookies and safely retry even a generation POST once.
+      throw new UnauthorizedException({
+        message: 'Invalid or expired authentication session',
+        code: 'AUTH_SESSION_REJECTED',
+      })
     }
 
     const user = authData.user

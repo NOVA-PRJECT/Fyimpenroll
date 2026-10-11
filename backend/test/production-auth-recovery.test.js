@@ -2,15 +2,68 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { AuthGuard } = require('../dist/core/auth/guards/auth.guard')
 const { AuthService } = require('../dist/modules/auth/auth.service')
+const { AuthController } = require('../dist/modules/auth/auth.controller')
 const { RateLimiterService } = require('../dist/core/security/rate-limiter.service')
 const audit={log:async()=>{}}, logger={warn:()=>{},error:()=>{}}
 const user={userId:'student',role:'student',email:'student@example.test',token:'access'}
 const rotated={data:{user:{id:'student',app_metadata:{role:'student'}},session:{access_token:'access',refresh_token:'rotated',expires_in:3600}},error:null}
+
+test('only missing or invalid access credentials advertise a pre-handler rejection', async () => {
+  for (const token of [undefined, 'expired']) {
+    let accountQueries = 0
+    const guard = new AuthGuard({admin:{
+      auth:{getUser:async()=>({error:{status:401}})},
+      from:()=>{accountQueries++;throw Error('must not execute account queries')},
+    }})
+    const request = {headers:{}, cookies:{auth_token:token}, method:'POST'}
+    await assert.rejects(guard.canActivate({switchToHttp:()=>({getRequest:()=>request})}), error => {
+      assert.equal(error.getStatus(), 401)
+      assert.equal(error.getResponse().code, 'AUTH_SESSION_REJECTED')
+      return true
+    })
+    assert.equal(accountQueries, 0)
+    assert.equal(request.user, undefined)
+  }
+  const guard = new AuthGuard({admin:{auth:{getUser:async()=>({error:{status:503}})}}})
+  await assert.rejects(guard.canActivate({switchToHttp:()=>({getRequest:()=>({headers:{authorization:'Bearer access'},method:'POST'})})}), error => {
+    assert.equal(error.getStatus(), 503)
+    assert.notEqual(error.getResponse().code, 'AUTH_SESSION_REJECTED')
+    return true
+  })
+})
 function service(refresh) {
   const auth=new AuthService({createAuthClient:()=>({auth:{refreshSession:refresh}}),admin:{auth:{admin:{updateUserById:async()=>({error:null}),signOut:async()=>({error:null})}}}}, {},audit,logger)
   auth.determineUserRoute=async()=>({role:'student',must_change_password:false})
   return auth
 }
+
+test('logout with only a refresh cookie revokes the session without issuing cookies', async () => {
+  const auth = service(async () => rotated)
+  let revokedToken
+  auth.supabase.admin.auth.admin.signOut = async token => { revokedToken = token; return {error:null} }
+  const cleared = []
+  const result = await new AuthController(auth).logout(
+    {headers:{},cookies:{refresh_token:'old'},ip:'127.0.0.1'},
+    {clearCookie:name=>cleared.push(name),cookie:()=>assert.fail('logout must not issue credentials')},
+  )
+  assert.equal(result.revoked, true)
+  assert.equal(revokedToken, 'access')
+  assert.equal(auth.recentRefreshes.size, 0)
+  assert.deepEqual(cleared, ['auth_token','refresh_token','user_role'])
+})
+
+test('logout still clears cookies when refresh credentials are invalid or the provider is unavailable', async () => {
+  for (const status of [401, 503]) {
+    const auth = service(async () => ({error:{status}}))
+    const cleared = []
+    const result = await new AuthController(auth).logout(
+      {headers:{},cookies:{refresh_token:'old'},ip:'127.0.0.1'},
+      {clearCookie:name=>cleared.push(name)},
+    )
+    assert.equal(result.success, true)
+    assert.deepEqual(cleared, ['auth_token','refresh_token','user_role'])
+  }
+})
 test('authentication outages and throttling return 503 while invalid credentials return 401',async()=>{
   for(const status of [503,429,401]) {
     const guard=new AuthGuard({admin:{auth:{getUser:async()=>({error:{status}})}}})

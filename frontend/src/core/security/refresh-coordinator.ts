@@ -4,7 +4,7 @@
  * Coordinates token refresh across all in-browser API activity.
  * - Deduplicates concurrent 401 refresh requests into a single in-flight call to /api/auth/refresh
  * - Retries safe reads (GET, HEAD, OPTIONS) once with updated cookies
- * - Restricts mutation retries (POST, PUT, PATCH, DELETE) to idempotent requests (Idempotency-Key)
+ * - Retries mutations only with idempotency or an explicit pre-handler authentication rejection
  * - Distinguishes transient provider/backend outages (503/network) from genuine session revocation (401/400)
  */
 
@@ -17,6 +17,7 @@ interface RefreshResult {
 let activeRefreshPromise: Promise<RefreshResult> | null = null
 let isInterceptionInstalled = false
 let sessionGeneration = 0
+let refreshRevision = 0
 
 export function invalidateRefreshSession(): void {
   sessionGeneration += 1
@@ -40,6 +41,7 @@ export async function coordinateRefresh(): Promise<RefreshResult> {
 
       if (generation !== sessionGeneration) return { success: false, error: 'Session ended' }
       if (response.ok) {
+        refreshRevision += 1
         return { success: true }
       }
 
@@ -96,6 +98,9 @@ export async function apiFetch(
 ): Promise<Response> {
   const originalFetch = (typeof window !== 'undefined' && window.__originalFetch) || fetch
   const generation = sessionGeneration
+  const revision = refreshRevision
+  // Preserve a Request body before fetch consumes it, for a permitted single retry.
+  const retryInput = input instanceof Request ? input.clone() : input
   const response = await originalFetch(input, init)
 
   // Only intercept 401 Unauthorized responses for /api/ endpoints (excluding auth refresh/login/logout itself)
@@ -114,19 +119,32 @@ export async function apiFetch(
   const isSafe = isSafeMethod(method)
   const isIdempotentMutation = !isSafe && (options?.idempotent || hasIdempotencyHeader(init?.headers || (input instanceof Request ? input.headers : undefined)))
 
-  if (!isSafe && !isIdempotentMutation) {
+  const rejectedBeforeHandler = !isSafe &&
+    (await response.clone().json().catch(() => null))?.code === 'AUTH_SESSION_REJECTED'
+
+  if (!isSafe && !isIdempotentMutation && !rejectedBeforeHandler) {
     // Non-idempotent mutation without proof of commit safety: do not blindly replay
     return response
   }
 
   // Attempt coordinated refresh
-  const refreshResult = await coordinateRefresh()
-  if (!refreshResult.success || generation !== sessionGeneration) {
+  // A late 401 from an older concurrent request must not renew an already
+  // refreshed session, or bring back an account that has since logged out.
+  if (generation !== sessionGeneration) return response
+  const refreshResult: RefreshResult = revision !== refreshRevision ? { success: true } : await coordinateRefresh()
+  if (generation !== sessionGeneration) return response
+  if (!refreshResult.success) {
+    if (refreshResult.outage) {
+      return Response.json({ message: 'Authentication service is temporarily unavailable. Please retry.' }, { status: 503 })
+    }
+    return Response.json({ message: 'Your session has expired. Please sign in again.' }, { status: 401 })
+  }
+  if (init?.signal?.aborted || (input instanceof Request && input.signal.aborted)) {
     return response
   }
 
   // Retry the request once with fresh session cookies
-  return originalFetch(input, init)
+  return originalFetch(retryInput, init)
 }
 
 /**

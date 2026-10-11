@@ -119,24 +119,10 @@ export async function middleware(request: NextRequest) {
   const isHomeRoute = pathname === '/'
   const isApiRoute = pathname.startsWith('/api')
 
-  // API requests: if access token is missing but refresh token is present, proactively refresh (R30)
+  // Browser API refreshes are coordinated in one place after an explicit guard
+  // rejection. Refreshing here as well races cookie rotation during polling,
+  // and can even rotate credentials before forwarding /api/auth/refresh itself.
   if (isApiRoute) {
-    const hasAuthToken = !!request.cookies.get('auth_token')?.value
-    const hasRefreshToken = !!request.cookies.get('refresh_token')?.value
-    if (!hasAuthToken && hasRefreshToken) {
-      const refreshed = await tryRefreshSession(request)
-      if (refreshed === 'unavailable') return NextResponse.json({ message: 'Authentication service is temporarily unavailable. Please retry.' }, { status: 503 })
-      if (refreshed) {
-        const requestHeaders = new Headers(request.headers)
-        requestHeaders.set('authorization', `Bearer ${refreshed.token}`)
-        const response = NextResponse.next({
-          request: {
-            headers: requestHeaders,
-          },
-        })
-        return attachAuthCookies(response, refreshed.token, refreshed.refreshToken)
-      }
-    }
     return NextResponse.next()
   }
 

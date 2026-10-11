@@ -140,8 +140,19 @@ export class AuthController {
   ) {
     const ip = req.ip || req.socket?.remoteAddress || 'unknown'
     const authHeader = (req.headers as any).authorization as string | undefined
-    const token = (req as any).cookies?.auth_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined)
+    let token = (req as any).cookies?.auth_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined)
     const user = (req as any).user as AuthUser | undefined
+
+    // An expired access cookie must not prevent logout from revoking the
+    // remaining refresh session. Renew internally without issuing new cookies.
+    const refreshToken = (req as any).cookies?.refresh_token
+    if (!token && typeof refreshToken === 'string' && refreshToken && refreshToken.length <= 8192) {
+      try {
+        token = (await this.authService.refreshSession(refreshToken)).token
+      } catch {
+        // Even an invalid/unavailable provider must allow local cookie cleanup.
+      }
+    }
 
     const userWithToken = user ? { ...user, token: user.token || token } : token
     const result = await this.authService.logout(userWithToken, ip)

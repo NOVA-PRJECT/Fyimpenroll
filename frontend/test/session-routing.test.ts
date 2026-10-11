@@ -88,3 +88,12 @@ test('network outages keep authentication cookies and offer retry', async () => 
   expect(response.status).toBe(503)
   expect(response.cookies.get('auth_token')).toBeUndefined()
 })
+
+test.each(['/api/timetable/generate', '/api/timetable/job-status', '/api/auth/refresh', '/api/auth/logout', '/api/auth/login'])('middleware forwards %s without a competing cookie refresh', async (path) => {
+  const fetch = vi.fn()
+  vi.stubGlobal('fetch', fetch)
+  const response = await middleware(request(path, 'refresh_token=old'))
+  expect(response.headers.get('x-middleware-next')).toBe('1')
+  expect(response.headers.get('set-cookie')).toBeNull()
+  expect(fetch).not.toHaveBeenCalled()
+})
