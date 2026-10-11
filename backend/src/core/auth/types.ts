@@ -11,6 +11,7 @@ export interface AuthUser {
   current_semester?: number
   full_name?: string
   token?: string
+  consent?: { accepted: boolean; currentVersion: string }
 }
 
 export interface RequestWithUser extends Request {

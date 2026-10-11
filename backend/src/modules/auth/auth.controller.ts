@@ -75,6 +75,19 @@ export class AuthController {
       token: result.token,
       refreshToken: result.refreshToken,
       must_change_password: result.must_change_password,
+      consent: result.consent,
+    }
+  }
+
+  /** Routing facts only: AuthGuard already verified the account and consent. */
+  @Get('session')
+  @UseGuards(AuthGuard)
+  session(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
+    res.setHeader('Cache-Control', 'private, no-store')
+    return {
+      role: user.role,
+      must_change_password: !!user.must_change_password,
+      consent: user.consent,
     }
   }
 

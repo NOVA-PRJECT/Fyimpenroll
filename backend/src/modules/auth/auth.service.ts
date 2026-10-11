@@ -14,6 +14,7 @@ import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser, Role } from '../../core/auth/types'
 import { createHash } from 'crypto'
+import { currentConsentStatus } from '../../core/auth/consent-status'
 import { assertAuthProviderAvailable, authProviderCall } from '../../core/auth/provider-error'
 
 export const ROLE_DASHBOARD_MAP: Record<Role, string> = {
@@ -69,12 +70,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password. Please try again.')
     }
 
-    await this.rateLimiter.resetLoginLimits(ip, email)
-
     const userId = authData.user.id
     const existingRole = authData.user.app_metadata?.role as Role | undefined
     const existingMustChange = authData.user.app_metadata?.must_change_password as boolean | undefined
-    const userRoleInfo = await this.determineUserRoute(userId, existingRole, existingMustChange)
+    const [userRoleInfo, consent] = await Promise.all([
+      this.determineUserRoute(userId, existingRole, existingMustChange),
+      currentConsentStatus(this.supabase, userId, authData.user.app_metadata?.accepted_policy_version),
+      this.rateLimiter.resetLoginLimits(ip, email),
+    ])
 
     if (!userRoleInfo.role || !userRoleInfo.redirectTo) {
       throw new ForbiddenException('Account configuration mismatch: user role not found in portal database.')
@@ -83,16 +86,18 @@ export class AuthService {
     const { role, redirectTo, department_id, campus_id, must_change_password } = userRoleInfo
     const effectiveMustChange = (role === 'student' || role === 'teacher') ? (must_change_password ?? false) : false
 
-    // Update Supabase Auth metadata (parallelised with audit log)
+    const metadata = {
+      role,
+      department_id: department_id ?? null,
+      campus_id: campus_id ?? null,
+      must_change_password: effectiveMustChange,
+    }
+    const metadataChanged = Object.entries(metadata).some(([key, value]) => authData.user.app_metadata?.[key] !== value)
+    // Keep synchronization failures recoverable; established accounts need no write.
     const [metadataResult] = await Promise.all([
-      this.supabase.admin.auth.admin.updateUserById(userId, {
-        app_metadata: {
-          role,
-          department_id: department_id ?? null,
-          campus_id: campus_id ?? null,
-          must_change_password: effectiveMustChange,
-        },
-      }),
+      metadataChanged
+        ? this.supabase.admin.auth.admin.updateUserById(userId, { app_metadata: metadata })
+        : Promise.resolve({ error: null }),
       this.auditLogger.log({
         eventType: AuditEvents.USER_LOGIN,
         userId,
@@ -112,7 +117,8 @@ export class AuthService {
       refreshToken: authData.session.refresh_token,
       expiresIn: authData.session.expires_in,
       role,
-      redirectTo,
+      redirectTo: effectiveMustChange ? '/change-password' : consent.accepted ? redirectTo : '/consent',
+      consent,
       userId,
       must_change_password: effectiveMustChange,
     }

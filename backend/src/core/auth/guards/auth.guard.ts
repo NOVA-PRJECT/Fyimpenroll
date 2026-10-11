@@ -10,6 +10,7 @@ import { SupabaseService } from '../../database/supabase.service'
 import { AuthUser, Role } from '../types'
 import { CURRENT_POLICY_VERSION } from '../../../modules/consent/consent.constants'
 import { assertAuthProviderAvailable, authProviderCall } from '../provider-error'
+import { currentConsentStatus } from '../consent-status'
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -163,6 +164,7 @@ export class AuthGuard implements CanActivate {
     const ALLOWED_RESTRICTED_PATHS = new Set([
       '/api/auth/profile',
       '/api/auth/me',
+      '/api/auth/session',
       '/api/auth/change-password',
       '/api/auth/sync-password-status',
       '/api/auth/complete-password-reset',
@@ -186,32 +188,21 @@ export class AuthGuard implements CanActivate {
     }
 
     // F12: Versioned consent enforcement on normal protected operations
-    if (!isAllowedRestrictedPath) {
+    if (!isAllowedRestrictedPath || normalizedPath === '/api/auth/session') {
       const cachedConsentVersion = user.app_metadata?.accepted_policy_version as string | undefined
-      let hasAcceptedCurrentConsent = cachedConsentVersion === CURRENT_POLICY_VERSION
-
-      if (!hasAcceptedCurrentConsent) {
-        const { data: consentRecord } = await this.supabaseService.admin
-          .from('consent_records')
-          .select('policy_version')
-          .eq('user_id', user.id)
-          .eq('policy_version', CURRENT_POLICY_VERSION)
-          .maybeSingle()
-
-        if (consentRecord) {
-          hasAcceptedCurrentConsent = true
-          this.supabaseService.admin.auth.admin
-            .updateUserById(user.id, {
-              app_metadata: {
-                ...(user.app_metadata || {}),
-                accepted_policy_version: CURRENT_POLICY_VERSION,
-              },
-            })
-            .catch(() => {})
-        }
+      authUser.consent = await currentConsentStatus(this.supabaseService, user.id, cachedConsentVersion)
+      if (authUser.consent.accepted && cachedConsentVersion !== CURRENT_POLICY_VERSION) {
+        this.supabaseService.admin.auth.admin
+          .updateUserById(user.id, {
+            app_metadata: {
+              ...(user.app_metadata || {}),
+              accepted_policy_version: CURRENT_POLICY_VERSION,
+            },
+          })
+          .catch(() => {})
       }
 
-      if (!hasAcceptedCurrentConsent) {
+      if (!authUser.consent.accepted && !isAllowedRestrictedPath) {
         throw new ForbiddenException({
           statusCode: 403,
           error: 'Forbidden',

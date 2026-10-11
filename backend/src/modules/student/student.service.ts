@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService } from '../../core/logging/audit-logger.service'
@@ -18,7 +19,10 @@ export class StudentService {
   ) {}
 
   async getDashboardSummary(user: AuthUser) {
-    const { data: student, error } = await this.supabase.admin
+    const loadSettings = (campusId: string) => this.supabase.admin.from('campus_settings')
+      .select('deadline, min_credits, max_credits, academic_year').eq('campus_id', campusId).maybeSingle()
+    const [studentResult, verifiedSettings] = await Promise.all([
+      this.supabase.admin
       .from('students')
       .select(`
         campus_id,
@@ -31,7 +35,10 @@ export class StudentService {
         campuses (name)
       `)
       .eq('id', user.userId)
-      .single()
+      .single(),
+      user.campus_id ? loadSettings(user.campus_id) : Promise.resolve(null),
+    ])
+    const { data: student, error } = studentResult
 
     if (error || !student) {
       throw new NotFoundException('Student record not found')
@@ -39,13 +46,11 @@ export class StudentService {
 
     const effectiveCampusId = student.campus_id || user.campus_id
 
-    const { data: settings } = effectiveCampusId
-      ? await this.supabase.admin
-          .from('campus_settings')
-          .select('deadline, min_credits, max_credits, academic_year')
-          .eq('campus_id', effectiveCampusId)
-          .maybeSingle()
-      : { data: null }
+    const settingsResult = verifiedSettings && effectiveCampusId === user.campus_id
+      ? verifiedSettings
+      : effectiveCampusId ? await loadSettings(effectiveCampusId) : { data: null, error: null }
+    if (settingsResult.error) throw new ServiceUnavailableException('Campus settings are temporarily unavailable. Please retry.')
+    const settings = settingsResult.data
 
     const academicYear = settings?.academic_year || null
 
