@@ -19,6 +19,8 @@ test('only missing or invalid access credentials advertise a pre-handler rejecti
     await assert.rejects(guard.canActivate({switchToHttp:()=>({getRequest:()=>request})}), error => {
       assert.equal(error.getStatus(), 401)
       assert.equal(error.getResponse().code, 'AUTH_SESSION_REJECTED')
+      assert.equal(error.getResponse().statusCode, 401)
+      assert.equal(error.getResponse().error, 'Unauthorized')
       return true
     })
     assert.equal(accountQueries, 0)
