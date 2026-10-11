@@ -2,6 +2,22 @@ import {test} from 'vitest';
 import assert from 'node:assert/strict';
 import {entriesForDepartment} from '../src/core/utils/campusTimetable';
 
+test('cohort grids and exports show both minors taught elsewhere and exclude unrelated owned courses',()=>{
+  const entries=[{id:'major',departmentId:'it',category:'DSC',enrolledDepartmentIds:['it']},
+    {id:'minor-one',departmentId:'math',category:'DSC',enrolledDepartmentIds:['it','math']},
+    {id:'minor-two',departmentId:'stats',category:'DSC',enrolledDepartmentIds:['it']},
+    {id:'owned-but-not-selected',departmentId:'it',category:'DSC',enrolledDepartmentIds:['math']},
+    {id:'campus',departmentId:'stats',category:'MDC',enrolledDepartmentIds:['math']}];
+  assert.deepEqual(entriesForDepartment(entries,'it').map(e=>e.id),['major','minor-one','minor-two','campus']);
+  assert.equal(entriesForDepartment(entries,'stats').some(e=>e.id==='minor-two'),false);
+});
+
+test('unscheduled minor sessions follow the same cohort filter as placed entries',()=>{
+  const conflicts=[{id:'minor',departmentId:'stats',enrolledDepartmentIds:['it']},
+    {id:'unrelated',departmentId:'it',enrolledDepartmentIds:['math']}];
+  assert.deepEqual(entriesForDepartment(conflicts,'it').map(e=>e.id),['minor']);
+});
+
 test('department views include every common campus paper without duplicating owned entries',()=>{
   const entries=[{id:'major',departmentId:'cs',category:'DSC'},
     {id:'other-major',departmentId:'eco',category:'DSC'},

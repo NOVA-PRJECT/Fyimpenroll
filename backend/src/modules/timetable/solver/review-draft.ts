@@ -24,6 +24,7 @@ export function createReviewDraft(result: OrtoolsSolverResult, courses: CourseNo
     const course = byId.get(session.courseId);
     if (!course || !Number.isInteger(session.periods) || session.periods < 1) throw new Error('Invalid unscheduled session.');
     return { ...session, id: `unscheduled-${index}`, courseName: course.courseTitle, courseCode: course.courseCode,
+      category: course.category,
       departmentId: course.departmentId, departmentName: course.departmentName,
       reason: `${session.periods} ${session.sessionType} period(s) unscheduled. ${session.reason}`,
       conflictingStudentCount: course.studentIds.size };

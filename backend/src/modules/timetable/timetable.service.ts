@@ -7,6 +7,7 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   UnprocessableEntityException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { z } from 'zod'
 import { SupabaseService } from '../../core/database/supabase.service'
@@ -20,6 +21,7 @@ import { FileConstraintStoreService } from './solver/file-constraint-store.servi
 import * as crypto from 'crypto'
 import { RuleDefinitionSchema } from './solver/schemas'
 import { readReviewDraft } from './solver/review-draft'
+import { loadTimetableAudience, belongsToCohort } from './timetable-audience'
 
 @Injectable()
 export class TimetableService implements OnModuleInit, OnModuleDestroy {
@@ -101,14 +103,30 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    let audience: Awaited<ReturnType<typeof loadTimetableAudience>> | undefined
     if (user.role === 'campus_director' && scope.campusId) {
+      try {
+        audience = await loadTimetableAudience(this.supabase.admin, scope.campusId, academicYear, semester)
+      } catch {
+        throw new ServiceUnavailableException('Could not load timetable enrollment. Please retry.')
+      }
+      campusDepartments = campusDepartments.filter(d => audience!.departmentCounts.has(d.id))
+        .map(d => ({ ...d, registeredStudentCount: audience!.departmentCounts.get(d.id) }))
+      if (campusDepartments.length === 0 || (departmentId && !audience.departmentCounts.has(departmentId))) {
+        return { academicYear, semester, departments: campusDepartments, entries: [], conflicts: [] }
+      }
       const review = await readReviewDraft(this.supabase.admin, scope.campusId, academicYear, semester)
-      if (review) return {
-        academicYear, semester, departments: campusDepartments, reviewDraft: true,
-        unscheduledPeriods: review.unscheduledPeriods, diagnostics: review.diagnostics,
-        entries: departmentId ? review.entries.filter((entry: any) => entry.departmentId === departmentId ||
-          ['MDC', 'SEC', 'VAC', 'AEC'].includes((entry.category || '').trim().toUpperCase())) : review.entries,
-        conflicts: departmentId ? review.conflicts.filter((entry: any) => entry.departmentId === departmentId) : review.conflicts,
+      if (review) {
+        const decorate = <T extends { courseId: string }>(entry: T) => ({ ...entry,
+          enrolledDepartmentIds: audience!.courseDepartments.get(entry.courseId) || [] })
+        const entries = review.entries.map(decorate)
+        const conflicts = review.conflicts.map(decorate)
+        return {
+          academicYear, semester, departments: campusDepartments, reviewDraft: true,
+          unscheduledPeriods: review.unscheduledPeriods, diagnostics: review.diagnostics,
+          entries: departmentId ? entries.filter(entry => belongsToCohort(entry, departmentId)) : entries,
+          conflicts: departmentId ? conflicts.filter(entry => belongsToCohort(entry, departmentId)) : conflicts,
+        }
       }
     }
 
@@ -126,7 +144,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     if (scope.campusId && campusDeptIds.length > 0) {
       deptsFetchQuery = deptsFetchQuery.in('id', campusDeptIds)
     }
-    const { data: allDepartmentsData } = await deptsFetchQuery
+    const { data: allDepartmentsData } = audience ? { data: campusDepartments } : await deptsFetchQuery
 
     let query = this.supabase.admin
       .from('timetable_entries')
@@ -135,6 +153,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         academic_year,
         semester,
         time_slot_id,
+        course_id,
         department_id,
         campus_id,
         teacher_id,
@@ -179,7 +198,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       if (departmentId) {
         query = query.eq('department_id', departmentId)
       }
-    } else if (departmentId) {
+    } else if (departmentId && !audience) {
       query = query.eq('department_id', departmentId)
     } else if (user.role === 'hod' && user.department_id) {
       query = query.eq('department_id', user.department_id)
@@ -222,6 +241,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       credits: entry.courses?.credits,
       isLabBlock: entry.is_lab_block,
       status: entry.status,
+      ...(audience ? { enrolledDepartmentIds: audience.courseDepartments.get(entry.course_id) || [] } : {}),
     }))
 
     // STUDENTS never receive conflict rows!
@@ -248,6 +268,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
           id,
           course_code,
           title,
+          category,
           department_id,
           departments (
             id,
@@ -270,11 +291,13 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       courseId: c.course_id,
       courseCode: c.courses?.course_code,
       courseName: c.courses?.title || 'Unknown Course',
+      category: c.courses?.category,
       departmentId: c.courses?.department_id,
       departmentName: c.courses?.departments?.name,
       departmentCode: c.courses?.departments?.code,
       reason: c.reason,
       conflictingStudentCount: c.conflicting_student_count || 0,
+      ...(audience ? { enrolledDepartmentIds: audience.courseDepartments.get(c.course_id) || [] } : {}),
     }))
 
     if (scope.campusId && campusDeptIds.length > 0) {
@@ -284,14 +307,14 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (departmentId) {
-      formattedConflicts = formattedConflicts.filter((c: any) => c.departmentId === departmentId)
+      formattedConflicts = formattedConflicts.filter((c: any) => audience ? belongsToCohort(c, departmentId) : c.departmentId === departmentId)
     }
 
     return {
       academicYear,
       semester,
       departments: allDepartmentsData || [],
-      entries: formattedEntries,
+      entries: audience && departmentId ? formattedEntries.filter(entry => belongsToCohort(entry, departmentId)) : formattedEntries,
       conflicts: formattedConflicts,
     }
   }

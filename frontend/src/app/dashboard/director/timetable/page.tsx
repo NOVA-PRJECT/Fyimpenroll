@@ -22,6 +22,7 @@ interface TimetableEntry {
   departmentId: string;
   departmentName: string;
   departmentCode?: string;
+  enrolledDepartmentIds?: string[];
   day: number;
   period: number;
   startTime: string;
@@ -32,6 +33,8 @@ interface TimetableEntry {
 }
 
 interface ConflictItem {
+  category?: string;
+  enrolledDepartmentIds?: string[];
   id?: string;
   courseId: string;
   courseName: string;
@@ -194,7 +197,7 @@ export default function CampusDirectorTimetablePage() {
         const conflictsList = data.conflicts ?? [];
         let deptList = data.departments ?? [];
 
-        if (!deptList || deptList.length === 0) {
+        if (!Array.isArray(data.departments)) {
           const deptMap = new Map<string, string>();
           entriesList.forEach((e: TimetableEntry) => {
             if (e.departmentId) deptMap.set(e.departmentId, e.departmentName);
@@ -521,16 +524,6 @@ export default function CampusDirectorTimetablePage() {
         deptMap.set(d.id, { id: d.id, name: d.name, code: d.code || d.name });
       });
 
-      allEntries.forEach((e) => {
-        if (e.departmentId && !deptMap.has(e.departmentId)) {
-          deptMap.set(e.departmentId, {
-            id: e.departmentId,
-            name: e.departmentName || 'Department',
-            code: e.departmentName || 'Dept',
-          });
-        }
-      });
-
       const deptsToExport = targetDept === 'all'
         ? Array.from(deptMap.values())
         : Array.from(deptMap.values()).filter((d) => d.id === targetDept);
@@ -625,7 +618,7 @@ export default function CampusDirectorTimetablePage() {
         const pendingSheet = wb.addWorksheet(getUniqueSheetName('Unscheduled sessions'));
         pendingSheet.addRow(['REVIEW DRAFT — INCOMPLETE; NOT FOR PUBLICATION']);
         pendingSheet.addRow(['Course code', 'Course', 'Department', 'Session', 'Remaining periods', 'Reason']);
-        allConflicts.filter(c => targetDept === 'all' || c.departmentId === targetDept).forEach(c =>
+        (targetDept === 'all' ? allConflicts : entriesForDepartment(allConflicts, targetDept)).forEach(c =>
           pendingSheet.addRow([c.courseCode, c.courseName, c.departmentName, c.sessionType, c.periods, c.reason]));
         pendingSheet.columns.forEach(column => { column.width = 25; });
       }
@@ -662,10 +655,11 @@ export default function CampusDirectorTimetablePage() {
 
   const displayedConflicts = conflictDeptFilter === 'all'
     ? allConflicts
-    : allConflicts.filter((c) => c.departmentId === conflictDeptFilter);
+    : entriesForDepartment(allConflicts, conflictDeptFilter);
+  const visibleConflicts = !selectedDeptId ? allConflicts : entriesForDepartment(allConflicts, selectedDeptId);
 
   const totalConflictingStudents = allConflicts.reduce((sum, c) => sum + (c.conflictingStudentCount || 0), 0);
-  const impactedDeptIds = new Set(allConflicts.map((c) => c.departmentId).filter(Boolean));
+  const impactedDeptIds = new Set(departments.filter(d => entriesForDepartment(allConflicts, d.id).length).map(d => d.id));
 
   return (
     <div className={styles.pageWrapper}>
@@ -921,7 +915,7 @@ export default function CampusDirectorTimetablePage() {
                   <option value="all">All Departments ({allConflicts.length})</option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.code || d.name} ({allConflicts.filter((c) => c.departmentId === d.id).length})
+                      {d.code || d.name} ({entriesForDepartment(allConflicts, d.id).length})
                     </option>
                   ))}
                 </select>
@@ -965,7 +959,7 @@ export default function CampusDirectorTimetablePage() {
 
                   <div className={styles.conflictFooter}>
                     <span>👥 Impacted Students: <strong>{c.conflictingStudentCount} student(s)</strong></span>
-                    {c.departmentId && (
+                    {departments.some(d => entriesForDepartment([c], d.id).length) && (
                       <button
                         style={{
                           background: '#002147',
@@ -977,9 +971,9 @@ export default function CampusDirectorTimetablePage() {
                           cursor: 'pointer',
                           fontWeight: 600,
                         }}
-                        onClick={() => handleDeptChange(c.departmentId!)}
+                        onClick={() => handleDeptChange(departments.find(d => entriesForDepartment([c], d.id).length)!.id)}
                       >
-                        View {c.departmentCode || c.departmentName} Grid →
+                        View Student Department Grid →
                       </button>
                     )}
                   </div>
@@ -1081,7 +1075,7 @@ export default function CampusDirectorTimetablePage() {
               <div className={styles.conflictsSectionCard} style={{ marginTop: '2rem' }}>
                 <div className={styles.conflictsSectionHeader}>
                   <h4 className={styles.conflictsSectionTitle} style={{ fontSize: '1rem' }}>
-                    ⚠️ Scheduling Conflicts in Active View ({allConflicts.filter((c) => !selectedDeptId || c.departmentId === selectedDeptId).length} of {allConflicts.length})
+                    ⚠️ Scheduling Conflicts in Active View ({visibleConflicts.length} of {allConflicts.length})
                   </h4>
                   <button
                     style={{
@@ -1101,9 +1095,7 @@ export default function CampusDirectorTimetablePage() {
                 </div>
 
                 <div className={styles.conflictsList}>
-                  {allConflicts
-                    .filter((c) => !selectedDeptId || c.departmentId === selectedDeptId)
-                    .map((c, idx) => (
+                  {visibleConflicts.map((c, idx) => (
                       <div key={c.id || idx} className={styles.conflictItem}>
                         <div className={styles.conflictHeader}>
                           <div className={styles.conflictCourseTitle}>
@@ -1124,7 +1116,7 @@ export default function CampusDirectorTimetablePage() {
                       </div>
                     ))}
 
-                  {allConflicts.filter((c) => !selectedDeptId || c.departmentId === selectedDeptId).length === 0 && (
+                  {visibleConflicts.length === 0 && (
                     <p style={{ margin: '0.5rem 0', color: '#166534', fontWeight: 600, fontSize: '0.85rem' }}>
                       ✓ Zero conflicts in this department! (The remaining {allConflicts.length} conflict(s) are in other campus departments).
                     </p>
@@ -1281,11 +1273,11 @@ export default function CampusDirectorTimetablePage() {
         {reviewDraft && <div>
           <h2>INCOMPLETE REVIEW DRAFT — NOT FOR PUBLICATION</h2>
           <p>{unscheduledPeriods} course periods remain unscheduled.</p>
-          <ul>{allConflicts.filter(c => printTargetDept === 'all' || c.departmentId === printTargetDept).map((c, index) =>
+          <ul>{(printTargetDept === 'all' ? allConflicts : entriesForDepartment(allConflicts, printTargetDept)).map((c, index) =>
             <li key={c.id || index}>{c.courseCode}: {c.reason}</li>)}</ul>
         </div>}
         {(printTargetDept === 'all'
-          ? (departments.length > 0 ? departments : Array.from(new Set(allEntries.map((e) => e.departmentId))).map((id) => ({ id, name: allEntries.find((e) => e.departmentId === id)?.departmentName || 'Department' })))
+          ? departments
           : departments.filter((d) => d.id === printTargetDept)
         ).map((dept) => {
           const deptEntries = entriesForDepartment(allEntries, dept.id, departments.find(d => d.id === dept.id)?.code);
