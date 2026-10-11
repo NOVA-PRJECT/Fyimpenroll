@@ -26,11 +26,11 @@ test('campus paper identities survive different department slot layouts and sepa
 
 test('campus papers cannot be split to hide unequal hours or student overlap',async()=>{
   const unequal=[course('a','SEC',2),course('b','SEC',3)];
-  assert.throws(()=>detectParallelGroups(unequal),/identical total contact hours/);
-  assert.equal((await runOrtoolsSolver(payload(unequal))).status,'MODEL_INVALID');
+  assert.equal(detectParallelGroups(unequal).length,1);
+  assert.equal((await runOrtoolsSolver(payload(unequal))).status,'INFEASIBLE');
   const overlapping=[course('a','MDC',3,'shared'),course('b','MDC',3,'shared')];
-  assert.throws(()=>detectParallelGroups(overlapping),/overlapping student enrollments/);
-  assert.equal((await runOrtoolsSolver(payload(overlapping))).status,'MODEL_INVALID');
+  assert.equal(detectParallelGroups(overlapping).length,1);
+  assert.equal((await runOrtoolsSolver(payload(overlapping))).status,'INFEASIBLE');
 });
 
 for(const category of ['MDC','SEC','VAC']) test(`${category} options synchronize across departments even if caller groups are missing or split`,async()=>{

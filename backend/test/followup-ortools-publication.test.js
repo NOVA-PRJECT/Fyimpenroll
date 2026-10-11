@@ -1,3 +1,4 @@
+function emptyReviewQuery(){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:null})};return q}
 /**
  * Test Suite for Follow-up Plan 06:
  * OR-Tools rule compilation, durable JSON file overrides, independent validation,
@@ -163,7 +164,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
       assert.strictEqual(violations.length, 0)
     })
 
-    it('rejects a 3-hour Semester 3 VAC course at preflight before invoking solver or writing draft', () => {
+    it('accepts catalogue VAC hours for the solver to report sessions outside its window', () => {
       const courses = [
         {
           courseId: 'vac-excess',
@@ -174,15 +175,10 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
         },
       ]
 
-      assert.throws(
-        () => {
-          validatePreflightRules(courses, 3)
-        },
-        /exceeds the mandatory Semester 3 Monday P5\+P6 \(2-hour\) window/
-      )
+      assert.doesNotThrow(() => validatePreflightRules(courses, 3))
     })
 
-    it('solver rejects 3-hour Semester 3 VAC as MODEL_INVALID if passed directly', async () => {
+    it('solver reports 3-hour Semester 3 VAC as INFEASIBLE if passed directly', async () => {
       const payload = {
         academic_year: '2025-2026',
         semester: 3,
@@ -203,7 +199,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
       }
 
       const result = await runOrtoolsSolver(payload)
-      assert.strictEqual(result.status, 'MODEL_INVALID')
+      assert.strictEqual(result.status, 'INFEASIBLE')
       assert.ok(result.diagnostics.some((d) => d.includes('exceeds the mandatory Semester 3 Monday P5+P6')))
     })
 
@@ -239,7 +235,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
   // 3. R21: Strict Enforcement of Lab Blocks & Elimination of Odd Lab Exception
   // ──────────────────────────────────────────────────────────────────────────
   describe('3. R21: Strict Lab Blocks & Elimination of Odd Practical Workarounds', () => {
-    it('blocks odd-hour practical course data at preflight with actionable error', () => {
+    it('accepts odd practical catalogue hours for explicit unscheduled-session reporting', () => {
       const courses = [
         {
           courseId: 'bot-lab-1',
@@ -250,15 +246,10 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
         },
       ]
 
-      assert.throws(
-        () => {
-          validatePreflightRules(courses, 1)
-        },
-        /Practical courses must be scheduled in 2-period consecutive blocks \(no odd-hour practicals permitted under current academic rules\)/
-      )
+      assert.doesNotThrow(() => validatePreflightRules(courses, 1))
     })
 
-    it('solver rejects odd practical hours as MODEL_INVALID without scheduling single-period workaround', async () => {
+    it('solver reports odd practical hours as INFEASIBLE without scheduling single-period workaround', async () => {
       const payload = {
         academic_year: '2025-2026',
         semester: 1,
@@ -279,7 +270,7 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
       }
 
       const result = await runOrtoolsSolver(payload)
-      assert.strictEqual(result.status, 'MODEL_INVALID')
+      assert.strictEqual(result.status, 'INFEASIBLE')
       assert.ok(result.diagnostics.some((d) => d.includes('practicalHours=1 (odd number)')))
     })
 
@@ -436,17 +427,17 @@ describe('Follow-up Plan 06: OR-Tools Rule Compilation & Atomic Timetable Public
   // ──────────────────────────────────────────────────────────────────────────
   describe('6. R22: Atomic Draft Replacement & Publication Immutability Guards', () => {
     it("rejects publication when an active generation job is running for the cohort", async () => {
- const service=new TimetableService({admin:{rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"Cannot publish while generation is active"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
+ const service=new TimetableService({admin:{from:emptyReviewQuery,rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"Cannot publish while generation is active"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
  await assert.rejects(service.publish('2026-27',1,{userId:'dir',role:'campus_director',campus_id:'host'},true),/Cannot publish while generation is active/)
 })
 
     it("rejects publication when no draft entries exist for the cohort", async () => {
- const service=new TimetableService({admin:{rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"No verified current draft"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
+ const service=new TimetableService({admin:{from:emptyReviewQuery,rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"No verified current draft"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
  await assert.rejects(service.publish('2026-27',1,{userId:'dir',role:'campus_director',campus_id:'host'},true),/No verified current draft/)
 })
 
     it("disallows force publish from bypassing hard constraint violations", async () => {
- const service=new TimetableService({admin:{rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"Cannot publish with unresolved conflicts"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
+ const service=new TimetableService({admin:{from:emptyReviewQuery,rpc:async(name)=>{assert.equal(name,'publish_timetable_cohort');return {error:{message:"Cannot publish with unresolved conflicts"}}}}},{log:async()=>{}},{warn:()=>{},error:()=>{}})
  await assert.rejects(service.publish('2026-27',1,{userId:'dir',role:'campus_director',campus_id:'host'},true),/Cannot publish with unresolved conflicts/)
 })
   })

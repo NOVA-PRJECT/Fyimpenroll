@@ -90,6 +90,14 @@ test('publication rejects a visiting teacher already published in another cohort
   await db.query('DELETE FROM timetable_entries WHERE campus_id=$1',[id(90)])
   assert.equal((await call('publish_timetable_cohort',[campus,'2026-27',1])).published_count,1)
 })
+test('a completed review preview without a fingerprint blocks publication of an older verified draft',async()=>{
+  await reset();const first=(await claim()).job_id;await running(first);await commit(first);
+  const review=(await claim()).job_id;await running(review);
+  await db.query("UPDATE system_logs SET status='completed',completed_at=now()+interval '1 second',metadata=metadata || $2::jsonb WHERE id=$1",
+    [review,JSON.stringify({reviewDraft:{kind:'review_draft',unscheduledPeriods:2}})]);
+  await assert.rejects(call('publish_timetable_cohort',[campus,'2026-27',1]),/No verified current draft/);
+  assert.equal(Number((await db.query("SELECT count(*) AS n FROM timetable_entries WHERE status='published'")).rows[0].n),0);
+});
 test('direct attendance metadata reads and browser RPC calls are denied; duplicate indexes are removed safely', async () => {
   for(const name of ['period_attendance_sessions','retired_cohorts']) {
     assert.equal((await db.query("SELECT has_table_privilege('authenticated',$1,'SELECT') AS allowed",[name])).rows[0].allowed,false)

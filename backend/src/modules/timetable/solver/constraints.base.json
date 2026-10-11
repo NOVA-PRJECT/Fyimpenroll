@@ -206,7 +206,7 @@
       "targetCategory": "MDC",
       "isHard": true,
       "version": 1,
-      "description": "MDC courses have 3 theory hours and no practicals, split into a 2-hour continuous session on one day and a 1-hour session on another day",
+      "description": "For MDC courses whose catalogue specifies 3 theory and 0 practical hours, split theory into 2 continuous periods and 1 period on another day. Other contact hours follow the catalogue.",
       "parameters": {
         "theoryHours": 3,
         "practicalHours": 0,
@@ -260,7 +260,7 @@
     "1": {
       "hard_constraints": [
         "Common campus AEC first paper KU01AECENG101: Tuesday P4-P6; second paper KU01AECENG102: Wednesday P4-P6 (13:30-16:30)",
-        "MDC courses have 3 theory hours and no practicals, split into a 2-hour continuous session on one day and a 1-hour session on another day"
+        "MDC with catalogue hours of 3 theory and 0 practical uses a 2+1 theory split; other contact hours follow the catalogue"
       ],
       "soft_constraints": [
         "Prefer placing MDC 2-hour sessions on Thursdays and 1-hour sessions on Fridays"

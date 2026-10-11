@@ -51,17 +51,8 @@ export function buildCampusPaperGroups(courses: CourseNode[]): ParallelGroup[] {
   const groups: ParallelGroup[] = [];
   for (const [key, bucket] of [...buckets].sort(([a], [b]) => a.localeCompare(b))) {
     bucket.sort((a, b) => a.courseCode.localeCompare(b.courseCode));
-    const expected = bucket[0].theoryHours + bucket[0].practicalHours;
-    const students = new Set<string>();
-    for (const course of bucket) {
-      if (course.theoryHours + course.practicalHours !== expected) {
-        throw new Error(`[Campus Paper Conflict] ${key} requires identical total contact hours across departments. ${bucket.map(c => `${c.courseCode}=${c.theoryHours + c.practicalHours}`).join(', ')}. Correct the catalogue; this common paper cannot be split.`);
-      }
-      if ([...course.studentIds].some(id => students.has(id))) {
-        throw new Error(`[Campus Paper Conflict] ${key} contains overlapping student enrollments across course options. Correct the selections; this common paper cannot be split.`);
-      }
-      course.studentIds.forEach(id => students.add(id));
-    }
+    // Incompatible hours/enrollments remain one mandatory group. The solver can
+    // return a review draft with missing sessions, never split the campus block.
     if (bucket.length > 1) groups.push({ groupId: `campus:${key}`, departmentId: 'CAMPUS_WIDE',
       category: bucket[0].category.toUpperCase().trim(), isCampusWide: true,
       courseIds: bucket.map(c => c.courseId), courseCodes: bucket.map(c => c.courseCode) });

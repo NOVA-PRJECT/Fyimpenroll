@@ -19,6 +19,7 @@ export function validateTimetable(
   options?: {
     semester?: number;
     effectiveRules?: EffectiveRuleDocument | RuleDefinition[];
+    allowPartial?: boolean; // Review previews only; publication always requires complete coverage.
   }
 ): ValidationViolation[] {
   const violations: ValidationViolation[] = [];
@@ -39,7 +40,7 @@ export function validateTimetable(
   for (const course of courses) {
     if (course.theoryHours > 0 || course.practicalHours > 0) {
       const assignment = response.assignments.find((a) => a.courseId === course.courseId);
-      if (!assignment || assignment.slots.length === 0) {
+      if ((!assignment || assignment.slots.length === 0) && !options?.allowPartial) {
         violations.push({
           type: 'unplaced_course',
           courseId: course.courseId,
@@ -64,10 +65,6 @@ export function validateTimetable(
     if (!course) continue;
 
     const category = (course.category || '').toUpperCase().trim();
-    if (category === 'MDC' && (course.practicalHours !== 0 || (semester === 1 && course.theoryHours !== 3))) {
-      violations.push({ type: 'hours_mismatch', courseId: course.courseId,
-        detail: `Course ${course.courseCode} (MDC) must have no practical hours; Semester 1 requires 3 theory hours. Correct the course catalogue before publication.` });
-    }
     const categoryWindows = rulesList.filter(r => r.kind === 'CATEGORY_WINDOW' && r.isHard &&
       (!r.targetSemester || r.targetSemester === semester) &&
       (!r.targetCategory || r.targetCategory.toUpperCase().trim() === category) &&
@@ -234,14 +231,14 @@ export function validateTimetable(
     }
 
     // Hours mismatch check
-    if (theoryCount !== course.theoryHours) {
+    if (options?.allowPartial ? theoryCount > course.theoryHours : theoryCount !== course.theoryHours) {
       violations.push({
         type: 'hours_mismatch',
         courseId: assignment.courseId,
         detail: `Course ${course.courseCode} needs ${course.theoryHours} theory hours but got ${theoryCount}`,
       });
     }
-    if (practicalCount !== course.practicalHours) {
+    if (options?.allowPartial ? practicalCount > course.practicalHours : practicalCount !== course.practicalHours) {
       violations.push({
         type: 'hours_mismatch',
         courseId: assignment.courseId,
@@ -250,7 +247,8 @@ export function validateTimetable(
     }
 
     // Semester 1 MDC rule: "split into a 2-hour continuous session on one day and a 1-hour session on another day"
-    if (semester === 1 && category === 'MDC' && course.theoryHours === 3 && course.practicalHours === 0) {
+    if (semester === 1 && category === 'MDC' && course.theoryHours === 3 && course.practicalHours === 0 &&
+        (!options?.allowPartial || theoryCount === 3)) {
       const slotsByDay = new Map<number, number[]>();
       for (const s of assignment.slots) {
         if (!slotsByDay.has(s.day)) slotsByDay.set(s.day, []);
@@ -394,9 +392,8 @@ export function validateTimetable(
   const departmentGroups = parallelGroups.filter(group =>
     !group.courseIds.some(id => CAMPUS_WIDE_CATEGORIES.has((courseMap.get(id)?.category || '').toUpperCase().trim())));
   for (const group of [...mandatoryGroups, ...departmentGroups]) {
-      const grpAssignments = response.assignments.filter((a) =>
-        group.courseIds.includes(a.courseId)
-      );
+      const grpAssignments = group.courseIds.map(courseId =>
+        response.assignments.find(a => a.courseId === courseId) || { courseId, slots: [] });
       if (grpAssignments.length < 2) continue;
 
       const refAssignment = grpAssignments[0];

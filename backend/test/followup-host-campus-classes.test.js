@@ -1,3 +1,4 @@
+function emptyReviewQuery(){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:null})};return q}
 /**
  * Automated Test Suite for Follow-up Plan 03: Host-campus classes and teacher identity
  * Findings covered: R06, R07, R08
@@ -66,7 +67,7 @@ describe('Follow-up Plan 03: Host-campus classes and teacher identity (R06, R07,
     })
 
     it('publication delegates exactly one host cohort to the atomic transaction', async () => {
- let args;const service=new TimetableService({admin:{rpc:async(name,input)=>{assert.equal(name,'publish_timetable_cohort');args=input;return {data:{success:true,published_count:1,published_at:'2026-10-10T00:00:00Z'}}}}},mockAuditLogger,mockServerLogger)
+ let args;const service=new TimetableService({admin:{from:emptyReviewQuery,rpc:async(name,input)=>{assert.equal(name,'publish_timetable_cohort');args=input;return {data:{success:true,published_count:1,published_at:'2026-10-10T00:00:00Z'}}}}},mockAuditLogger,mockServerLogger)
  const result=await service.publish('2025-26',1,{userId:'dir',role:'campus_director',campus_id:'campus-b'})
  assert.equal(result.publishedCount,1);assert.deepEqual(args,{p_campus_id:'campus-b',p_academic_year:'2025-26',p_semester:1})
 })

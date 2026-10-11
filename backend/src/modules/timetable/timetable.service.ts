@@ -19,6 +19,7 @@ import { getRedisClient } from './solver/redisClient'
 import { FileConstraintStoreService } from './solver/file-constraint-store.service'
 import * as crypto from 'crypto'
 import { RuleDefinitionSchema } from './solver/schemas'
+import { readReviewDraft } from './solver/review-draft'
 
 @Injectable()
 export class TimetableService implements OnModuleInit, OnModuleDestroy {
@@ -57,6 +58,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     const scope = AuthorizationPolicy.resolveTimetableScope(user)
 
     let campusDeptIds: string[] = []
+    let campusDepartments: any[] = []
     if (scope.campusId) {
       const { data: depts, error: deptsErr } = await this.supabase.admin
         .from('departments')
@@ -68,6 +70,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         throw new InternalServerErrorException(`Failed to resolve campus departments: ${deptsErr.message}`)
       }
       campusDeptIds = (depts || []).map((d: any) => d.id)
+      campusDepartments = depts || []
     }
 
     // If campus director and campus has no departments, return empty results immediately
@@ -95,6 +98,17 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         if (user.department_id && departmentId !== user.department_id) {
           throw new ForbiddenException('Students can only view timetable entries for their enrolled department')
         }
+      }
+    }
+
+    if (user.role === 'campus_director' && scope.campusId) {
+      const review = await readReviewDraft(this.supabase.admin, scope.campusId, academicYear, semester)
+      if (review) return {
+        academicYear, semester, departments: campusDepartments, reviewDraft: true,
+        unscheduledPeriods: review.unscheduledPeriods, diagnostics: review.diagnostics,
+        entries: departmentId ? review.entries.filter((entry: any) => entry.departmentId === departmentId ||
+          ['MDC', 'SEC', 'VAC', 'AEC'].includes((entry.category || '').trim().toUpperCase())) : review.entries,
+        conflicts: departmentId ? review.conflicts.filter((entry: any) => entry.departmentId === departmentId) : review.conflicts,
       }
     }
 
@@ -542,6 +556,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   // ──────────────── Publish ────────────────
   async publish(academicYear: string, semester: number, user: AuthUser, force = false) {
     if (!user.campus_id) throw new BadRequestException('Select an explicit campus before publication')
+    if (await readReviewDraft(this.supabase.admin, user.campus_id, academicYear, semester)) {
+      throw new UnprocessableEntityException('This review draft has unscheduled sessions. Resolve them and generate a complete verified timetable before publication.')
+    }
     const { data, error } = await this.supabase.admin.rpc('publish_timetable_cohort', {
       p_campus_id: user.campus_id, p_academic_year: academicYear, p_semester: semester,
     })

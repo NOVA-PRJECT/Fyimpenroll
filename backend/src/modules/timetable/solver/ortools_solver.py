@@ -45,18 +45,8 @@ def build_campus_paper_groups(courses):
         buckets.setdefault((category, paper), []).append(c)
     groups = []
     for (category, paper), bucket in sorted(buckets.items()):
-        expected = int(bucket[0].get("theoryHours", 0)) + int(bucket[0].get("practicalHours", 0))
-        students = set()
-        for c in bucket:
-            hours = int(c.get("theoryHours", 0)) + int(c.get("practicalHours", 0))
-            if hours != expected:
-                raise ValueError(f"[Campus Paper Conflict] {category} paper {paper} requires identical total contact hours "
-                                 "across departments. Correct the catalogue; this common paper cannot be split.")
-            members = set(c.get("studentIds", []))
-            if students.intersection(members):
-                raise ValueError(f"[Campus Paper Conflict] {category} paper {paper} contains overlapping student "
-                                 "enrollments across course options. Correct the selections; this common paper cannot be split.")
-            students.update(members)
+        # Incompatible hours/enrollments never split the campus block. In review
+        # mode, sessions that cannot synchronize remain explicitly unscheduled.
         if len(bucket) > 1:
             groups.append({"groupId": f"campus:{category}:paper:{paper}", "category": category,
                            "courseIds": [c["courseId"] for c in bucket]})
@@ -110,6 +100,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
     teacher_reservations = input_data.get("teacher_reservations", [])
     constraints = input_data.get("constraints", {})
     config = input_data.get("config", {})
+    allow_partial = config.get("allow_partial") is True
 
     max_seconds = float(config.get("max_time_in_seconds", 300))
     num_workers = int(config.get("num_workers", 4))
@@ -210,20 +201,10 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
         p_hours = int(c.get("practicalHours", 0))
         category = (c.get("category") or "").upper().strip()
 
-        if category == "MDC" and (p_hours != 0 or (semester == 1 and t_hours != 3)):
-            return {
-                "status": "MODEL_INVALID", "assignments": [],
-                "diagnostics": [f"Course {c.get('courseCode')} (MDC) has {t_hours} theory and {p_hours} practical hours. "
-                                "MDC courses have no practical hours; Semester 1 requires 3 theory hours. "
-                                "Correct the course catalogue before generation."],
-                "stats": {"wall_time_seconds": 0.0, "rule_hash": rule_hash,
-                          "total_courses": len(courses_data), "total_sessions_assigned": 0},
-            }
-
         # R21: Odd practical hours check - strictly prohibited under 2-period lab block rule
-        if p_hours % 2 != 0:
+        if p_hours % 2 != 0 and not allow_partial:
             return {
-                "status": "MODEL_INVALID",
+                "status": "INFEASIBLE",
                 "assignments": [],
                 "diagnostics": [
                     f"Course {c.get('courseCode')} ({cid}) has practicalHours={p_hours} (odd number). "
@@ -239,9 +220,9 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         # R18: Semester 3 VAC window check - required contact hours cannot exceed 2-hour window (Mon P5+P6)
-        if semester == 3 and category == "VAC" and (t_hours + p_hours) > 2:
+        if semester == 3 and category == "VAC" and (t_hours + p_hours) > 2 and not allow_partial:
             return {
-                "status": "MODEL_INVALID",
+                "status": "INFEASIBLE",
                 "assignments": [],
                 "diagnostics": [
                     f"Course {c.get('courseCode')} (VAC) requires {t_hours + p_hours} contact hours, "
@@ -275,7 +256,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                           "total_courses": len(courses_data), "total_sessions_assigned": 0}}
 
     capacity_conflict = find_overloaded_conflict_group(courses_data, len(campus_allowed_slots))
-    if capacity_conflict:
+    if capacity_conflict and not allow_partial:
         required = capacity_conflict["required"]
         available = len(campus_allowed_slots)
         return {
@@ -349,6 +330,10 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
         course_sessions[cid] = sessions
 
+        if p_hours % 2:
+            sessions.append({"id": "unpaired_practical", "type": "practical_unpaired",
+                             "duration": 1, "is_lab": True, "unpaired": True})
+
     # Decision Variables:
     # active_vars[(cid, d, p)] = list of BoolVars active at slot (d, p)
     active_vars: Dict[Tuple[str, int, int], List[cp_model.IntVar]] = {}
@@ -358,6 +343,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Store placement vars per session for exact constraints & reconstruction
     session_start_vars: Dict[Tuple[str, str], Dict[Tuple[int, int], cp_model.IntVar]] = {}
+    session_presence = {}
 
     for cid, sessions in course_sessions.items():
         c_meta = courses_by_id[cid]
@@ -368,7 +354,9 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
             dur = s["duration"]
             start_dict: Dict[Tuple[int, int], cp_model.IntVar] = {}
 
-            if dur == 1:
+            if s.get("unpaired"):
+                pass
+            elif dur == 1:
                 for d, p in ALL_SLOTS:
                     # Enforce campus allowed slots (R19)
                     if (d, p) not in course_allowed_slots[cid]:
@@ -388,12 +376,6 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     v = model.NewBoolVar(f"x_{cid}_{sid}_d{d}_p{p}")
                     start_dict[(d, p)] = v
                     active_vars[(cid, d, p)].append(v)
-
-                if start_dict:
-                    model.AddExactlyOne(list(start_dict.values()))
-                else:
-                    diagnostics.append(f"Domain for course {cid} session {sid} is empty under constraints.")
-                    model.AddBoolOr([])
 
             elif dur == 2:
                 # 2-hour continuous block
@@ -420,12 +402,18 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                         active_vars[(cid, d, p)].append(v)
                         active_vars[(cid, d, p + 1)].append(v)
 
-                if start_dict:
-                    model.AddExactlyOne(list(start_dict.values()))
-                else:
-                    diagnostics.append(f"Domain for 2-hour block {cid} session {sid} is empty under constraints.")
-                    model.AddBoolOr([])
-
+            if allow_partial:
+                present = model.NewBoolVar(f"present_{cid}_{sid}")
+                session_presence[(cid, sid)] = present
+                model.Add(sum(start_dict.values()) == present)
+                model.AddHint(present, 0)
+                for variable in start_dict.values():
+                    model.AddHint(variable, 0)
+            elif start_dict:
+                model.AddExactlyOne(list(start_dict.values()))
+            else:
+                diagnostics.append(f"Domain for course {cid} session {sid} is empty under constraints.")
+                model.AddBoolOr([])
             session_start_vars[(cid, sid)] = start_dict
 
     # ──────────────── Hard Constraints ────────────────
@@ -593,7 +581,13 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                         if d != 5:  # Not Friday
                             objective_terms.append(var * 2)
 
-    if objective_terms:
+    if allow_partial:
+        session_count = sum(len(sessions) for sessions in course_sessions.values())
+        coverage_weight = 1000 * (session_count + len(courses_data) + 1)
+        coverage = sum(s["duration"] * session_presence[(cid, s["id"])]
+                       for cid, sessions in course_sessions.items() for s in sessions)
+        model.Maximize(coverage * coverage_weight - sum(objective_terms))
+    elif objective_terms:
         model.Minimize(sum(objective_terms))
 
     # ──────────────── Solve ────────────────
@@ -622,6 +616,7 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
         diagnostics.append("Solver search timed out or returned UNKNOWN without finding a solution.")
 
     assignments: List[Dict[str, Any]] = []
+    unscheduled = []
 
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         for cid, sessions in course_sessions.items():
@@ -669,9 +664,22 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
                             "isLabBlock": True,
                         })
 
+                elif allow_partial:
+                    unscheduled.append({"courseId": cid, "sessionId": sid,
+                                        "sessionType": "practical" if is_lab else "theory", "periods": dur,
+                                        "reason": "A single practical hour cannot satisfy the two-period lab-block rule."
+                                        if s.get("unpaired") else
+                                        "No allowed placement for this session." if not start_dict else
+                                        "Not placed within the available periods and conflict-free scheduling rules."})
+
+    if allow_partial and status in (cp_model.OPTIMAL, cp_model.FEASIBLE) and unscheduled:
+        status_str = "PARTIAL"
+        diagnostics.append("Review draft only: unscheduled sessions must be resolved before publication.")
+
     return {
         "status": status_str,
         "assignments": assignments,
+        "unscheduled": unscheduled,
         "diagnostics": diagnostics,
         "stats": {
             "wall_time_seconds": round(elapsed, 3),

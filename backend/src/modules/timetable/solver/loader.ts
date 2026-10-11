@@ -31,21 +31,8 @@ function buildConflictSummary(
 
 export function validatePreflightRules(courses: CourseNode[], semester: number): void {
   for (const c of courses) {
-    if ((c.category || '').toUpperCase().trim() === 'MDC' &&
-        (c.practicalHours !== 0 || (semester === 1 && c.theoryHours !== 3))) {
-      throw new Error(`[Preflight Rule Conflict] Course ${c.courseCode} (MDC) has ${c.theoryHours} theory and ${c.practicalHours} practical hours. MDC courses have no practical hours; Semester 1 requires 3 theory hours. Correct the course catalogue before generation.`);
-    }
-    // R21: Practical contact hours must be in exact 2-period consecutive blocks
-    if (c.practicalHours % 2 !== 0) {
-      throw new Error(
-        `[Preflight Rule Conflict] Course ${c.courseCode} (${c.courseId}) has practicalHours=${c.practicalHours} (odd contact period). Practical courses must be scheduled in 2-period consecutive blocks (no odd-hour practicals permitted under current academic rules) (R21).`
-      );
-    }
-    // R18: Semester 3 VAC window check
-    if (semester === 3 && (c.category || '').toUpperCase() === 'VAC' && (c.theoryHours + c.practicalHours) > 2) {
-      throw new Error(
-        `[Preflight Rule Conflict] Course ${c.courseCode} (VAC) requires ${c.theoryHours + c.practicalHours} contact hours, which exceeds the mandatory Semester 3 Monday P5+P6 (2-hour) window (R18). Academic curriculum requires correction before scheduling.`
-      );
+    if (![c.theoryHours, c.practicalHours].every(hours => Number.isInteger(hours) && hours >= 0)) {
+      throw new Error(`[Preflight Rule Conflict] Course ${c.courseCode} has invalid contact hours. Hours must be nonnegative integers.`);
     }
   }
 }
@@ -325,8 +312,8 @@ export async function loadGenerationInput(
       departmentName: deptNameMap.get(c.department_id) || 'Department',
       courseCode: code,
       courseTitle: (c.title || 'Course').trim(),
-      theoryHours: c.theory_hours_per_week ?? 3,
-      practicalHours: c.practical_hours_per_week ?? 0,
+      theoryHours: c.theory_hours_per_week,
+      practicalHours: c.practical_hours_per_week,
       category: (c.category || 'General').trim(),
     });
   }

@@ -44,11 +44,14 @@ test('a campus time restriction cannot move the first AEC paper to Wednesday or 
   assert.equal(result.status,'INFEASIBLE');assert.equal(result.assignments.length,0);
 });
 
-test('MDC catalogue errors are rejected instead of silently dropping practicals',async()=>{
-  const invalid=course('mdc','KU01MDCPSY101','MDC',2,2);
-  assert.throws(()=>validatePreflightRules([invalid],1),/3 theory hours/);
-  assert.equal((await runOrtoolsSolver(input([invalid]))).status,'MODEL_INVALID');
-  assert.ok(validateTimetable({assignments:[{courseId:'mdc',slots:[]}]},[invalid],slotMap,[],[],{semester:1}).some(v=>v.detail.includes('no practical hours')));
+test('MDC contact hours follow the catalogue, including practicals when configured',async()=>{
+  const configured=course('mdc','KU01MDCPSY101','MDC',2,2);
+  assert.doesNotThrow(()=>validatePreflightRules([configured],1));
+  const actual=await runOrtoolsSolver(input([configured]));
+  assert.ok(['OPTIMAL','FEASIBLE'].includes(actual.status));
+  assert.equal(actual.assignments.filter(a=>a.sessionType==='theory').length,2);
+  assert.equal(actual.assignments.filter(a=>a.sessionType==='practical').length,2);
+  assert.deepEqual(validateTimetable(response(actual.assignments),[configured],slotMap,[],[],{semester:1,effectiveRules:rules}),[]);
   const valid=course('mdc','KU01MDCPSY101','MDC');
   assert.doesNotThrow(()=>validatePreflightRules([valid],1));
   const result=await runOrtoolsSolver(input([valid]));

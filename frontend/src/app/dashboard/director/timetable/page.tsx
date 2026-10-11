@@ -41,6 +41,8 @@ interface ConflictItem {
   departmentCode?: string;
   reason: string;
   conflictingStudentCount: number;
+  sessionType?: 'theory' | 'practical';
+  periods?: number;
 }
 
 interface BaseConstraintsData {
@@ -102,6 +104,8 @@ export default function CampusDirectorTimetablePage() {
   // Timetable data state
   const [allEntries, setAllEntries] = useState<TimetableEntry[]>([]);
   const [allConflicts, setAllConflicts] = useState<ConflictItem[]>([]);
+  const [reviewDraft, setReviewDraft] = useState(false);
+  const [unscheduledPeriods, setUnscheduledPeriods] = useState(0);
   const [departments, setDepartments] = useState<{ id: string; name: string; code?: string }[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [conflictDeptFilter, setConflictDeptFilter] = useState<string>('all');
@@ -200,6 +204,8 @@ export default function CampusDirectorTimetablePage() {
 
         setAllEntries(entriesList);
         setAllConflicts(conflictsList);
+        setReviewDraft(data.reviewDraft === true);
+        setUnscheduledPeriods(data.unscheduledPeriods || 0);
         setDepartments(deptList);
       } catch (err: unknown) {
         setError((err instanceof Error ? err.message : ''));
@@ -445,6 +451,10 @@ export default function CampusDirectorTimetablePage() {
 
   async function handlePublish(force = false) {
     if (!settingsReady || loading || error) return;
+    if (reviewDraft || allConflicts.length > 0) {
+      setErrorMsg('Resolve unscheduled sessions and generate a complete verified timetable before publication.');
+      return;
+    }
     setPublishing(true);
     setPublishModalError(null);
     setPublishConflicts(null);
@@ -542,7 +552,7 @@ export default function CampusDirectorTimetablePage() {
 
       if (targetDept === 'all') {
         const allSheetRows: string[][] = [
-          ['KANNUR UNIVERSITY — ALL DEPARTMENTS TIMETABLE OVERVIEW'],
+          [`KANNUR UNIVERSITY — ALL DEPARTMENTS ${reviewDraft ? 'INCOMPLETE REVIEW DRAFT' : 'TIMETABLE OVERVIEW'}`],
           [`Academic Year: ${academicYear} | Semester: ${semester}`],
           [],
         ];
@@ -583,7 +593,7 @@ export default function CampusDirectorTimetablePage() {
       deptsToExport.forEach((dept) => {
         const deptEntries = entriesForDepartment(allEntries, dept.id, dept.code);
         const sheetData: string[][] = [
-          [`KANNUR UNIVERSITY — ${dept.name.toUpperCase()} TIMETABLE`],
+          [`KANNUR UNIVERSITY — ${dept.name.toUpperCase()} ${reviewDraft ? 'INCOMPLETE REVIEW DRAFT' : 'TIMETABLE'}`],
           [`Academic Year: ${academicYear} | Semester: ${semester}`],
           [],
           ['Day / Period', ...PERIODS.map((p) => `${p.label} (${p.time})`)],
@@ -611,8 +621,16 @@ export default function CampusDirectorTimetablePage() {
       });
 
       const selectedDeptObj = deptMap.get(targetDept);
+      if (reviewDraft) {
+        const pendingSheet = wb.addWorksheet(getUniqueSheetName('Unscheduled sessions'));
+        pendingSheet.addRow(['REVIEW DRAFT — INCOMPLETE; NOT FOR PUBLICATION']);
+        pendingSheet.addRow(['Course code', 'Course', 'Department', 'Session', 'Remaining periods', 'Reason']);
+        allConflicts.filter(c => targetDept === 'all' || c.departmentId === targetDept).forEach(c =>
+          pendingSheet.addRow([c.courseCode, c.courseName, c.departmentName, c.sessionType, c.periods, c.reason]));
+        pendingSheet.columns.forEach(column => { column.width = 25; });
+      }
       const fileTag = targetDept === 'all' ? 'All_Departments' : (selectedDeptObj?.code || selectedDeptObj?.name || 'Department');
-      const filename = `FYIMP_Timetable_${fileTag}_${academicYear}_Sem${semester}.xlsx`;
+      const filename = `FYIMP_${reviewDraft ? 'Review_Draft' : 'Timetable'}_${fileTag}_${academicYear}_Sem${semester}.xlsx`;
       const excelBuffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([excelBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -672,6 +690,11 @@ export default function CampusDirectorTimetablePage() {
       </div>
 
       <div className={styles.mainContent}>
+        {reviewDraft && <div role="status" className={styles.bannerWarning}>
+          <strong>Incomplete review draft — {unscheduledPeriods} course periods remain unscheduled.</strong>
+          <p>The displayed sessions satisfy the scheduling rules. Review the unscheduled sessions, adjust the catalogue or rules as appropriate, then generate again. This draft cannot be published.</p>
+          <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
+        </div>}
         {!rulesReady && !rulesError && <p role="status">Loading scheduling rules…</p>}
         {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-800">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
         {!settingsReady && !settingsError && <p role="status">Loading campus settings…</p>}
@@ -757,7 +780,7 @@ export default function CampusDirectorTimetablePage() {
                 {jobStatus === 'running' || jobStatus === 'queued' ? 'Generating...' : '⚡ Generate AI Timetable'}
               </button>
 
-              {allEntries.length > 0 && (
+              {(allEntries.length > 0 || reviewDraft) && (
                 <>
                   <button
                     className={styles.exportExcelBtn}
@@ -782,7 +805,7 @@ export default function CampusDirectorTimetablePage() {
                       setPublishConflicts(null);
                       setShowPublishModal(true);
                     }}
-                    disabled={!settingsReady || loading || !!error}
+                    disabled={!settingsReady || loading || !!error || reviewDraft || allConflicts.length > 0}
                     title="Publish timetable for students and faculty"
                     style={{ background: '#059669' }}
                   >
@@ -828,7 +851,7 @@ export default function CampusDirectorTimetablePage() {
                 ⚠️ {allConflicts.length} Course Scheduling Conflict(s) Require Attention
               </p>
               <p style={{ margin: 0, fontSize: '0.82rem', color: '#78350f' }}>
-                Some courses could not be placed due to student timetable overlaps across departments.
+                Required sessions remain unscheduled under the current hours, available periods and scheduling rules.
               </p>
             </div>
             <button
@@ -884,7 +907,7 @@ export default function CampusDirectorTimetablePage() {
                   ⚠️ Campus Scheduling Conflicts ({allConflicts.length})
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  The following courses could not be assigned to time slots due to student schedule clashes.
+                  These required sessions remain unscheduled. Partially scheduled courses may still appear in the timetable grid.
                 </p>
               </div>
 
@@ -909,7 +932,7 @@ export default function CampusDirectorTimetablePage() {
             <div className={styles.conflictsSummaryGrid}>
               <div className={styles.conflictStatCard}>
                 <p className={styles.conflictStatValue}>{allConflicts.length}</p>
-                <p className={styles.conflictStatLabel}>Unplaced Courses</p>
+                <p className={styles.conflictStatLabel}>Unscheduled Sessions</p>
               </div>
               <div className={styles.conflictStatCard}>
                 <p className={styles.conflictStatValue}>{impactedDeptIds.size}</p>
@@ -1255,6 +1278,12 @@ export default function CampusDirectorTimetablePage() {
 
       {/* Dedicated PDF Print Section */}
       <div className={styles.printArea}>
+        {reviewDraft && <div>
+          <h2>INCOMPLETE REVIEW DRAFT — NOT FOR PUBLICATION</h2>
+          <p>{unscheduledPeriods} course periods remain unscheduled.</p>
+          <ul>{allConflicts.filter(c => printTargetDept === 'all' || c.departmentId === printTargetDept).map((c, index) =>
+            <li key={c.id || index}>{c.courseCode}: {c.reason}</li>)}</ul>
+        </div>}
         {(printTargetDept === 'all'
           ? (departments.length > 0 ? departments : Array.from(new Set(allEntries.map((e) => e.departmentId))).map((id) => ({ id, name: allEntries.find((e) => e.departmentId === id)?.departmentName || 'Department' })))
           : departments.filter((d) => d.id === printTargetDept)

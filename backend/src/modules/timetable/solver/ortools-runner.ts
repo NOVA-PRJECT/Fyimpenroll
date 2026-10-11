@@ -43,6 +43,7 @@ export interface OrtoolsInputPayload {
     max_time_in_seconds?: number
     num_workers?: number
     random_seed?: number
+    allow_partial?: boolean
   }
 }
 
@@ -56,8 +57,9 @@ export interface OrtoolsAssignment {
 }
 
 export interface OrtoolsSolverResult {
-  status: 'OPTIMAL' | 'FEASIBLE' | 'INFEASIBLE' | 'UNKNOWN' | 'MODEL_INVALID'
+  status: 'OPTIMAL' | 'FEASIBLE' | 'PARTIAL' | 'INFEASIBLE' | 'UNKNOWN' | 'MODEL_INVALID'
   assignments: OrtoolsAssignment[]
+  unscheduled?: Array<{ courseId: string; sessionId: string; sessionType: 'theory' | 'practical'; periods: number; reason: string }>
   diagnostics: string[]
   stats: {
     wall_time_seconds: number

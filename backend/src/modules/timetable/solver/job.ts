@@ -5,6 +5,7 @@ import { runOrtoolsSolver, OrtoolsInputPayload } from './ortools-runner';
 import { loadGenerationInput } from './loader';
 import { validateTimetable, violationsToText } from './validator';
 import { DynamicConstraint, AIAssignment, AIGeneratorResponse } from './types';
+import { createReviewDraft, saveReviewDraft } from './review-draft';
 
 function formatSolverErrorMessage(raw: string): string {
   if (raw.includes('already exists') || raw.includes('immutable')) {
@@ -181,7 +182,7 @@ export async function runGenerationJob(
       },
       rules: effectiveDoc.rules,
       config: {
-        max_time_in_seconds: 300,
+        max_time_in_seconds: 240,
         num_workers: 4,
         random_seed: 42,
       },
@@ -190,7 +191,27 @@ export async function runGenerationJob(
     await reportProgress(40, '⚙️ Executing local OR-Tools CP-SAT constraint optimization...');
 
     // 4. Run solver process
-    const solverResult = await runOrtoolsSolver(ortoolsPayload);
+    let solverResult = await runOrtoolsSolver(ortoolsPayload);
+    if (solverResult.status === 'INFEASIBLE' || solverResult.status === 'UNKNOWN') {
+      const completeDiagnostics = solverResult.diagnostics;
+      await reportProgress(60, 'Building a conflict-free review draft and listing sessions that cannot fit...');
+      solverResult = await runOrtoolsSolver({ ...ortoolsPayload,
+        config: { ...ortoolsPayload.config, allow_partial: true, max_time_in_seconds: 60 } });
+      solverResult.diagnostics = [...completeDiagnostics, ...solverResult.diagnostics];
+      if (solverResult.status === 'UNKNOWN') {
+        solverResult.status = 'PARTIAL';
+        solverResult.assignments = [];
+        solverResult.unscheduled = courses.flatMap(course => [
+          ...Array.from({ length: course.theoryHours }, (_, i) => ({ courseId: course.courseId,
+            sessionId: `theory-${i + 1}`, sessionType: 'theory' as const, periods: 1,
+            reason: 'No verified placement was found before the search limit.' })),
+          ...Array.from({ length: Math.ceil(course.practicalHours / 2) }, (_, i) => ({ courseId: course.courseId,
+            sessionId: `practical-${i + 1}`, sessionType: 'practical' as const,
+            periods: Math.min(2, course.practicalHours - i * 2),
+            reason: 'No verified placement was found before the search limit.' })),
+        ]);
+      }
+    }
 
     await reportProgress(
       70,
@@ -199,16 +220,12 @@ export async function runGenerationJob(
     );
 
     // 5. Handle solver status
-    if (solverResult.status !== 'OPTIMAL' && solverResult.status !== 'FEASIBLE') {
+    if (!['OPTIMAL', 'FEASIBLE', 'PARTIAL'].includes(solverResult.status)) {
       if (solverResult.status === 'INFEASIBLE') {
         throw new Error(
           `OR-Tools proved timetable is INFEASIBLE under current constraints. Diagnostics: ${
             solverResult.diagnostics.join('; ') || 'No feasible slot combination exists'
           }`
-        );
-      } else if (solverResult.status === 'UNKNOWN') {
-        throw new Error(
-          `OR-Tools returned UNKNOWN after ${solverResult.stats.wall_time_seconds}s. Diagnostics: ${solverResult.diagnostics.join('; ') || 'No complete schedule found before the limit.'}`
         );
       } else {
         throw new Error(
@@ -247,6 +264,7 @@ export async function runGenerationJob(
       {
         semester,
         effectiveRules: effectiveDoc.rules,
+        allowPartial: solverResult.status === 'PARTIAL',
       }
     );
 
@@ -255,6 +273,16 @@ export async function runGenerationJob(
       throw new Error(
         `Independent validator rejected solver output with ${violations.length} violation(s): ${summary}`
       );
+    }
+
+    if (solverResult.status === 'PARTIAL') {
+      const draft = createReviewDraft(solverResult, courses);
+      await saveReviewDraft(dbClient, jobId, fencingToken, campusId!, draft);
+      await redis.set(redisKey, JSON.stringify({ status: 'completed', progress: 100, jobId,
+        stepMessage: `Review draft ready: ${draft.entries.length} periods placed and ${draft.unscheduledPeriods} unscheduled. Publication is blocked until all sessions are resolved.`,
+        stats: { ...loadStats, solverStatus: 'PARTIAL', unscheduledPeriods: draft.unscheduledPeriods },
+      }), { ex: 3600 }).catch(() => {});
+      return;
     }
 
     await reportProgress(

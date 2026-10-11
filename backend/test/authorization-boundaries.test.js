@@ -452,7 +452,7 @@ describe('Plan 01: Authorization & Role Boundaries (F01, F02, F03, F04, F05, F06
 
   describe('7. F04 & F05: Timetable Scoping, Draft Isolation & Empty-Campus Safety', () => {
     it('empty-campus publication rejects through the scoped transaction without a global update', async () => {
- let args;const service=new TimetableService({admin:{rpc:async(name,input)=>{args=input;return {error:{message:'No verified current draft'}}},from:()=>{throw Error('Direct publication forbidden')}}},mockAuditLogger,mockServerLogger)
+ let args;const service=new TimetableService({admin:{rpc:async(name,input)=>{args=input;return {error:{message:'No verified current draft'}}},from:table=>{assert.equal(table,'system_logs');const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:null})};return q}}},mockAuditLogger,mockServerLogger)
  await assert.rejects(service.publish('2026-27',1,{userId:'dir',role:'campus_director',campus_id:'empty-campus'}),/No verified current draft/)
  assert.equal(args.p_campus_id,'empty-campus')
 })

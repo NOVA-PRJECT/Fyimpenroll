@@ -1,4 +1,6 @@
--- User-confirmed catalogue correction: Semester 1 MDC = 3 theory hours, 0 practicals.
+-- HISTORICAL HANDOFF: superseded by catalogue-driven hours in TIMETABLE_REVIEW_DRAFTS.md.
+-- Do not apply as a routine release step. Current catalogue hours are authoritative.
+-- Earlier user-confirmed catalogue correction: Semester 1 MDC = 3 theory hours, 0 practicals.
 -- Apply manually in Supabase SQL Editor after reviewing the three course codes.
 -- No migrations, registrations, credits, allocations or timetable entries are changed.
 BEGIN;

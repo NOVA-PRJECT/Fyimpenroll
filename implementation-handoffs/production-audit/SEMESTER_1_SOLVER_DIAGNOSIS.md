@@ -1,5 +1,7 @@
 # Semester 1 solver failure diagnosis — 2026-10-11
 
+**Historical diagnosis:** The catalogue has changed since this report. See [catalogue hours and review drafts](TIMETABLE_REVIEW_DRAFTS.md) for the current behavior and refreshed feasible cohort. Fixed MDC hour checks are removed; the earlier 32-period conflict does not describe the latest data.
+
 For academic year 2026-27, Semester 1, the latest failed generation job lasted approximately 310 seconds. It used the shipped rules. Read-only diagnosis loaded 126 registrations, 18 courses, five departments and three parallel baskets. Real student and teacher identifiers stayed in memory; the local solver reproduction used anonymized identifiers. No production registrations, course hours, rules or timetable entries were changed.
 
 **Academic clarification:** Both AEC papers are common campus sessions. KU01AECENG101 must occupy Tuesday 13:30-16:30 and KU01AECENG102 Wednesday 13:30-16:30. Both already have all 126 students in one course node each; neither was multiplied by department in the capacity calculation. The shipped rule previously allowed either afternoon without fixing the paper order. The solver and independent validator now enforce the confirmed order, including when a browser supplies older saved rules.
