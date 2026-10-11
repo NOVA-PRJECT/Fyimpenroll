@@ -24,6 +24,7 @@ before(async()=>{
  assert.equal((await db.query("SELECT to_regclass('public.graduation_candidates') AS name")).rows[0].name,null)
  assert.equal((await db.query("SELECT count(*) n FROM schema_migrations WHERE version LIKE '2026101004%'")).rows[0].n,0)
  await db.exec(bundle)
+ await db.exec(fs.readFileSync(path.join(migrations,'20261011020000_security_advisor_function_hardening.sql'),'utf8'))
 })
 after(async()=>{await db?.close()})
 test('full plan and follow-up sequence composes on the actual base table constraints',async()=>{
@@ -42,7 +43,10 @@ test('allocation deadlines and claim timestamps use the same instant in a non-UT
  await db.exec("SET TIME ZONE 'Asia/Kolkata'")
  await db.query('INSERT INTO campuses(id,name,code) VALUES($1,$2,$3)',[id(1),'Synthetic Campus','TEST'])
  await db.query("UPDATE campus_settings SET academic_year='2026-27',deadline=now()-interval '30 minutes' WHERE campus_id=$1",[id(1)])
- const run=(await db.query('SELECT claim_allocation_run($1,$2,$3,$4,$5,$6) AS id',[id(1),'2026-27',1,id(2),300,id(3)])).rows[0].id
+ let run
+ await db.exec('SET ROLE service_role')
+ try { run=(await db.query('SELECT public.claim_allocation_run($1,$2,$3,$4,$5,$6) AS id',[id(1),'2026-27',1,id(2),300,id(3)])).rows[0].id }
+ finally { await db.exec('RESET ROLE') }
  assert.equal((await db.query("SELECT abs(extract(epoch FROM (started_at-now())))<2 AS correct FROM system_logs WHERE id=$1",[run])).rows[0].correct,true)
 })
 

@@ -45,3 +45,5 @@ This is an ordered inventory, not permission to replay destructive historical mi
 39. `supabase/migrations/20261010080000_production_timetable_transactions.sql`
 40. `supabase/migrations/20261010090000_production_attendance_summary.sql`
 41. `supabase/migrations/20261010100000_production_allocation_fencing_and_clocks.sql`
+42. `supabase/migrations/20261011010000_timetable_draft_delivery_repair.sql`
+43. `supabase/migrations/20261011020000_security_advisor_function_hardening.sql`

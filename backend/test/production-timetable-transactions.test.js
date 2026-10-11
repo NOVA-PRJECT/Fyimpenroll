@@ -50,6 +50,7 @@ before(async () => {
   await db.query("UPDATE system_logs SET status='failed' WHERE id=$1",[job])
   await db.exec(repair)
   await db.exec(repair) // Re-running the manual handoff must be safe.
+  await db.exec(readFileSync(path.join(__dirname,'../../supabase/migrations/20261011020000_security_advisor_function_hardening.sql'),'utf8'))
   assert.equal((await db.query('SELECT campus_id FROM timetable_entries')).rows[0].campus_id,null,'Migration preserves legacy rows')
   assert.equal((await db.query("SELECT to_regclass('timetable_entries_unique') AS old_key")).rows[0].old_key,null)
 })
@@ -59,7 +60,11 @@ async function call(name, args) {
   const { rows } = await db.query(`SELECT public.${name}(${args.map((_,i)=>`$${i+1}`).join(',')}) AS result`,args)
   return rows[0].result
 }
-async function claim() { return call('claim_timetable_generation_job',[campus,'2026-27',1,actor,600,token]) }
+async function claim() {
+  await db.exec('SET ROLE service_role')
+  try { return await call('claim_timetable_generation_job',[campus,'2026-27',1,actor,600,token]) }
+  finally { await db.exec('RESET ROLE') }
+}
 const entries = (patch = {}) => JSON.stringify([{ academic_year:'2026-27',semester:1,campus_id:campus,course_id:course,
   department_id:department,time_slot_id:slot,session_type:'theory',...patch }])
 async function running(job) { await call('update_timetable_worker',[job,token,'running',25,null]) }
