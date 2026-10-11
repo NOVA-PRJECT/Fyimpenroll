@@ -4,7 +4,7 @@ The completed 2026-27 Semester 1 production draft contains all 18 registered cou
 
 The director API now derives course audiences from all eight registration slots for the exact campus, academic year and semester. It returns only department IDs and registered-student counts; student identities are not included in the timetable response. The department list contains only cohorts with registered students. Course ownership remains unchanged, so a Statistics paper can appear in IT's cohort timetable while retaining Statistics as its teaching department.
 
-The director grid, unscheduled-session filters, Excel sheets, PDF grids and export selectors use the same enrollment audience. Campus category options retain their shared display. Excel and PDF no longer reconstruct empty department cohorts from course ownership. Empty registration results are authoritative; provider failures produce a retryable service error. Registration and student reads are paginated and student ID lookups are bounded; they avoid ambiguous PostgREST relationship embeddings on legacy databases. Teacher assignment views, HOD course-management authorization and students' published-only access retain their existing restrictions.
+The director grid, unscheduled-session filters, Excel sheets, PDF grids and export selectors use the same enrollment audience. Each department sees only the campus category papers its students selected, including MDC, SEC, VAC and AEC. Campus-wide synchronization determines when papers occur; it does not make every option relevant to every department. The campus overview retains all scheduled papers. Excel and PDF no longer reconstruct empty department cohorts from course ownership. Empty registration results are authoritative; provider failures produce a retryable service error. Registration and student reads are paginated and student ID lookups are bounded; they avoid ambiguous PostgREST relationship embeddings on legacy databases. Teacher assignment views, HOD course-management authorization and students' published-only access retain their existing restrictions.
 
 Read-only execution of the changed backend and frontend filter against the existing production draft produced:
 
@@ -15,6 +15,13 @@ Read-only execution of the changed backend and frontend filter against the exist
 | Physical Education & Sports | 40 | 12 | 30 |
 | School Of Behavioural Sciences | 33 | 10 | 30 |
 | Department of Economics | 13 | 12 | 26 |
+
+The enrollment-based campus-paper filter was also checked read-only against the
+same 50 saved entries. The MDC slot now shows 2 selected options for IT, 1 for
+Mathematical Science, 4 for Economics, 6 for Physical Education & Sports, and 4
+for Behavioural Sciences, instead of all 8 campus options in every grid. These
+counts describe the union of choices across students in a department. The shared
+MDC time slots and saved timetable entries remain unchanged.
 
 Statistics, Environmental Studies, and Wood Science have no home-department students in this cohort and therefore have no cohort tabs or export sheets. Their registered papers remain scheduled and appear for the departments whose students take them. Occupied-slot counts describe the union of each department's students' choices; they do not imply every individual student attends every option. A cohort needing 22 distinct periods can legitimately have eight blank weekly periods.
 

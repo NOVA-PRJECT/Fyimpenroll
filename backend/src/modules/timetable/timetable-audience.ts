@@ -2,7 +2,6 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util';
 
 const SLOT_FIELDS = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id`);
-const CAMPUS_CATEGORIES = new Set(['MDC', 'SEC', 'VAC', 'AEC']);
 
 /** Course ownership is distinct from the home departments of enrolled students. */
 export async function loadTimetableAudience(db: SupabaseClient, campusId: string, academicYear: string, semester: number) {
@@ -39,6 +38,5 @@ export async function loadTimetableAudience(db: SupabaseClient, campusId: string
 }
 
 export function belongsToCohort(entry: { category?: string; enrolledDepartmentIds?: string[] }, departmentId: string) {
-  return CAMPUS_CATEGORIES.has((entry.category || '').trim().toUpperCase()) ||
-    !!entry.enrolledDepartmentIds?.includes(departmentId);
+  return !!entry.enrolledDepartmentIds?.includes(departmentId);
 }

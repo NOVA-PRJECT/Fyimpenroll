@@ -8,7 +8,7 @@ test('cohort grids and exports show both minors taught elsewhere and exclude unr
     {id:'minor-two',departmentId:'stats',category:'DSC',enrolledDepartmentIds:['it']},
     {id:'owned-but-not-selected',departmentId:'it',category:'DSC',enrolledDepartmentIds:['math']},
     {id:'campus',departmentId:'stats',category:'MDC',enrolledDepartmentIds:['math']}];
-  assert.deepEqual(entriesForDepartment(entries,'it').map(e=>e.id),['major','minor-one','minor-two','campus']);
+  assert.deepEqual(entriesForDepartment(entries,'it').map(e=>e.id),['major','minor-one','minor-two']);
   assert.equal(entriesForDepartment(entries,'stats').some(e=>e.id==='minor-two'),false);
 });
 
@@ -18,13 +18,24 @@ test('unscheduled minor sessions follow the same cohort filter as placed entries
   assert.deepEqual(entriesForDepartment(conflicts,'it').map(e=>e.id),['minor']);
 });
 
-test('department views include every common campus paper without duplicating owned entries',()=>{
+test('legacy entries without enrollment metadata retain common paper and ownership fallback',()=>{
   const entries=[{id:'major',departmentId:'cs',category:'DSC'},
     {id:'other-major',departmentId:'eco',category:'DSC'},
     ...['MDC','SEC','VAC','AEC'].map(category=>({id:category,departmentId:'eco',category})),
     {id:'owned-aec',departmentId:'cs',category:'AEC'}];
   assert.deepEqual(entriesForDepartment(entries,'cs').map(e=>e.id),['major','MDC','SEC','VAC','AEC','owned-aec']);
   assert.equal(entriesForDepartment(entries,'eco').filter(e=>e.id==='MDC').length,1);
+});
+
+test.each(['MDC', 'SEC', 'VAC', 'AEC'])('%s slots show only papers selected by the department students', category => {
+  const entries = [
+    {id:'selected',category,departmentId:'stats',enrolledDepartmentIds:['it']},
+    {id:'other-department-option',category,departmentId:'it',enrolledDepartmentIds:['math']},
+    {id:'unselected',category,departmentId:'it',enrolledDepartmentIds:[]},
+    {id:'selected-by-both',category,departmentId:'stats',enrolledDepartmentIds:['it','math']},
+  ];
+  assert.deepEqual(entriesForDepartment(entries,'it').map(e=>e.id),['selected','selected-by-both']);
+  assert.deepEqual(entriesForDepartment(entries,'math').map(e=>e.id),['other-department-option','selected-by-both']);
 });
 
 test('department code aliases remain supported and uncategorized entries stay scoped',()=>{

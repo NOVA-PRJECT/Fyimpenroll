@@ -14,7 +14,7 @@ function fixture() {
     departments: [dept('it'), dept('math'), dept('stats'), dept('foreign', 'other-campus')],
     student_registrations: [registration('student-it', 'it', { slot_1_course_id: 'it-major', slot_2_course_id: 'math-minor',
       slot_3_course_id: 'stats-minor', slot_7_course_id: 'extra-seven', slot_8_course_id: 'extra-eight' }),
-      registration('student-math', 'math', { slot_1_course_id: 'math-minor', slot_2_course_id: 'it-major' }),
+      registration('student-math', 'math', { slot_1_course_id: 'math-minor', slot_2_course_id: 'it-major', slot_4_course_id: 'campus-mdc' }),
       registration('student-foreign', 'foreign', { campus_id: 'other-campus', slot_1_course_id: 'foreign-major' })],
     timetable_entries: [entry('it-major', 'it'), entry('math-minor', 'math'), entry('stats-minor', 'stats'),
       entry('extra-seven', 'stats'), entry('extra-eight', 'stats'), entry('campus-mdc', 'stats', 'MDC'),
@@ -58,12 +58,35 @@ test('director cohort view includes both external minors and all eight registrat
   const f = fixture(); const result = await f.service.getEntries('2026-27', 1, 'it', director);
   assert.deepEqual(result.departments.map(d => d.id), ['it', 'math']);
   assert.deepEqual(result.departments.map(d => d.registeredStudentCount), [1, 1]);
-  assert.deepEqual(result.entries.map(e => e.courseId), ['it-major', 'math-minor', 'stats-minor', 'extra-seven', 'extra-eight', 'campus-mdc']);
+  assert.deepEqual(result.entries.map(e => e.courseId), ['it-major', 'math-minor', 'stats-minor', 'extra-seven', 'extra-eight']);
   assert.deepEqual(result.entries.find(e => e.courseId === 'stats-minor').enrolledDepartmentIds, ['it']);
   assert.equal(result.entries.find(e => e.courseId === 'stats-minor').departmentId, 'stats', 'Course ownership is retained');
   assert.ok(!JSON.stringify(result).includes('student-it'));
   assert.ok(!JSON.stringify(result).includes('other-campus'));
   assert.ok(!result.entries.some(e => e.courseId === 'foreign-major'));
+});
+
+test('MDC cohort view includes enrolled options even when taught elsewhere, and excludes other or unselected options', async () => {
+  const f = fixture();
+  f.tables.student_registrations[0].slot_4_course_id = 'it-mdc';
+  f.tables.timetable_entries.push(f.entry('it-mdc', 'stats', 'MDC'), f.entry('unselected-mdc', 'it', 'MDC'));
+  const it = await f.service.getEntries('2026-27', 1, 'it', director);
+  const math = await f.service.getEntries('2026-27', 1, 'math', director);
+  assert.deepEqual(it.entries.filter(e=>e.category==='MDC').map(e=>e.courseId), ['it-mdc']);
+  assert.deepEqual(math.entries.filter(e=>e.category==='MDC').map(e=>e.courseId), ['campus-mdc']);
+  const campus = await f.service.getEntries('2026-27', 1, undefined, director);
+  assert.ok(campus.entries.some(e=>e.courseId==='campus-mdc'), 'Campus overview retains the other department option');
+});
+
+test('review-draft MDC entries and remaining sessions follow student choices', async () => {
+  const f = fixture();
+  f.tables.student_registrations[0].slot_4_course_id = 'it-mdc';
+  const options = ['it-mdc','campus-mdc','unselected-mdc'].map(courseId=>({courseId,departmentId:'stats',category:'MDC'}));
+  f.tables.system_logs.push({log_type:'timetable_job',campus_id:'campus',academic_year:'2026-27',semester:1,
+    status:'completed',metadata:{reviewDraft:{kind:'review_draft',unscheduledPeriods:3,entries:options,conflicts:options}}});
+  const result = await f.service.getEntries('2026-27', 1, 'it', director);
+  assert.deepEqual(result.entries.map(e=>e.courseId), ['it-mdc']);
+  assert.deepEqual(result.conflicts.map(e=>e.courseId), ['it-mdc']);
 });
 test('departments without cohort students do not produce grids; another term does not borrow registrations', async () => {
   const f = fixture();
