@@ -1,20 +1,17 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
-import { execFileSync } from 'node:child_process'
+import { Controller, Get, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { execFile } from 'node:child_process'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { FileConstraintStoreService } from '../timetable/solver/file-constraint-store.service'
 
 @Controller('api/health')
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name)
   private lastCheck?: { expires: number; result: Record<string, unknown>; ready: boolean }
   private pending?: Promise<{ result: Record<string, unknown>; ready: boolean }>
-  private readonly solverAvailable: boolean
-  constructor(private readonly supabase: SupabaseService) {
-    try {
-      execFileSync(process.env.PYTHON_PATH || (process.platform === 'win32' ? 'python' : 'python3'), ['-c', 'from ortools.sat.python import cp_model'], { timeout: 10000, stdio: 'ignore', windowsHide: true })
-      new FileConstraintStoreService().getBaseConstraints()
-      this.solverAvailable = true
-    } catch { this.solverAvailable = false }
-  }
+  private solverAvailable = false
+  private lastSolverError?: string
+  constructor(private readonly supabase: SupabaseService) {}
+
   @Get()
   check() { return { status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() } }
 
@@ -28,14 +25,45 @@ export class HealthController {
     if (!this.lastCheck.ready) throw new ServiceUnavailableException(this.lastCheck.result)
     return this.lastCheck.result
   }
-  private async checkDependencies() {
-    let database = false
+
+  private async checkSolver(): Promise<boolean> {
+    // Installed dependencies and repository rules are immutable for this process.
+    // Cache success, but retry a failed cold-start check on the next readiness cycle.
+    if (this.solverAvailable) return true
+    const binary = process.env.PYTHON_PATH || (process.platform === 'win32' ? 'python' : 'python3')
+    const failure = await new Promise<string | null>((resolve) => {
+      execFile(binary, ['-c', 'from ortools.sat.python import cp_model'],
+        { timeout: 30000, windowsHide: true }, (error, _stdout, stderr) => {
+          resolve(error ? (stderr.trim() || error.message).slice(0, 1500) : null)
+        })
+    })
+    let detail = failure
+    if (!detail) {
+      try { new FileConstraintStoreService().getBaseConstraints() }
+      catch (error) { detail = error instanceof Error ? error.message : 'Repository scheduling rules could not be loaded' }
+    }
+    if (detail) {
+      if (detail !== this.lastSolverError) this.logger.warn(`Timetable runtime readiness failed (${binary}): ${detail}`)
+      this.lastSolverError = detail
+      return false
+    }
+    if (this.lastSolverError) this.logger.log('Timetable runtime readiness recovered')
+    this.lastSolverError = undefined
+    this.solverAvailable = true
+    return true
+  }
+
+  private async checkDatabase(): Promise<boolean> {
     try {
       const { data, error } = await this.supabase.admin.rpc('production_readiness')
-      database = !error && data?.ready === true
-    } catch {}
-    const ready = database && this.solverAvailable
-    return { ready, result: { status: ready ? 'ready' : 'unavailable', database, solverAndRules: this.solverAvailable,
+      return !error && data?.ready === true
+    } catch { return false }
+  }
+
+  private async checkDependencies() {
+    const [database, solverAndRules] = await Promise.all([this.checkDatabase(), this.checkSolver()])
+    const ready = database && solverAndRules
+    return { ready, result: { status: ready ? 'ready' : 'unavailable', database, solverAndRules,
       rateLimiter: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'shared-with-local-fallback' : 'single-process',
       authenticationProvider: 'checked-on-authentication-requests' } }
   }

@@ -37,3 +37,11 @@ The job retains solver statistics on failure and distinguishes an unresolved tim
 - No schema migration, frontend or mobile changes are required.
 
 Backend build passed. The full backend suite with local file concurrency limited to two passed 254 tests; one separate-connection PostgreSQL test was skipped locally. An existing Friday-P6 test failed once in the initial fully parallel run, passed in isolation, and passed in the full bounded rerun. CI supplies PostgreSQL and checks the default test concurrency and clean deployment builds.
+
+## Runtime readiness recovery
+
+After Render restarted for the capacity-check release, public readiness returned database=true and solverAndRules=false. The supplied logs showed successful Nest startup but no Python or rule-loading error. The previous health controller discarded the exception from its synchronous ten-second startup import check and permanently cached failure. The exact Render failure cause remains unconfirmed from those logs.
+
+Readiness now checks Python asynchronously with a thirty-second timeout, checks the database concurrently, logs a failed import or invalid rules, and retries failures after the existing fifteen-second readiness cache expires. Concurrent callers share one probe. A successful Python/rules check remains cached for the process lifetime. Missing dependencies, invalid rules and database failures still return HTTP 503; errors are logged rather than exposed in the public response.
+
+The backend build and three targeted recovery tests passed. A real local Python import and rule check returned ready in 2.046 seconds. The complete backend suite passed 257 tests with one PostgreSQL integration test skipped locally. Deployment readiness and CI must be checked after pushing this follow-up.
