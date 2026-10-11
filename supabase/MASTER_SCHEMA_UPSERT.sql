@@ -209,13 +209,16 @@ CREATE TABLE IF NOT EXISTS timetable_entries (
     semester SMALLINT NOT NULL,
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+    campus_id UUID REFERENCES campuses(id) ON DELETE CASCADE,
     time_slot_id UUID NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
     is_lab_block BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'generated', 'published')),
     session_type TEXT DEFAULT 'theory',
     published_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(department_id, time_slot_id, academic_year, semester)
+    -- Parallel elective options may share a slot; each host course delivery remains unique.
+    CONSTRAINT timetable_entries_delivery_unique
+        UNIQUE NULLS NOT DISTINCT (campus_id, academic_year, semester, course_id, time_slot_id, department_id)
 );
 
 -- 14. Timetable Conflicts

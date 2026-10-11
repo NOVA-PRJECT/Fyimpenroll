@@ -21,7 +21,8 @@ before(async () => {
       academic_year text,semester int,user_id uuid,metadata jsonb DEFAULT '{}',progress int,error_message text,
       started_at timestamptz DEFAULT now(),created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),completed_at timestamptz);
     CREATE TABLE timetable_entries(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),campus_id uuid,academic_year text,semester int,
-      course_id uuid REFERENCES courses(id),department_id uuid,time_slot_id uuid REFERENCES time_slots(id),session_type text,is_lab_block boolean,teacher_id uuid,status text,published_at timestamptz);
+      course_id uuid REFERENCES courses(id),department_id uuid,time_slot_id uuid REFERENCES time_slots(id),session_type text,is_lab_block boolean,teacher_id uuid,status text,published_at timestamptz,
+      CONSTRAINT timetable_entries_unique UNIQUE(academic_year,semester,course_id,time_slot_id,department_id));
     CREATE TABLE timetable_conflicts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),course_id uuid,academic_year text,semester int,resolved boolean);
     CREATE TABLE period_attendance_sessions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),timetable_slot_id uuid,attendance_date date,
       CONSTRAINT uq_period_attendance_sessions UNIQUE(timetable_slot_id,attendance_date));
@@ -37,6 +38,20 @@ before(async () => {
   for (const file of ['20261010080000_production_timetable_transactions.sql','20261010090000_production_attendance_summary.sql']) {
     await db.exec(readFileSync(path.join(__dirname,'../../supabase/migrations',file),'utf8'))
   }
+  // Reproduce the deployed failure using the previous RPC and the real old key.
+  await db.query("INSERT INTO timetable_entries(campus_id,academic_year,semester,course_id,department_id,time_slot_id,session_type,status) VALUES(NULL,$1,1,$2,$3,$4,'theory','draft')",['2026-27',course,department,slot])
+  const job=(await claim()).job_id; await running(job)
+  await assert.rejects(commit(job),/timetable_entries_unique/)
+  assert.equal((await db.query('SELECT campus_id FROM timetable_entries')).rows[0].campus_id,null)
+  const repair=readFileSync(path.join(__dirname,'../../supabase/migrations/20261011010000_timetable_draft_delivery_repair.sql'),'utf8')
+  await assert.rejects(db.exec(repair),/generation is active/)
+  await db.exec('ROLLBACK')
+  assert.notEqual((await db.query("SELECT to_regclass('timetable_entries_unique') AS old_key")).rows[0].old_key,null)
+  await db.query("UPDATE system_logs SET status='failed' WHERE id=$1",[job])
+  await db.exec(repair)
+  await db.exec(repair) // Re-running the manual handoff must be safe.
+  assert.equal((await db.query('SELECT campus_id FROM timetable_entries')).rows[0].campus_id,null,'Migration preserves legacy rows')
+  assert.equal((await db.query("SELECT to_regclass('timetable_entries_unique') AS old_key")).rows[0].old_key,null)
 })
 after(async () => { await db?.close() })
 async function reset() { await db.exec("DELETE FROM timetable_conflicts; DELETE FROM timetable_entries; DELETE FROM system_logs WHERE log_type='timetable_job';") }
@@ -49,6 +64,80 @@ const entries = (patch = {}) => JSON.stringify([{ academic_year:'2026-27',semest
   department_id:department,time_slot_id:slot,session_type:'theory',...patch }])
 async function running(job) { await call('update_timetable_worker',[job,token,'running',25,null]) }
 async function commit(job, fencing = token, rows = entries()) { return call('atomic_replace_timetable_draft',[campus,'2026-27',1,rows,job,fencing]) }
+test('legacy campus-less drafts are replaced within their department campus only; failures roll back',async()=>{
+  await reset()
+  const otherDepartment=id(30),otherCampus=id(31)
+  await db.query('INSERT INTO departments VALUES($1,$2)',[otherDepartment,otherCampus])
+  await db.query(`INSERT INTO timetable_entries(campus_id,academic_year,semester,course_id,department_id,time_slot_id,session_type,status)
+    VALUES(NULL,'2026-27',1,$1,$2,$3,'theory','draft'),
+    ($4,'2026-27',1,$1,$2,$3,'theory','draft'),
+    (NULL,'2026-27',1,$1,$5,$3,'theory','draft'),
+    (NULL,'2027-28',1,$1,$2,$3,'theory','draft'),
+    (NULL,'2026-27',2,$1,$2,$3,'theory','draft')`,[course,department,slot,otherCampus,otherDepartment])
+  const job=(await claim()).job_id; await running(job)
+  const original=(await db.query('SELECT id FROM timetable_entries ORDER BY id')).rows
+  await assert.rejects(commit(job,id(88)),/worker claim/)
+  await assert.rejects(commit(job,token,entries({course_id:id(91)})),/foreign key/)
+  assert.deepEqual((await db.query('SELECT id FROM timetable_entries ORDER BY id')).rows,original)
+  assert.equal((await commit(job)).inserted_count,1)
+  assert.equal(Number((await db.query('SELECT count(*) AS n FROM timetable_entries')).rows[0].n),5)
+  assert.equal(Number((await db.query("SELECT count(*) AS n FROM timetable_entries WHERE campus_id IS NULL AND department_id=$1 AND academic_year='2026-27' AND semester=1",[department])).rows[0].n),0)
+  assert.equal((await db.query('SELECT status,metadata FROM system_logs WHERE id=$1',[job])).rows[0].status,'completed')
+  assert.ok((await db.query('SELECT metadata FROM system_logs WHERE id=$1',[job])).rows[0].metadata.draft_hash)
+})
+test('parallel category options share a department slot, but duplicate campus course deliveries fail',async()=>{
+  await reset();const otherCourse=id(32)
+  await db.query('INSERT INTO courses VALUES($1,$2)',[otherCourse,department])
+  const job=(await claim()).job_id;await running(job)
+  const parallel=[...JSON.parse(entries()),...JSON.parse(entries({course_id:otherCourse}))]
+  assert.equal((await commit(job,token,JSON.stringify(parallel))).inserted_count,2)
+  const replacement=(await claim()).job_id;await running(replacement)
+  await assert.rejects(commit(replacement,token,JSON.stringify([parallel[0],parallel[0]])),/timetable_entries_delivery_unique/)
+  assert.equal(Number((await db.query('SELECT count(*) AS n FROM timetable_entries')).rows[0].n),2)
+})
+test('published legacy rows prevent replacement, including a direct worker RPC call',async()=>{
+  await reset();const job=(await claim()).job_id;await running(job)
+  await db.query("INSERT INTO timetable_entries(campus_id,academic_year,semester,course_id,department_id,time_slot_id,status) VALUES(NULL,'2026-27',1,$1,$2,$3,'published')",[course,department,slot])
+  await assert.rejects(commit(job),/already published/)
+  assert.equal((await db.query('SELECT status FROM timetable_entries')).rows[0].status,'published')
+})
+test('delivery uniqueness also protects campus-less rows with nullable department fields',async()=>{
+  await reset()
+  const sql="INSERT INTO timetable_entries(campus_id,academic_year,semester,course_id,department_id,time_slot_id,status) VALUES(NULL,'2026-27',1,$1,NULL,$2,'draft')"
+  await db.query(sql,[course,slot])
+  await assert.rejects(db.query(sql,[course,slot]),/timetable_entries_delivery_unique/)
+})
+test('manual repair supports standalone and bootstrap keys, and rejects unexpected definitions without changing them',async()=>{
+  await reset()
+  const repair=readFileSync(path.join(__dirname,'../../supabase/migrations/20261011010000_timetable_draft_delivery_repair.sql'),'utf8')
+  const handoff=readFileSync(path.join(__dirname,'../../implementation-handoffs/production-audit/APPLY_TIMETABLE_DRAFT_REPAIR.sql'),'utf8')
+  assert.equal(handoff,repair,'Manual handoff must exactly match the tested migration')
+  await db.exec(`DROP INDEX timetable_entries_delivery_unique;
+    CREATE UNIQUE INDEX timetable_entries_unique ON timetable_entries(academic_year,semester,course_id,time_slot_id,department_id);
+    CREATE INDEX timetable_entries_unrelated_test ON timetable_entries(teacher_id,time_slot_id);`)
+  await db.exec(repair)
+  assert.notEqual((await db.query("SELECT to_regclass('timetable_entries_unrelated_test') AS idx")).rows[0].idx,null)
+  await db.exec(`DROP INDEX timetable_entries_delivery_unique;
+    ALTER TABLE timetable_entries ADD CONSTRAINT bootstrap_key UNIQUE(academic_year,semester,department_id,time_slot_id);`)
+  await db.exec(repair)
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_constraint WHERE conname='bootstrap_key'")).rows[0].n,0)
+  await db.exec(`CREATE UNIQUE INDEX timetable_entries_unique ON timetable_entries(id,teacher_id);`)
+  await assert.rejects(db.exec(repair),/Unexpected timetable_entries_unique/)
+  await db.exec('ROLLBACK')
+  assert.notEqual((await db.query("SELECT to_regclass('timetable_entries_unique') AS idx")).rows[0].idx,null)
+  await db.exec(`DROP INDEX timetable_entries_unique; DROP INDEX timetable_entries_delivery_unique;
+    CREATE INDEX timetable_entries_delivery_unique ON timetable_entries(campus_id);`)
+  await assert.rejects(db.exec(repair),/Unexpected timetable_entries_delivery_unique/)
+  await db.exec('ROLLBACK')
+  await db.exec('DROP INDEX timetable_entries_delivery_unique')
+  // Old nullable unique keys could allow duplicate legacy rows; never delete them silently.
+  const sql="INSERT INTO timetable_entries(campus_id,academic_year,semester,course_id,department_id,time_slot_id,status) VALUES(NULL,'2026-27',1,$1,NULL,$2,'draft')"
+  await db.query(sql,[course,slot]);await db.query(sql,[course,slot])
+  await assert.rejects(db.exec(repair),/Duplicate course delivery rows/)
+  await db.exec('ROLLBACK')
+  assert.equal(Number((await db.query('SELECT count(*) AS n FROM timetable_entries')).rows[0].n),2)
+  await reset();await db.exec(repair)
+})
 test('actual SQL rejects nonexistent, completed, expired and wrong-token worker commits', async () => {
   await reset(); const job = (await claim()).job_id; await running(job)
   await assert.rejects(commit(id(99)),/worker claim/)

@@ -8,6 +8,9 @@ import { DynamicConstraint, AIAssignment, AIGeneratorResponse } from './types';
 import { createReviewDraft, saveReviewDraft } from './review-draft';
 
 function formatSolverErrorMessage(raw: string): string {
+  if (raw.includes('timetable_entries_unique')) {
+    return 'The database still uses the old timetable draft schema. Apply the verified timetable draft repair SQL, then generate again. The save failed atomically; no replacement timetable was committed.';
+  }
   if (raw.includes('already exists') || raw.includes('immutable')) {
     return raw;
   }
