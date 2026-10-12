@@ -876,6 +876,7 @@ export default function StudentDashboardClient({
         {activeTab === 'campus-signin' && (
           <div style={{ width: '100%', margin: '0 auto' }}>
             <CampusSignInCard
+              key={studentInfo?.id}
               studentId={studentInfo?.id}
               campusName={studentInfo?.campus_name || 'Campus'}
             />

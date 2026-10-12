@@ -47,7 +47,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
     >
       <Text style={[typography.caption, { color: '#FFFFFF', textAlign: 'center' }]}>
         {!isOnline
-          ? 'You are offline. Submissions will auto-sync when reconnected.'
+          ? 'You are offline. Campus sign-in requires a connection. Saved class attendance will sync when reconnected.'
           : 'Pending actions queued for sync...'}
       </Text>
     </View>

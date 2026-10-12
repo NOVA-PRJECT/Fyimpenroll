@@ -2,6 +2,7 @@
   Body,
   Controller,
   Get,
+  Header,
   Put,
   UseGuards,
 } from '@nestjs/common'
@@ -17,6 +18,17 @@ import { AuthUser } from '../../core/auth/types'
 @Roles('campus_director')
 export class DirectorController {
   constructor(private readonly directorService: DirectorService) {}
+
+  @Get('attendance-settings')
+  @Header('Cache-Control', 'private, no-store')
+  getAttendanceSettings(@CurrentUser() user: AuthUser) {
+    return this.directorService.getAttendanceSettings(user)
+  }
+
+  @Put('attendance-settings')
+  updateAttendanceSettings(@Body() body: unknown, @CurrentUser() user: AuthUser) {
+    return this.directorService.updateAttendanceSettings(body, user)
+  }
 
   @Get('settings')
   async getSettings(@CurrentUser() user: AuthUser) {

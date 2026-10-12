@@ -247,3 +247,66 @@
 .app[data-role=teacher] .teacher-marking-row small{display:block;color:#718194;margin-top:4px}
 .app[data-role=teacher] .teacher-mark-toggle{min-width:86px;padding:7px;border:1px solid #9bd2ae;border-radius:7px;background:#edf9f1;color:#17683b;font-size:10px;font-weight:800}
 .app[data-role=teacher] .teacher-mark-toggle.is-absent{border-color:#edb1b1;background:#fff1f1;color:#a62525}
+
+/* Shared, role-aware controls and narrow-screen layouts. */
+select:not([multiple]){padding-right:36px!important}
+.identity{min-width:0;max-width:min(54vw,520px)}
+.identity-copy{min-width:0}
+.identity-copy b,.identity-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auth-header .university-logo{width:42px;height:42px}
+.person{gap:0}
+@media(max-width:760px){
+  .auth-layout{grid-template-columns:1fr}
+  .auth-aside{min-height:190px;padding:25px 22px}
+  .auth-aside-content h1{font-size:28px}
+  .auth-main{padding:22px 14px}
+  .login-card{padding:22px 18px}
+  .app[data-role=student] .topbar{padding:8px 12px;gap:8px}
+  .app[data-role=student] .identity{max-width:calc(100vw - 130px)}
+  .app[data-role=student] .identity-copy small{max-width:none}
+  .app[data-role=student] .content{padding:16px 12px 96px}
+  .app[data-role=student] .student-profile{align-items:flex-start;padding:15px}
+  .app[data-role=student] .student-profile-avatar{width:44px;height:44px;flex-basis:44px}
+  .app[data-role=student] .panel{padding:15px}
+  .app[data-role=student] .student-course-grid{grid-template-columns:1fr;padding:12px}
+  .app[data-role=student] .detail-grid{grid-template-columns:1fr 1fr}
+  .app[data-role=student] .registration-workspace{grid-template-columns:minmax(0,1fr)}
+  .app[data-role=student] .registration-summary{position:static;grid-row:auto}
+  .app[data-role=student] .slot-card,.app[data-role=student] .optional-slots{padding:12px}
+  .app[data-role=student] .rank-option{grid-template-columns:1fr;gap:8px}
+  .app[data-role=student] .rank-option select{width:100%}
+  .app[data-role=student] .session-grid{grid-template-columns:1fr}
+  .app[data-role=student] .gps-heading .btn{margin:0 0 0 50px}
+  .app[data-role=student] .table-wrap{max-width:100%}
+}
+@media(max-width:430px){
+  .app[data-role=student] .topbar .brand>span:last-child{display:none}
+  .app[data-role=student] .identity{max-width:calc(100vw - 110px)}
+  .app[data-role=student] .identity-copy b{max-width:145px}
+  .app[data-role=student] .identity-copy small{max-width:145px;font-size:8px}
+  .app[data-role=student] .logout-button{font-size:0;padding:8px}
+  .app[data-role=student] .logout-button span{font-size:13px}
+  .app[data-role=student] .detail-grid{grid-template-columns:1fr}
+  .app[data-role=student] .registration-meta{flex-wrap:wrap}
+  .app[data-role=student] .modal{width:calc(100vw - 20px);padding:20px 16px}
+  .app[data-role=student] .modal-actions{position:sticky;bottom:0;background:#fff}
+}
+
+.pathway-picker{max-width:860px;margin:16px auto}.pathway-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}.pathway-choice{display:flex;align-items:flex-start;gap:11px;padding:16px;border:1px solid var(--line);border-radius:11px;background:#fff;cursor:pointer}.pathway-choice.selected{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}.pathway-choice input{margin:3px 0 0;accent-color:var(--brand)}.pathway-choice small,.pathway-choice b{display:block}.pathway-choice small{margin-bottom:6px;color:var(--muted);font-size:9px;letter-spacing:.06em}.pathway-choice b{font-size:13px;color:var(--ink)}.pathway-picker>.btn{width:100%}.closed-registration,.submitted-registration{max-width:620px;margin:28px auto;text-align:center;padding:28px}.closed-registration h2,.submitted-registration h2{margin:10px 0;color:var(--ink)}.closed-registration p,.submitted-registration p{color:var(--muted);font-size:13px;line-height:1.6}.closed-registration-icon,.submitted-mark{display:grid;place-items:center;width:52px;height:52px;margin:auto;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-size:24px}.submitted-mark{background:#eaf7ef;color:#19804a;font-weight:800}.change-track{display:inline-flex;margin-bottom:10px}.slot-preferences{display:grid;gap:8px;margin-top:12px}.slot-preferences .rank-option{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:center;gap:10px;margin:0}.slot-preferences .rank-option>span{color:var(--muted);font-size:10px;font-weight:700}.slot-preferences select,.minor-slot select{width:100%;min-height:38px;border:1px solid #cad5df;border-radius:8px;background:#fff;color:#263a50;padding:8px 36px 8px 10px}.minor-slot .slot-heading{align-items:center}.minor-note{margin:7px 0 0}.add-minor-button{margin-top:14px}.add-minor-button:disabled{opacity:.55;cursor:not-allowed}.window-closed-banner{background:#fff3f3!important;border-color:#efb8b8!important;color:#9f2835!important}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.form-grid .field{display:flex;flex-direction:column;gap:6px}.form-grid input,.form-grid select{min-height:38px;border:1px solid #c8d3dd;border-radius:8px;padding:8px 10px;background:#fff;color:#24384d}.field.full{grid-column:1/-1}.field fieldset{margin:0}.detail-grid-wide{grid-column:1/-1;padding:10px;border:1px solid var(--line);border-radius:8px}.detail-grid-wide small,.detail-grid-wide b{display:block}.detail-grid-wide b{margin-top:5px}.minor-slot .action-dots{flex:0 0 34px;min-width:34px}
+@media(max-width:620px){.pathway-grid,.form-grid{grid-template-columns:1fr}.slot-preferences .rank-option{grid-template-columns:1fr}.closed-registration,.submitted-registration{padding:22px 16px}.modal .form-grid{grid-template-columns:1fr}}
+
+/* Student registered-credit ledger and post-allocation slot adjustment */
+.app[data-role=student] .ledger-header{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.app[data-role=student] .ledger-total{display:grid;min-width:190px;gap:5px;padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:#f7f9fc;text-align:center}
+.app[data-role=student] .ledger-total small,.app[data-role=student] .ledger-total span{color:var(--muted);font-size:11px}
+.app[data-role=student] .ledger-total strong{color:var(--ink);font-size:32px}
+.app[data-role=student] .ledger-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:14px}
+.app[data-role=student] .ledger-category-grid article{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}
+.app[data-role=student] .ledger-category-grid b{color:var(--muted);font-size:11px}
+.app[data-role=student] .ledger-category-grid strong{color:var(--ink);font-size:17px}
+.app[data-role=student] .slot-update-control{display:flex;align-items:center;gap:8px}
+.app[data-role=student] .slot-update-control select{min-width:230px;min-height:38px;padding:8px 35px 8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+@media(max-width:620px){.app[data-role=student] .ledger-header{align-items:stretch;flex-direction:column}.app[data-role=student] .ledger-total{min-width:0}.app[data-role=student] .slot-update-control{align-items:stretch;flex-direction:column;width:100%}.app[data-role=student] .slot-update-control select{min-width:0;width:100%}}
+
+/* Keep the university mark constrained in every authenticated role header. */
+.app .topbar .university-logo{display:block;width:36px;height:36px;max-width:36px;object-fit:contain;flex:0 0 36px}

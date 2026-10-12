@@ -8,6 +8,7 @@ import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
+import { attendanceSettings, CampusAttendanceSettingsSchema, campusSetupError } from '../campus-attendance/campus-settings'
 
 @Injectable()
 export class DirectorService {
@@ -16,6 +17,26 @@ export class DirectorService {
     private readonly auditLogger: AuditLoggerService,
     private readonly serverLogger: ServerLoggerService,
   ) {}
+
+  async getAttendanceSettings(user: AuthUser) {
+    if (user.role !== 'campus_director' || !user.campus_id) throw new BadRequestException('A campus director with an assigned campus is required')
+    const { data, error } = await this.supabase.admin.from('campuses').select('*').eq('id', user.campus_id).maybeSingle()
+    if (error) throw new InternalServerErrorException('Unable to load campus attendance settings')
+    if (!data) throw new NotFoundException('Campus not found')
+    return { campus_name: data.name, settings: attendanceSettings(data), setup_error: campusSetupError(data) }
+  }
+
+  async updateAttendanceSettings(body: unknown, user: AuthUser) {
+    if (user.role !== 'campus_director' || !user.campus_id) throw new BadRequestException('A campus director with an assigned campus is required')
+    const parsed = CampusAttendanceSettingsSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    const { data, error } = await this.supabase.admin.from('campuses').update(parsed.data).eq('id', user.campus_id).select('id').maybeSingle()
+    if (error) throw new InternalServerErrorException('Unable to save campus attendance settings')
+    if (!data) throw new NotFoundException('Campus not found')
+    await this.auditLogger.log({ eventType: 'campus_attendance_settings_updated', userId: user.userId, userRole: user.role,
+      action: 'Updated campus geofence and attendance timings', resourceType: 'campus', resourceId: user.campus_id, status: 'success', metadata: parsed.data })
+    return { success: true }
+  }
 
   async getSettings(user: AuthUser) {
     const { data: faculty, error: facultyError } = await this.supabase.admin
@@ -30,7 +51,7 @@ export class DirectorService {
 
     const { data: campus } = await this.supabase.admin
       .from('campuses')
-      .select('name, center_latitude, center_longitude, radius_meters')
+      .select('*')
       .eq('id', faculty.campus_id)
       .single()
 
@@ -44,7 +65,7 @@ export class DirectorService {
     let setupStatus: 'ready' | 'incomplete_geofence' | 'incomplete_registration_window' | 'uninitialized' = 'ready'
     if (!settings) {
       setupStatus = 'uninitialized'
-    } else if (campus?.center_latitude == null || campus?.center_longitude == null) {
+    } else if (campusSetupError(campus)) {
       setupStatus = 'incomplete_geofence'
     } else if (!settings.academic_year || !settings.deadline) {
       setupStatus = 'incomplete_registration_window'

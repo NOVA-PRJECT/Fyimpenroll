@@ -10,6 +10,9 @@ import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util';
 import { AuthUser } from '../../core/auth/types';
+import { CampusAttendanceStatus, formatCampusTime } from '@fyimp/contracts';
+import { attendanceSettings, campusSetupError, timeMinutes } from './campus-settings';
+import { CampusSignInSchema } from './dto/campus-attendance.dto';
 
 interface CampusRecord {
   id: string;
@@ -51,16 +54,9 @@ export class CampusAttendanceService {
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const clamped = Math.max(0, Math.min(1, a));
+    const c = 2 * Math.atan2(Math.sqrt(clamped), Math.sqrt(1 - clamped));
     return R * c;
-  }
-
-  /**
-   * Helper to convert time string (HH:MM:SS or HH:MM) to minutes from midnight.
-   */
-  private timeStringToMinutes(timeStr: string): number {
-    const parts = timeStr.split(':').map((p) => parseInt(p, 10));
-    return parts[0] * 60 + (parts[1] || 0);
   }
 
   /**
@@ -88,7 +84,7 @@ export class CampusAttendanceService {
     const day = String(istDate.getUTCDate()).padStart(2, '0');
 
     return {
-      totalMinutes: hours * 60 + minutes,
+      totalMinutes: hours * 60 + minutes + seconds / 60 + istDate.getUTCMilliseconds() / 60000,
       timeString: `${hh}:${mm}:${ss}`,
       dateString: `${year}-${month}-${day}`,
     };
@@ -103,8 +99,18 @@ export class CampusAttendanceService {
     clientLat: number,
     clientLon: number,
     accuracy: number,
-    ip: string
+    ip: string,
+    clientTimestamp: string,
   ) {
+    if (user.role !== 'student') throw new ForbiddenException('Only students can sign in.');
+    const input = CampusSignInSchema.safeParse({ latitude: clientLat, longitude: clientLon, accuracy, client_timestamp: clientTimestamp });
+    if (!input.success) throw new BadRequestException(input.error.issues[0].message);
+    const requestTime = new Date();
+    const capturedAt = new Date(clientTimestamp);
+    const age = requestTime.getTime() - capturedAt.getTime();
+    if (age > 60000 || age < -10000) {
+      throw new BadRequestException('Location expired or device clock is incorrect. Enable automatic time and sign in again while online.');
+    }
     const studentId = user.userId;
 
     // 1. Resolve student and their assigned campus
@@ -114,7 +120,8 @@ export class CampusAttendanceService {
       .eq('id', studentId)
       .maybeSingle();
 
-    if (studentError || !student) {
+    if (studentError) throw new InternalServerErrorException('Unable to load your student profile. Please try again.');
+    if (!student) {
       throw new NotFoundException('Student profile not found.');
     }
 
@@ -123,11 +130,9 @@ export class CampusAttendanceService {
       throw new NotFoundException('No university campus linked to your student account.');
     }
 
-    if (campus.center_latitude === null || campus.center_longitude === null) {
-      throw new InternalServerErrorException(
-        `Campus geofence coordinates are not configured for ${campus.name}. Please contact your administrator.`
-      );
-    }
+    const setupError = campusSetupError(campus);
+    if (setupError) throw new BadRequestException(setupError);
+    const settings = attendanceSettings(campus);
 
     // 2. Server-side Haversine Distance Check
     const distanceMeters = this.calculateHaversineDistance(
@@ -137,7 +142,7 @@ export class CampusAttendanceService {
       Number(campus.center_longitude)
     );
 
-    const allowedRadius = campus.radius_meters || 400;
+    const allowedRadius = settings.radius_meters;
     if (distanceMeters > allowedRadius) {
       const excess = Math.round(distanceMeters - allowedRadius);
       throw new BadRequestException(
@@ -146,13 +151,18 @@ export class CampusAttendanceService {
     }
 
     // 3. IST Time and Session Evaluation
-    const now = new Date();
+    const now = requestTime;
     const ist = this.getISTDateTime(now);
 
-    const morningCutoffMin = this.timeStringToMinutes(campus.morning_cutoff_time || '09:30:00');
-    const middaySplitMin = this.timeStringToMinutes(campus.midday_split_time || '13:30:00');
-    const eveningCutoffMin = this.timeStringToMinutes(campus.evening_cutoff_time || '15:30:00');
-    const dayEndMin = this.timeStringToMinutes(campus.day_end_time || '17:00:00');
+    const morningCutoffMin = timeMinutes(settings.morning_cutoff_time);
+    const middaySplitMin = timeMinutes(settings.midday_split_time);
+    const eveningCutoffMin = timeMinutes(settings.evening_cutoff_time);
+    const dayEndMin = timeMinutes(settings.day_end_time);
+    const capturedIST = this.getISTDateTime(capturedAt);
+    if (capturedIST.dateString !== ist.dateString ||
+        (capturedIST.totalMinutes < middaySplitMin) !== (ist.totalMinutes < middaySplitMin)) {
+      throw new BadRequestException('The attendance session changed. Acquire a fresh location and sign in again.');
+    }
 
     let sessionType: 'morning' | 'evening';
     let status: 'on_time' | 'late' | 'early_leave';
@@ -165,7 +175,7 @@ export class CampusAttendanceService {
       status = ist.totalMinutes >= eveningCutoffMin ? 'on_time' : 'early_leave';
     } else {
       throw new BadRequestException(
-        'Campus attendance checkpoints are closed for today (Day closed at 17:00 IST).'
+        `Campus attendance checkpoints are closed for today (day ends at ${formatCampusTime(settings.day_end_time)} IST).`
       );
     }
 
@@ -179,6 +189,7 @@ export class CampusAttendanceService {
       .eq('session_type', sessionType)
       .maybeSingle();
 
+    if (existingError) throw new InternalServerErrorException('Unable to check existing sign-in. Please try again.');
     if (existing) {
       throw new ConflictException(
         `You have already completed your ${sessionType} campus verification today at ${new Date(existing.signed_in_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}.`
@@ -193,7 +204,6 @@ export class CampusAttendanceService {
         campus_id: campus.id,
         session_type: sessionType,
         signed_in_at: now.toISOString(),
-        signed_in_date: ist.dateString,
         location_accuracy_meters: Math.round(accuracy * 10) / 10,
         status: status,
         source: 'gps',
@@ -201,11 +211,8 @@ export class CampusAttendanceService {
       .select('id, session_type, status, signed_in_at, location_accuracy_meters')
       .single();
 
-    if (insertError) {
-      throw new InternalServerErrorException(
-        `Failed to record campus sign-in: ${insertError.message}`
-      );
-    }
+    if (insertError?.code === '23505') throw new ConflictException(`Your ${sessionType} campus sign-in is already recorded. Refresh your status.`);
+    if (insertError || !inserted) throw new InternalServerErrorException('Failed to record campus sign-in. Please refresh your status before trying again.');
 
     // 6. Audit Logging
     await this.auditLogger.log({
@@ -237,15 +244,15 @@ export class CampusAttendanceService {
         status === 'on_time'
           ? `✓ ${sessionType.toUpperCase()} sign-in verified on-time at ${campus.name}!`
           : status === 'late'
-          ? `⚠️ Morning sign-in recorded (Late: after ${campus.morning_cutoff_time.slice(0, 5)} AM)`
-          : `⚠️ Evening sign-in recorded (Early Leave: before ${campus.evening_cutoff_time.slice(0, 5)} PM)`,
+          ? `Morning sign-in recorded (late: after ${formatCampusTime(settings.morning_cutoff_time)} IST).`
+          : `Evening sign-in recorded (early leave: before ${formatCampusTime(settings.evening_cutoff_time)} IST).`,
     };
   }
 
   /**
    * Retrieves today's morning & evening campus verification status for a student.
    */
-  async getStudentCampusStatus(user: AuthUser, studentId: string) {
+  async getStudentCampusStatus(user: AuthUser, studentId: string): Promise<CampusAttendanceStatus> {
     // Students can only view themselves. Staff scope is checked against the
     // student's database profile below; route roles alone are not enough.
     if (user.role === 'student' && user.userId !== studentId) {
@@ -258,7 +265,8 @@ export class CampusAttendanceService {
       .eq('id', studentId)
       .maybeSingle();
 
-    if (studentError || !student) {
+    if (studentError) throw new InternalServerErrorException('Unable to load your student profile. Please try again.');
+    if (!student) {
       throw new NotFoundException('Student profile not found.');
     }
 
@@ -287,23 +295,26 @@ export class CampusAttendanceService {
 
     const campus = (student as any).campuses as CampusRecord;
     const ist = this.getISTDateTime();
+    const settings = attendanceSettings(campus);
+    const setupError = campusSetupError(campus);
 
     // Query today's sign-in rows
     const { data: records, error: recordsError } = await this.supabase.admin
       .from('campus_sign_ins')
       .select('id, session_type, status, signed_in_at, location_accuracy_meters')
       .eq('student_id', studentId)
+      .eq('campus_id', student.campus_id || '00000000-0000-0000-0000-000000000000')
       .eq('signed_in_date', ist.dateString);
 
     if (recordsError) {
-      throw new InternalServerErrorException(`Failed to fetch status: ${recordsError.message}`);
+      throw new InternalServerErrorException('Unable to load campus attendance. Please try again.');
     }
 
     const morningRecord = records?.find((r) => r.session_type === 'morning');
     const eveningRecord = records?.find((r) => r.session_type === 'evening');
 
-    const middaySplitMin = this.timeStringToMinutes(campus?.midday_split_time || '13:30:00');
-    const dayEndMin = this.timeStringToMinutes(campus?.day_end_time || '17:00:00');
+    const middaySplitMin = timeMinutes(settings.midday_split_time);
+    const dayEndMin = timeMinutes(settings.day_end_time);
 
     // Resolve Morning Session
     let morningState: 'completed' | 'pending' | 'absent';
@@ -319,23 +330,28 @@ export class CampusAttendanceService {
     let eveningState: 'completed' | 'pending' | 'absent';
     if (eveningRecord) {
       eveningState = 'completed';
-    } else if (ist.totalMinutes < dayEndMin) {
+    } else if (ist.totalMinutes <= dayEndMin) {
       eveningState = 'pending';
     } else {
       eveningState = 'absent';
     }
 
+    const activeSession = ist.totalMinutes < middaySplitMin ? 'morning' : ist.totalMinutes <= dayEndMin ? 'evening' : 'closed';
+    const completed = activeSession === 'morning' ? !!morningRecord : activeSession === 'evening' && !!eveningRecord;
     return {
       date: ist.dateString,
       current_time_ist: ist.timeString,
+      active_session: activeSession,
+      can_sign_in: !setupError && activeSession !== 'closed' && !completed,
+      unavailable_reason: setupError || (activeSession === 'closed' ? `Campus checkpoints closed at ${formatCampusTime(settings.day_end_time)} IST.` : completed ? 'This session is already recorded.' : null),
       campus: {
-        id: campus?.id,
-        name: campus?.name,
-        radius_meters: campus?.radius_meters || 400,
-        morning_cutoff: campus?.morning_cutoff_time,
-        midday_split: campus?.midday_split_time,
-        evening_cutoff: campus?.evening_cutoff_time,
-        day_end: campus?.day_end_time,
+        id: campus?.id ?? null,
+        name: campus?.name ?? null,
+        radius_meters: settings.radius_meters,
+        morning_cutoff: settings.morning_cutoff_time,
+        midday_split: settings.midday_split_time,
+        evening_cutoff: settings.evening_cutoff_time,
+        day_end: settings.day_end_time,
       },
       morning: {
         state: morningState,
@@ -356,18 +372,24 @@ export class CampusAttendanceService {
    */
   async getDepartmentCampusRoster(user: AuthUser, queryDate?: string) {
     const istNow = this.getISTDateTime();
-    const targetDate = queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate) ? queryDate : istNow.dateString;
+    if (queryDate && (!/^\d{4}-\d{2}-\d{2}$/.test(queryDate) ||
+        !Number.isFinite(Date.parse(`${queryDate}T00:00:00Z`)) ||
+        new Date(`${queryDate}T00:00:00Z`).toISOString().slice(0, 10) !== queryDate)) {
+      throw new BadRequestException('Use a valid attendance date (YYYY-MM-DD).');
+    }
+    const targetDate = queryDate || istNow.dateString;
+    if (targetDate > istNow.dateString) throw new BadRequestException('Attendance cannot be viewed for a future date.');
     const isToday = targetDate === istNow.dateString;
 
     let campus: CampusRecord | null = null;
     let dept: any = null;
     let studentsQuery = this.supabase.admin
       .from('students')
-      .select('id, full_name, cap_application_number, current_semester, department_id, campus_id')
+      .select('id, full_name, cap_application_number, current_semester, department_id, campus_id, campuses(*)')
       .order('full_name', { ascending: true });
 
     if (user.role === 'hod') {
-      if (!user.department_id) {
+      if (!user.department_id || !user.campus_id) {
         throw new ForbiddenException('HOD is not associated with any academic department.');
       }
       const { data: deptData, error: deptError } = await this.supabase.admin
@@ -380,8 +402,9 @@ export class CampusAttendanceService {
         throw new NotFoundException('Department details not found.');
       }
       dept = deptData;
+      if (dept.campus_id !== user.campus_id) throw new ForbiddenException('Department is outside your campus.');
       campus = (dept as any).campuses as CampusRecord;
-      studentsQuery = studentsQuery.eq('department_id', user.department_id);
+      studentsQuery = studentsQuery.eq('department_id', user.department_id).eq('campus_id', user.campus_id);
     } else if (user.role === 'campus_director') {
       if (!user.campus_id) {
         throw new ForbiddenException('Campus Director has no assigned campus affiliation.');
@@ -397,27 +420,12 @@ export class CampusAttendanceService {
       }
       campus = campusData as CampusRecord;
       studentsQuery = studentsQuery.eq('campus_id', user.campus_id);
-    } else if (user.role === 'superadmin') {
-      const { data: campusData } = await this.supabase.admin
-        .from('campuses')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      campus = campusData as CampusRecord;
-    } else {
+    } else if (user.role !== 'superadmin') {
       throw new ForbiddenException(`Role '${user.role}' is not authorized to view attendance roster.`);
     }
 
-    const middaySplitMin = this.timeStringToMinutes(campus?.midday_split_time || '13:30:00');
-    const dayEndMin = this.timeStringToMinutes(campus?.day_end_time || '17:00:00');
-
     // 2. Fetch scoped students
     const students = await fetchAllPaginated<any>(studentsQuery.order('id'));
-    const studentsError = null;
-
-    if (studentsError) {
-      throw new InternalServerErrorException(`Failed to fetch students: ${studentsError.message}`);
-    }
 
     const studentIds = (students || []).map((s) => s.id);
 
@@ -425,10 +433,10 @@ export class CampusAttendanceService {
     let signIns: any[] = [];
     if (studentIds.length > 0) {
       signIns = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin
-        .from('campus_sign_ins').select('id, student_id, session_type, status, signed_in_at')
+        .from('campus_sign_ins').select('id, student_id, campus_id, session_type, status, signed_in_at')
         .in('student_id', ids).eq('signed_in_date', targetDate).order('id'));
     }
-    const signInByStudentSession = new Map(signIns.map(row => [`${row.student_id}:${row.session_type}`, row]));
+    const signInByStudentSession = new Map(signIns.map(row => [`${row.student_id}:${row.campus_id}:${row.session_type}`, row]));
 
     // 4. Map students to status derivation
     let morningOnTime = 0;
@@ -442,8 +450,11 @@ export class CampusAttendanceService {
     let eveningPending = 0;
 
     const roster = (students || []).map((student) => {
-      const morningRecord = signInByStudentSession.get(`${student.id}:morning`);
-      const eveningRecord = signInByStudentSession.get(`${student.id}:evening`);
+      const morningRecord = signInByStudentSession.get(`${student.id}:${student.campus_id}:morning`);
+      const eveningRecord = signInByStudentSession.get(`${student.id}:${student.campus_id}:evening`);
+      const settings = attendanceSettings(student.campuses || campus);
+      const middaySplitMin = timeMinutes(settings.midday_split_time);
+      const dayEndMin = timeMinutes(settings.day_end_time);
 
       // Derive Morning Status
       let morningDerivedStatus: 'on_time' | 'late' | 'absent' | 'pending';
@@ -465,7 +476,7 @@ export class CampusAttendanceService {
         eveningDerivedStatus = eveningRecord.status;
         if (eveningRecord.status === 'on_time') eveningOnTime++;
         else eveningEarlyLeave++;
-      } else if (isToday && istNow.totalMinutes < dayEndMin) {
+      } else if (isToday && istNow.totalMinutes <= dayEndMin) {
         eveningDerivedStatus = 'pending';
         eveningPending++;
       } else {
@@ -504,7 +515,7 @@ export class CampusAttendanceService {
       department: {
         id: dept?.id || null,
         name: dept?.name || (user.role === 'campus_director' ? 'All Departments' : 'Department'),
-        campus_name: campus?.name || 'Main Campus',
+        campus_name: campus?.name || (user.role === 'superadmin' ? 'All campuses' : 'Unknown campus'),
       },
       date: targetDate,
       summary: {

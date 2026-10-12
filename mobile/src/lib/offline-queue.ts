@@ -19,11 +19,18 @@ export class OfflineActionQueue {
     if (!raw) return []
     const rows: QueuedAction[] = JSON.parse(raw)
     if (!Array.isArray(rows) || rows.some(row => row.ownerId !== owner)) throw new Error('Offline queue ownership is invalid')
-    return rows
+    // Old app versions persisted GPS payloads. They cannot prove current presence
+    // and must never be replayed into a later attendance session.
+    const safeRows = rows.filter(row => row.type !== 'CAMPUS_SIGN_IN' && !row.endpoint.replace(/\/$/, '').endsWith('/attendance/campus/sign-in'))
+    if (safeRows.length !== rows.length) await this.storage.setItem(this.key(owner), JSON.stringify(safeRows))
+    return safeRows
   }
   list(owner: string) { return this.serialize(() => this.read(owner)) }
   enqueue(action: QueuedAction) {
     return this.serialize(async () => {
+      if (action.type === 'CAMPUS_SIGN_IN' || action.endpoint.replace(/\/$/, '').endsWith('/attendance/campus/sign-in')) {
+        throw new Error('Campus sign-in requires a live internet connection and cannot be queued.')
+      }
       const rows = await this.read(action.ownerId)
       if (rows.length >= 50) throw new Error('Offline queue is full. Sync or review pending actions first.')
       rows.push(action)

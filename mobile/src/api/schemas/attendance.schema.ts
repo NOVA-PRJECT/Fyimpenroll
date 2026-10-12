@@ -1,18 +1,19 @@
 import { z } from 'zod';
 
+const CampusSessionSchema = z.object({
+  state: z.enum(['completed', 'pending', 'absent']),
+  status: z.enum(['on_time', 'late', 'early_leave']).nullable(),
+  signed_in_at: z.string().nullable(),
+});
 export const CampusSignInStatusSchema = z.object({
-  morning: z.object({
-    signed_in: z.boolean(),
-    timestamp: z.string().nullable().optional(),
-    synced_late: z.boolean().optional(),
+  date: z.string(), current_time_ist: z.string(),
+  active_session: z.enum(['morning', 'evening', 'closed']),
+  can_sign_in: z.boolean(), unavailable_reason: z.string().nullable(),
+  campus: z.object({
+    id: z.string().nullable(), name: z.string().nullable(), radius_meters: z.number(),
+    morning_cutoff: z.string(), midday_split: z.string(), evening_cutoff: z.string(), day_end: z.string(),
   }),
-  evening: z.object({
-    signed_in: z.boolean(),
-    timestamp: z.string().nullable().optional(),
-    synced_late: z.boolean().optional(),
-  }),
-  eligible: z.boolean().default(true),
-  reason: z.string().nullable().optional(),
+  morning: CampusSessionSchema, evening: CampusSessionSchema,
 });
 
 export const CourseAttendanceItemSchema = z.object({

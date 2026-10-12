@@ -185,7 +185,7 @@ export default function PrivacyPolicyPage() {
                   <span>No Live Location Tracking</span>
                 </div>
                 <p className="text-[11px] text-slate-700 leading-normal">
-                  We never track or store your GPS location. When you check in on campus, your phone simply confirms you have arrived, and that momentary location check is instantly deleted without saving any record of where you go.
+                  When you sign in on campus, your device sends its location coordinates to the server to check the campus boundary. These coordinates are not saved, and we do not continuously track your location. We retain the campus, attendance time, session, result, location accuracy, and audit details including distance from the campus centre.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">

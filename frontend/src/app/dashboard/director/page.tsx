@@ -1,6 +1,7 @@
 'use client'
 
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+import CampusAttendanceSettings from './CampusAttendanceSettings'
 
 import NavigationLink from '@/components/NavigationLink'
 import { sessionRedirect } from '@/core/security/session-response'
@@ -527,6 +528,7 @@ export default function DirectorDashboard() {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
+        {activeTab === 'registration' && <CampusAttendanceSettings />}
         {settingsError && <div role="alert" className={styles.errorBanner}>{settingsError} <button onClick={() => loadSettingsData()}>Try again</button></div>}
         {loadingDirector && <p role="status">Loading campus settings…</p>}
         <fieldset disabled={!settingsReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>

@@ -8,6 +8,26 @@ function sourceModule(file) {
 const { OfflineActionQueue } = sourceModule('src/lib/offline-queue.ts')
 const storage = () => { const values=new Map();return {getItem:async key=>values.get(key)||null,setItem:async(key,value)=>{values.set(key,value)}} }
 const action = (id,ownerId='alice') => ({id,ownerId,type:'PERIOD_MARKING',endpoint:'/marks',payload:{attendance_date:'2026-10-05',expected_revision:3,absent_student_ids:[id]},clientTimestamp:'2026-10-05T10:00:00Z'})
+
+test('campus location cannot be queued; legacy GPS payloads are removed without sending or losing class markings',async()=>{
+  const disk=storage(),queue=new OfflineActionQueue(disk)
+  const gps={...action('gps'),type:'CAMPUS_SIGN_IN',endpoint:'/api/attendance/campus/sign-in',payload:{latitude:12,longitude:75}}
+  await assert.rejects(queue.enqueue(gps),/live internet/)
+  await disk.setItem('fyimp_queue_v2_alice',JSON.stringify([gps,action('class')]))
+  const sent=[];await queue.sync('alice',()=>true,async row=>sent.push(row))
+  assert.deepEqual(sent.map(row=>row.id),['class'])
+  assert.equal(await disk.getItem('fyimp_queue_v2_alice'),'[]')
+  await assert.rejects(queue.enqueue({...gps,type:'PERIOD_MARKING'}),/live internet/)
+})
+
+test('mobile accepts canonical campus states and rejects the obsolete signed_in contract',()=>{
+  const {CampusSignInStatusSchema}=sourceModule('src/api/schemas/attendance.schema.ts')
+  const status={date:'2026-10-12',current_time_ist:'09:45:00',active_session:'morning',can_sign_in:false,unavailable_reason:'Already recorded',
+    campus:{id:'campus',name:'Campus',radius_meters:650,morning_cutoff:'09:30:00',midday_split:'13:30:00',evening_cutoff:'15:30:00',day_end:'17:00:00'},
+    morning:{state:'completed',status:'late',signed_in_at:'2026-10-12T04:15:00Z'},evening:{state:'pending',status:null,signed_in_at:null}}
+  assert.deepEqual(CampusSignInStatusSchema.parse(status),status)
+  assert.equal(CampusSignInStatusSchema.safeParse({...status,morning:{signed_in:true}}).success,false)
+})
 test('multiple markings retain order, owner and original revision/date payloads',async()=>{
   const queue=new OfflineActionQueue(storage());await queue.enqueue(action('a'));await queue.enqueue(action('b'));await queue.enqueue(action('c','bob'))
   const sent=[];await queue.sync('alice',()=>true,async row=>sent.push(row))

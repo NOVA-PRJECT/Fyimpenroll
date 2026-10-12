@@ -1,6 +1,7 @@
 ﻿import {
   Controller,
   Get,
+  Header,
   Post,
   Body,
   Param,
@@ -27,7 +28,7 @@ export class CampusAttendanceController {
 
   /**
    * Student endpoint: Twice-daily GPS-verified campus sign-in.
-   * Capped at 5 attempts per minute per student to mitigate geofence guessing/spoofing.
+   * Capped at 5 attempts per minute per student to limit repeated submissions.
    */
   @Post('sign-in')
   @Roles('student')
@@ -53,7 +54,8 @@ export class CampusAttendanceController {
       parsed.data.latitude,
       parsed.data.longitude,
       parsed.data.accuracy,
-      ip
+      ip,
+      parsed.data.client_timestamp,
     );
   }
 
@@ -61,6 +63,7 @@ export class CampusAttendanceController {
    * Student / Staff query for today's morning & evening campus check status.
    */
   @Get('status/:studentId')
+  @Header('Cache-Control', 'private, no-store')
   @Roles('student', 'teacher', 'teaching_staff', 'hod', 'campus_director', 'superadmin')
   async getStatus(
     @CurrentUser() user: AuthUser,
@@ -73,6 +76,7 @@ export class CampusAttendanceController {
    * HOD department campus attendance roster.
    */
   @Get('roster')
+  @Header('Cache-Control', 'private, no-store')
   @Roles('hod', 'campus_director', 'superadmin')
   async getDepartmentRoster(
     @CurrentUser() user: AuthUser,

@@ -1,298 +1,138 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { campusSessionLabel, formatCampusTime, type CampusAttendanceStatus } from '@fyimp/contracts'
 
-interface CampusStatusResponse {
-  student_id: string
-  student_name: string
-  campus_name: string
-  date: string
-  active_session: 'morning' | 'evening' | 'closed'
-  morning: {
-    status: 'present' | 'absent' | 'pending'
-    signed_in_at: string | null
-    time_window: string
-  }
-  evening: {
-    status: 'present' | 'absent' | 'pending'
-    signed_in_at: string | null
-    time_window: string
-  }
-}
-
-interface CampusSignInCardProps {
-  studentId?: string
-  campusName: string
-}
+interface CampusSignInCardProps { studentId?: string; campusName: string }
 
 export default function CampusSignInCard({ studentId, campusName }: CampusSignInCardProps) {
-  const [status, setStatus] = useState<CampusStatusResponse | null>(null)
+  const [status, setStatus] = useState<CampusAttendanceStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const [statusError, setStatusError] = useState('')
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const requestSequence = useRef(0)
+  const mounted = useRef(false)
 
   const fetchStatus = useCallback(async () => {
-    if (!studentId) return
+    if (!studentId || !mounted.current) return null
+    const request = ++requestSequence.current
     setLoading(true)
     try {
-      const res = await fetch(`/api/attendance/campus/status/${studentId}`)
-      if (res.ok) {
-        const data = await res.json()
+      const res = await fetch(`/api/attendance/campus/status/${studentId}`, { cache: 'no-store', signal: AbortSignal.timeout(15000) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load campus attendance.')
+      if (mounted.current && request === requestSequence.current) {
         setStatus(data)
+        setStatusError('')
       }
-    } catch {
-      // Non-blocking
-    } finally {
-      setLoading(false)
-    }
+      return data as CampusAttendanceStatus
+    } catch (err) {
+      if (mounted.current && request === requestSequence.current) {
+        setStatus(null)
+        setStatusError(err instanceof Error ? err.message : 'Unable to load campus attendance. Please try again.')
+      }
+      return null
+    } finally { if (mounted.current && request === requestSequence.current) setLoading(false) }
   }, [studentId])
 
   useEffect(() => {
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
-    fetchStatus()
+    mounted.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the live attendance view with the API.
+    void fetchStatus()
+    const timer = window.setInterval(() => void fetchStatus(), 30000)
+    const refresh = () => void fetchStatus()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    return () => {
+      mounted.current = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+    }
   }, [fetchStatus])
 
   async function handleGpsSignIn() {
     setFeedback(null)
-
-    if (!navigator.geolocation) {
-      setFeedback({
-        type: 'error',
-        message: 'Geolocation is not supported by your browser.',
-      })
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setFeedback({ type: 'error', message: 'Location access requires HTTPS and a browser that supports geolocation.' })
       return
     }
-
+    if (!navigator.onLine) {
+      setFeedback({ type: 'error', message: 'Connect to the internet before signing in. Campus sign-in cannot be saved offline.' })
+      return
+    }
     setLocating(true)
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude, accuracy } = pos.coords
-          const res = await fetch('/api/attendance/campus/sign-in', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ latitude, longitude, accuracy }),
-          })
-
-          const data = await res.json().catch(() => ({}))
-
-          if (res.ok && data.success) {
-            setFeedback({
-              type: 'success',
-              message: `✓ Signed in successfully for ${data.session_type.toUpperCase()} session at ${data.campus_name || campusName}! (Distance: ${Math.round(data.distance_meters)}m from campus center).`,
-            })
-            await fetchStatus()
-          } else {
-            setFeedback({
-              type: 'error',
-              message: data.message || 'GPS check-in failed. Please verify you are within the campus boundary.',
-            })
-          }
-        } catch (err: unknown) {
-          setFeedback({
-            type: 'error',
-            message: (err instanceof Error ? err.message : '') || 'Network error while recording campus check-in.',
-          })
-        } finally {
-          setLocating(false)
-        }
-      },
-      (err) => {
-        setLocating(false)
-        let msg = 'Unable to retrieve your location.'
-        if (err.code === err.PERMISSION_DENIED) {
-          msg = 'Location permission denied. Please allow location access in your browser to sign in.'
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          msg = 'GPS signal unavailable. Please ensure your device location is enabled.'
-        } else if (err.code === err.TIMEOUT) {
-          msg = 'GPS acquisition timed out. Please try again.'
-        }
-        setFeedback({ type: 'error', message: msg })
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 0,
+    try {
+      const latest = await fetchStatus()
+      if (!latest?.can_sign_in) return
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 })
+      })
+      if (!mounted.current) return
+      const { latitude, longitude, accuracy } = pos.coords
+      if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 50) {
+        throw new Error('Location accuracy must be 50 metres or better. Move to an open area and try again.')
       }
-    )
+      const res = await fetch('/api/attendance/campus/sign-in', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({ latitude, longitude, accuracy, client_timestamp: new Date(pos.timestamp).toISOString() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(typeof data.message === 'string' ? data.message : 'Campus sign-in failed. Refresh your status and try again.')
+      setFeedback({ type: 'success', message: data.message || 'Campus sign-in recorded.' })
+    } catch (err) {
+      const error = err as { code?: number; message?: string }
+      const message = error.code === 1 ? 'Allow location access in your browser to sign in.'
+        : error.code === 2 ? 'Location is unavailable. Enable device location and try again.'
+        : error.code === 3 ? 'Getting your location timed out. Move to an open area and try again.'
+        : error.message || 'Campus sign-in failed. Please try again.'
+      setFeedback({ type: 'error', message })
+    } finally {
+      if (mounted.current) {
+        await fetchStatus()
+        setLocating(false)
+      }
+    }
   }
 
   return (
-    <div style={{
-      background: '#ffffff',
-      border: '1px solid #e2e8f0',
-      borderRadius: '1rem',
-      padding: '1.25rem',
-      boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.05)',
-      marginBottom: '1.5rem',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+    <section aria-label="Campus sign-in" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '1rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.25rem' }}>📍</span>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-              Campus Physical Sign-In (GPS Geofence)
-            </h3>
-          </div>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-            Official twice-daily physical presence verification at <strong>{campusName}</strong>
-          </p>
+          <h3 style={{ margin: 0 }}>Campus Physical Sign-In</h3>
+          <p style={{ color: '#64748b', fontSize: '.85rem' }}>{status?.campus.name || campusName} · Twice-daily GPS check</p>
         </div>
-
-        <button
-          onClick={fetchStatus}
-          disabled={loading}
-          style={{
-            background: '#f1f5f9',
-            border: '1px solid #cbd5e1',
-            borderRadius: '0.375rem',
-            padding: '0.25rem 0.6rem',
-            fontSize: '0.72rem',
-            fontWeight: 600,
-            color: '#475569',
-            cursor: 'pointer',
-          }}
-        >
-          {loading ? 'Refreshing...' : '↻ Refresh Status'}
-        </button>
+        <button type="button" onClick={() => void fetchStatus()} disabled={loading || locating}>Refresh status</button>
       </div>
-
-      {/* Session Status Pills */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        {/* Morning Session */}
-        <div style={{
-          background: status?.morning?.status === 'present' ? '#f0fdf4' : '#f8fafc',
-          border: `1px solid ${status?.morning?.status === 'present' ? '#86efac' : '#e2e8f0'}`,
-          borderRadius: '0.625rem',
-          padding: '0.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#475569' }}>
-              🌅 Morning Session
-            </span>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              padding: '0.15rem 0.45rem',
-              borderRadius: '9999px',
-              background: status?.morning?.status === 'present' ? '#22c55e' : '#94a3b8',
-              color: '#ffffff',
-            }}>
-              {status?.morning?.status === 'present' ? '✓ Present' : 'Pending'}
-            </span>
+      {statusError && <p role="alert" style={{ color: '#991b1b' }}>{statusError}</p>}
+      {!studentId && <p role="alert">Your student profile is unavailable. Reload the page or contact your administrator.</p>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.75rem', margin: '1rem 0' }}>
+        {(['morning', 'evening'] as const).map(session => {
+          const record = status?.[session]
+          const completed = record?.state === 'completed'
+          const onTime = record?.status === 'on_time'
+          return <div key={session} style={{ padding: '.9rem', borderRadius: '.625rem', border: '1px solid #e2e8f0', background: completed ? onTime ? '#f0fdf4' : '#fffbeb' : '#f8fafc' }}>
+            <strong>{session === 'morning' ? 'Morning arrival' : 'Evening departure'}</strong>
+            <p aria-live="polite">{loading && !status ? 'Loading…' : campusSessionLabel(record)}</p>
+            {status && <p style={{ fontSize: '.8rem', color: '#64748b' }}>
+              {session === 'morning'
+                ? `On time until ${formatCampusTime(status.campus.morning_cutoff)}; closes at ${formatCampusTime(status.campus.midday_split)} IST`
+                : `On time from ${formatCampusTime(status.campus.evening_cutoff)}; closes at ${formatCampusTime(status.campus.day_end)} IST`}
+            </p>}
+            {record?.signed_in_at && <small>Recorded at {new Date(record.signed_in_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST</small>}
           </div>
-          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            {status?.morning?.time_window ? `Window: ${status.morning.time_window}` : 'Before midday split'}
-          </span>
-          {status?.morning?.signed_in_at && (
-            <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
-              Logged at: {new Date(status.morning.signed_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-        </div>
-
-        {/* Evening Session */}
-        <div style={{
-          background: status?.evening?.status === 'present' ? '#f0fdf4' : '#f8fafc',
-          border: `1px solid ${status?.evening?.status === 'present' ? '#86efac' : '#e2e8f0'}`,
-          borderRadius: '0.625rem',
-          padding: '0.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#475569' }}>
-              🌆 Evening Session
-            </span>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              padding: '0.15rem 0.45rem',
-              borderRadius: '9999px',
-              background: status?.evening?.status === 'present' ? '#22c55e' : '#94a3b8',
-              color: '#ffffff',
-            }}>
-              {status?.evening?.status === 'present' ? '✓ Present' : 'Pending'}
-            </span>
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            {status?.evening?.time_window ? `Window: ${status.evening.time_window}` : 'Midday to day end'}
-          </span>
-          {status?.evening?.signed_in_at && (
-            <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
-              Logged at: {new Date(status.evening.signed_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-        </div>
+        })}
       </div>
-
-      {/* Action Button & GPS Prompt */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <button
-          onClick={handleGpsSignIn}
-          disabled={locating}
-          id="btn-campus-gps-signin"
-          style={{
-            background: locating
-              ? '#94a3b8'
-              : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '0.5rem',
-            padding: '0.75rem 1.25rem',
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            cursor: locating ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          {locating ? (
-            <>
-              <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>
-              Acquiring GPS Coordinates & Verifying Campus Geofence...
-            </>
-          ) : (
-            <>
-              <span>📍</span>
-              Verify Campus Presence (GPS Sign-In)
-            </>
-          )}
-        </button>
-
-        {/* Feedback Messages */}
-        {feedback && (
-          <div style={{
-            padding: '0.75rem 1rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.82rem',
-            lineHeight: 1.4,
-            fontWeight: 600,
-            background: feedback.type === 'success' ? '#ecfdf5' : '#fef2f2',
-            color: feedback.type === 'success' ? '#065f46' : '#991b1b',
-            border: `1px solid ${feedback.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
-          }}>
-            {feedback.message}
-          </div>
-        )}
-
-        <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>
-          🔒 Privacy Notice: Raw GPS coordinates are strictly used in real-time to compute distance to campus and are discarded immediately. Only the binary verification result is saved.
-        </p>
-      </div>
-    </div>
+      {status?.unavailable_reason && <p role="status">{status.unavailable_reason}</p>}
+      <button type="button" id="btn-campus-gps-signin" onClick={() => void handleGpsSignIn()}
+        disabled={locating || loading || !studentId || !status?.can_sign_in}
+        style={{ background: !status?.can_sign_in || locating || loading ? '#64748b' : '#0369a1', color: '#fff', border: 0, borderRadius: '.5rem', padding: '.8rem 1.25rem' }}>
+        {locating ? 'Checking location and recording…' : 'Verify Campus Presence (GPS Sign-In)'}
+      </button>
+      {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} style={{ color: feedback.type === 'error' ? '#991b1b' : '#065f46' }}>{feedback.message}</p>}
+      {status && <p style={{ fontSize: '.8rem', color: '#64748b' }}>Sign in within {status.campus.radius_meters} metres of the campus centre, with location accuracy of 50 metres or better.</p>}
+      <p style={{ fontSize: '.75rem', color: '#64748b' }}>Location coordinates are used for this check and are not saved. We retain the time, result, location accuracy and audit details. An internet connection is required.</p>
+    </section>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { campusSessionLabel, formatCampusTime, type CampusAttendanceStatus } from '@fyimp/contracts';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +11,7 @@ import { useOfflineQueue } from '../../src/hooks/useOfflineQueue';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
 import { queryClient, queryKeys } from '../../src/lib/query-client';
-import { StudentAttendanceListSchema } from '../../src/api/schemas/attendance.schema';
+import { CampusSignInStatusSchema, StudentAttendanceListSchema } from '../../src/api/schemas/attendance.schema';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
 import { Button } from '../../src/components/common/Button';
@@ -18,38 +19,14 @@ import { Badge } from '../../src/components/common/Badge';
 import { Skeleton } from '../../src/components/common/Skeleton';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
-interface CampusStatusResponse {
-  date: string;
-  current_time_ist: string;
-  campus: {
-    id: string;
-    name: string;
-    radius_meters: number;
-    morning_cutoff?: string;
-    midday_split?: string;
-    evening_cutoff?: string;
-    day_end?: string;
-  };
-  morning: {
-    state: 'completed' | 'pending' | 'absent';
-    status: 'on_time' | 'late' | null;
-    signed_in_at: string | null;
-  };
-  evening: {
-    state: 'completed' | 'pending' | 'absent';
-    status: 'on_time' | 'early_leave' | null;
-    signed_in_at: string | null;
-  };
-}
-
 export default function StudentAttendanceScreen() {
   const { user } = useAuth();
   const { activeSemester } = useSemester();
-  const { colors, typography, spacing } = useTheme();
-  const { isOnline, enqueueAction, pendingActions } = useOfflineQueue();
+  const { colors, typography } = useTheme();
+  const { isOnline } = useOfflineQueue();
 
   const userId = user?.id || '';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
   const [locating, setLocating] = useState(false);
 
@@ -57,12 +34,14 @@ export default function StudentAttendanceScreen() {
   const {
     data: campusStatus,
     isLoading: loadingStatus,
+    error: statusError,
     refetch: refetchStatus,
     isRefetching: refetchingStatus,
-  } = useQuery<CampusStatusResponse>({
+  } = useQuery<CampusAttendanceStatus>({
     queryKey: queryKeys.student.campusStatus(userId, todayStr),
     queryFn: () =>
-      apiClient.get<CampusStatusResponse>(`${API_ENDPOINTS.CAMPUS_STATUS}/${userId}`),
+      apiClient.get<CampusAttendanceStatus>(`${API_ENDPOINTS.CAMPUS_STATUS}/${userId}`, { schema: CampusSignInStatusSchema }),
+    refetchInterval: 30000,
     enabled: !!userId,
   });
 
@@ -88,22 +67,13 @@ export default function StudentAttendanceScreen() {
     refetchCourses();
   };
 
-  // Determine current active session & button state based on IST time
-  const currentTimeStr = campusStatus?.current_time_ist || '10:00:00';
-  const [currentHours, currentMinutes] = currentTimeStr.split(':').map((v) => parseInt(v, 10));
-  const currentTotalMin = currentHours * 60 + currentMinutes;
-
-  const isMorningWindow = currentTotalMin < 13 * 60 + 30; // before 13:30 IST
-  const isEveningWindow = currentTotalMin >= 13 * 60 + 30 && currentTotalMin <= 17 * 60; // 13:30 - 17:00 IST
-  const isDayClosed = currentTotalMin > 17 * 60;
-
-  const morningCompleted = campusStatus?.morning.state === 'completed';
-  const eveningCompleted = campusStatus?.evening.state === 'completed';
-
   // 3. Campus Sign-in Mutation
   const signInMutation = useMutation({
     mutationFn: async () => {
+      if (!isOnline) throw new Error('Connect to the internet before signing in. Campus sign-in cannot be saved offline.');
       setLocating(true);
+      const latest = await refetchStatus();
+      if (latest.error || !latest.data?.can_sign_in) throw new Error(latest.data?.unavailable_reason || 'Unable to verify campus status. Try again.');
 
       // Step 1: Request foreground location permission
       const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
@@ -115,16 +85,21 @@ export default function StudentAttendanceScreen() {
       }
 
       // Step 2: Get high accuracy position
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      let locationTimer: ReturnType<typeof setTimeout> | undefined;
+      const position = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }),
+        new Promise<never>((_, reject) => {
+          locationTimer = setTimeout(() => reject(new Error('Getting your location timed out. Move to an open area and try again.')), 15000);
+        }),
+      ]).finally(() => clearTimeout(locationTimer));
 
-      // Step 3: Check client-side accuracy (< 50m required)
-      const accuracy = position.coords.accuracy || 0;
-      if (accuracy > 50) {
+      // Step 3: Check client-side accuracy (50m or better required)
+      if (position.mocked) throw new Error('Mock locations cannot be used for campus sign-in.');
+      const accuracy = position.coords.accuracy;
+      if (accuracy == null || !Number.isFinite(accuracy) || accuracy < 0 || accuracy > 50) {
         setLocating(false);
         throw new Error(
-          `GPS signal accuracy is low (±${Math.round(accuracy)}m). Please step into an open area or near a window and try again.`
+          'Location accuracy is unavailable or worse than 50 metres. Move to an open area and try again.'
         );
       }
 
@@ -132,35 +107,16 @@ export default function StudentAttendanceScreen() {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: accuracy,
-        client_timestamp: new Date().toISOString(),
+        client_timestamp: new Date(position.timestamp).toISOString(),
+        mocked: false,
       };
 
-      if (!isOnline) {
-        await enqueueAction(
-          'CAMPUS_SIGN_IN',
-          API_ENDPOINTS.CAMPUS_SIGN_IN,
-          payload
-        );
-        setLocating(false);
-        return { queued: true };
-      }
-
-      const res = await apiClient.post(API_ENDPOINTS.CAMPUS_SIGN_IN, payload);
+      const res = await apiClient.post(API_ENDPOINTS.CAMPUS_SIGN_IN, payload, { expectedUserId: userId });
       setLocating(false);
       return res;
     },
     onSuccess: (res: any) => {
-      if (res?.queued) {
-        Alert.alert(
-          'Saved Offline',
-          'Your campus sign-in was verified and recorded offline. It will automatically synchronize when your network connection is restored.'
-        );
-      } else {
-        Alert.alert(
-          'Campus Verified',
-          res?.message || 'Your presence on campus was successfully verified!'
-        );
-      }
+      Alert.alert('Campus Sign-In Recorded', res?.message || 'Your campus sign-in was recorded.');
       queryClient.invalidateQueries({
         queryKey: queryKeys.student.campusStatus(userId, todayStr),
       });
@@ -171,34 +127,15 @@ export default function StudentAttendanceScreen() {
     onError: (err: any) => {
       setLocating(false);
       Alert.alert('Sign-In Check Failed', err?.message || 'Unable to record campus attendance.');
+      void refetchStatus();
     },
   });
 
-  // Decide button properties
-  let buttonTitle = 'Sign In (Morning Arrival)';
-  let buttonDisabled = false;
-  let buttonVariant: 'primary' | 'outline' = 'primary';
-
-  if (isMorningWindow) {
-    if (morningCompleted) {
-      buttonTitle = '✓ Morning Arrival Verified';
-      buttonDisabled = true;
-    } else {
-      buttonTitle = 'Sign In (Morning Arrival)';
-      buttonDisabled = false;
-    }
-  } else if (isEveningWindow) {
-    if (eveningCompleted) {
-      buttonTitle = '✓ Evening Departure Verified';
-      buttonDisabled = true;
-    } else {
-      buttonTitle = 'End-of-Day Check (Evening Departure)';
-      buttonDisabled = false;
-    }
-  } else if (isDayClosed) {
-    buttonTitle = 'Campus Checkpoints Closed for Today';
-    buttonDisabled = true;
-  }
+  const buttonTitle = !isOnline ? 'Connect to the internet to sign in'
+    : loadingStatus ? 'Loading campus status…'
+    : campusStatus?.can_sign_in ? campusStatus.active_session === 'morning' ? 'Sign In (Morning Arrival)' : 'Sign In (Evening Departure)'
+    : campusStatus?.unavailable_reason || 'Campus sign-in unavailable';
+  const buttonDisabled = !isOnline || !!statusError || !campusStatus?.can_sign_in;
 
   return (
     <ScreenContainer
@@ -214,7 +151,7 @@ export default function StudentAttendanceScreen() {
               Campus Attendance Checkpoint
             </Text>
             <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-              {campusStatus?.campus?.name || 'University Campus'} • 400m GPS Geofence
+              {campusStatus?.campus?.name || 'University Campus'}{campusStatus ? ` • ${campusStatus.campus.radius_meters}m GPS Geofence` : ''}
             </Text>
           </View>
           <View style={styles.gpsBadge}>
@@ -227,27 +164,19 @@ export default function StudentAttendanceScreen() {
 
         <Text style={[typography.body, { color: colors.textSecondary, marginVertical: 12, lineHeight: 20 }]}>
           Verify your physical presence on campus. Raw GPS coordinates are evaluated in memory and are{' '}
-          <Text style={{ fontWeight: '700', color: colors.textPrimary }}>never stored</Text>.
+          <Text style={{ fontWeight: '700', color: colors.textPrimary }}>not saved</Text>. The time, result, location accuracy and audit details are retained. Sign-in requires an internet connection.
         </Text>
 
+        {statusError && <ErrorView message={statusError instanceof Error ? statusError.message : 'Unable to load campus status.'} onRetry={refetchStatus} />}
         {/* Action Button */}
         <Button
           title={locating ? 'Acquiring GPS Signal...' : buttonTitle}
           onPress={() => signInMutation.mutate()}
           loading={signInMutation.isPending || locating}
           disabled={buttonDisabled || signInMutation.isPending || locating}
-          variant={buttonVariant}
+          variant="primary"
           style={{ marginBottom: 12 }}
         />
-
-        {pendingActions.CAMPUS_SIGN_IN && (
-          <View style={[styles.pendingBanner, { backgroundColor: colors.warningLight }]}>
-            <Ionicons name="cloud-offline" size={16} color={colors.warning} />
-            <Text style={[typography.caption, { color: colors.warning, marginLeft: 6, flex: 1 }]}>
-              Offline check recorded locally — auto-syncing upon reconnection.
-            </Text>
-          </View>
-        )}
 
         {/* Checkpoint Status Readout Grid */}
         <View style={styles.statusReadoutGrid}>
@@ -257,18 +186,18 @@ export default function StudentAttendanceScreen() {
               MORNING ARRIVAL
             </Text>
             <Text style={[typography.caption, { color: colors.textSecondary, fontSize: 10, marginTop: 1 }]}>
-              Cutoff: 09:30 AM
+              Cutoff: {campusStatus ? formatCampusTime(campusStatus.campus.morning_cutoff) + ' IST' : '—'}
             </Text>
             <View style={{ marginTop: 6 }}>
               {campusStatus?.morning.state === 'completed' ? (
                 <Badge
-                  label={campusStatus.morning.status === 'on_time' ? 'ON TIME' : 'LATE'}
+                  label={campusSessionLabel(campusStatus.morning).toUpperCase()}
                   variant={campusStatus.morning.status === 'on_time' ? 'success' : 'warning'}
                 />
               ) : campusStatus?.morning.state === 'pending' ? (
                 <Badge label="PENDING" variant="neutral" />
               ) : (
-                <Badge label="ABSENT" variant="danger" />
+                <Badge label={loadingStatus ? "LOADING" : statusError || !campusStatus ? "UNAVAILABLE" : "ABSENT"} variant="neutral" />
               )}
             </View>
             {campusStatus?.morning.signed_in_at && (
@@ -288,18 +217,18 @@ export default function StudentAttendanceScreen() {
               EVENING CHECKPOINT
             </Text>
             <Text style={[typography.caption, { color: colors.textSecondary, fontSize: 10, marginTop: 1 }]}>
-              Cutoff: 03:30 PM
+              Cutoff: {campusStatus ? formatCampusTime(campusStatus.campus.evening_cutoff) + ' IST' : '—'}
             </Text>
             <View style={{ marginTop: 6 }}>
               {campusStatus?.evening.state === 'completed' ? (
                 <Badge
-                  label={campusStatus.evening.status === 'on_time' ? 'ON TIME' : 'EARLY LEAVE'}
+                  label={campusSessionLabel(campusStatus.evening).toUpperCase()}
                   variant={campusStatus.evening.status === 'on_time' ? 'success' : 'warning'}
                 />
               ) : campusStatus?.evening.state === 'pending' ? (
                 <Badge label="PENDING" variant="neutral" />
               ) : (
-                <Badge label="ABSENT" variant="danger" />
+                <Badge label={loadingStatus ? "LOADING" : statusError || !campusStatus ? "UNAVAILABLE" : "ABSENT"} variant="neutral" />
               )}
             </View>
             {campusStatus?.evening.signed_in_at && (
@@ -402,13 +331,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  pendingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
   },
   statusReadoutGrid: {
     flexDirection: 'row',
