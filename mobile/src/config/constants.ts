@@ -2,20 +2,9 @@
  * App-wide constants
  */
 
-export type UserRole =
-  | 'student'
-  | 'teaching_staff'
-  | 'hod'
-  | 'campus_director'
-  | 'superadmin';
-
-export const ROLES = {
-  STUDENT: 'student' as const,
-  TEACHING_STAFF: 'teaching_staff' as const,
-  HOD: 'hod' as const,
-  CAMPUS_DIRECTOR: 'campus_director' as const,
-  SUPERADMIN: 'superadmin' as const,
-};
+import { ROLES as SHARED_ROLES } from '@fyimp/contracts';
+export type { Role as UserRole } from '@fyimp/contracts';
+export const ROLES = { ...SHARED_ROLES, SUPERADMIN: SHARED_ROLES.SUPER_ADMIN };
 
 export const STORAGE_KEYS = {
   AUTH_SESSION: 'fyimp_auth_session',

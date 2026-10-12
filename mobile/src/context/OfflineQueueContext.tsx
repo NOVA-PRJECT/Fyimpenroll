@@ -1,202 +1,67 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from 'react';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import { STORAGE_KEYS } from '../config/constants';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import NetInfo from '@react-native-community/netinfo';
+import { Alert } from 'react-native';
 import { apiClient } from '../api/client';
-import { API_ENDPOINTS } from '../api/endpoints';
-import { queryClient, queryKeys } from '../lib/query-client';
+import { queryClient } from '../lib/query-client';
 import { secureStorage } from '../lib/secure-store';
+import { OfflineActionQueue, QueuedAction } from '../lib/offline-queue';
+import { useAuth } from './AuthContext';
 
-export type OfflineActionType = 'CAMPUS_SIGN_IN' | 'PERIOD_MARKING';
-
-export interface PendingAction {
-  id: string;
-  type: OfflineActionType;
-  endpoint: string;
-  payload: any;
-  clientTimestamp: string;
-}
-
+export type OfflineActionType = QueuedAction['type'];
+export type PendingAction = QueuedAction;
 interface OfflineQueueContextType {
   isOnline: boolean;
   pendingActions: Record<OfflineActionType, PendingAction | null>;
-  enqueueAction: (
-    type: OfflineActionType,
-    endpoint: string,
-    payload: any
-  ) => Promise<void>;
-  clearAction: (type: OfflineActionType) => Promise<void>;
-  syncPendingActions: () => Promise<void>;
+  queuedCount: number;
+  enqueueAction(type: OfflineActionType, endpoint: string, payload: unknown): Promise<void>;
+  clearAction(type: OfflineActionType): Promise<void>;
+  syncPendingActions(): Promise<void>;
 }
+const OfflineQueueContext = createContext<OfflineQueueContextType | undefined>(undefined);
+const queue = new OfflineActionQueue(secureStorage);
 
-const OfflineQueueContext = createContext<OfflineQueueContextType | undefined>(
-  undefined
-);
-
-export const OfflineQueueProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [pendingActions, setPendingActions] = useState<
-    Record<OfflineActionType, PendingAction | null>
-  >({
-    CAMPUS_SIGN_IN: null,
-    PERIOD_MARKING: null,
-  });
-
-  // Load queued actions from encrypted SecureStore on mount
-  useEffect(() => {
-    secureStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE).then((raw) => {
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          setPendingActions((prev) => ({ ...prev, ...parsed }));
-        } catch (e) {
-          console.warn('[OfflineQueue] Failed to parse stored queue:', e);
-        }
-      }
-    });
+export const OfflineQueueProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const owner = user?.id;
+  const ownerRef = useRef(owner);
+  ownerRef.current = owner;
+  const [isOnline, setIsOnline] = useState(true);
+  const [actions, setActions] = useState<QueuedAction[]>([]);
+  const update = useCallback((id: string, rows: QueuedAction[]) => {
+    if (ownerRef.current === id) setActions(rows);
   }, []);
-
-  const saveQueue = async (
-    newQueue: Record<OfflineActionType, PendingAction | null>
-  ) => {
-    setPendingActions(newQueue);
-    await secureStorage.setItem(
-      STORAGE_KEYS.OFFLINE_QUEUE,
-      JSON.stringify(newQueue)
-    );
-  };
-
-  const enqueueAction = useCallback(
-    async (type: OfflineActionType, endpoint: string, payload: any) => {
-      const action: PendingAction = {
-        id: `${type}_${Date.now()}`,
-        type,
-        endpoint,
-        payload,
-        clientTimestamp: new Date().toISOString(),
-      };
-
-      setPendingActions((prev) => {
-        const updated = { ...prev, [type]: action };
-        secureStorage.setItem(
-          STORAGE_KEYS.OFFLINE_QUEUE,
-          JSON.stringify(updated)
-        ).catch((err) =>
-          console.warn('[OfflineQueue] Error saving pending action:', err)
-        );
-        return updated;
-      });
-    },
-    []
-  );
-
+  useEffect(() => {
+    setActions([]);
+    if (owner) void queue.list(owner).then(rows => update(owner, rows)).catch(() => Alert.alert('Offline queue', 'Stored actions could not be read. They have not been submitted.'));
+  }, [owner, update]);
+  const enqueueAction = useCallback(async (type: OfflineActionType, endpoint: string, payload: unknown) => {
+    if (!owner) throw new Error('Sign in before saving offline work');
+    const rows = await queue.enqueue({ id: `${Date.now()}_${Math.random().toString(36).slice(2)}`, ownerId: owner, type, endpoint, payload, clientTimestamp: new Date().toISOString() });
+    update(owner, rows);
+  }, [owner, update]);
   const clearAction = useCallback(async (type: OfflineActionType) => {
-    setPendingActions((prev) => {
-      const updated = { ...prev, [type]: null };
-      secureStorage.setItem(
-        STORAGE_KEYS.OFFLINE_QUEUE,
-        JSON.stringify(updated)
-      ).catch((err) =>
-        console.warn('[OfflineQueue] Error clearing pending action:', err)
-      );
-      return updated;
-    });
-  }, []);
-
+    if (owner) update(owner, await queue.clear(owner, type));
+  }, [owner, update]);
   const syncPendingActions = useCallback(async () => {
-    const raw = await secureStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
-    if (!raw) return;
-
-    let currentQueue: Record<OfflineActionType, PendingAction | null>;
-    try {
-      currentQueue = JSON.parse(raw);
-    } catch {
-      return;
-    }
-
-    // Process CAMPUS_SIGN_IN
-    const signInAction = currentQueue.CAMPUS_SIGN_IN;
-    if (signInAction) {
-      try {
-        await apiClient.post(signInAction.endpoint, {
-          ...signInAction.payload,
-          client_timestamp: signInAction.clientTimestamp,
-          synced_late: true,
-        });
-        currentQueue.CAMPUS_SIGN_IN = null;
-        queryClient.invalidateQueries({
-          predicate: (query) => query.queryKey[1] === 'campus-sign-in',
-        });
-      } catch (err) {
-        console.warn('[OfflineQueue] Retry failed for sign-in action:', err);
-      }
-    }
-
-    // Process PERIOD_MARKING
-    const markAction = currentQueue.PERIOD_MARKING;
-    if (markAction) {
-      try {
-        await apiClient.post(markAction.endpoint, {
-          ...markAction.payload,
-          client_timestamp: markAction.clientTimestamp,
-          synced_late: true,
-        });
-        currentQueue.PERIOD_MARKING = null;
-        queryClient.invalidateQueries({
-          predicate: (query) =>
-            query.queryKey[1] === 'scheduled-periods' ||
-            query.queryKey[1] === 'slot-roster',
-        });
-      } catch (err) {
-        console.warn('[OfflineQueue] Retry failed for period marking:', err);
-      }
-    }
-
-    await saveQueue(currentQueue);
-  }, []);
-
-  // NetInfo network state listener
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
-      const reachable = !!state.isConnected && state.isInternetReachable !== false;
-      setIsOnline(reachable);
-
-      if (reachable) {
-        syncPendingActions();
-      }
+    if (!owner) return;
+    const rows = await queue.sync(owner, () => ownerRef.current === owner, async action => {
+      await apiClient.post(action.endpoint, action.payload, { expectedUserId: owner });
     });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [syncPendingActions]);
-
-  return (
-    <OfflineQueueContext.Provider
-      value={{
-        isOnline,
-        pendingActions,
-        enqueueAction,
-        clearAction,
-        syncPendingActions,
-      }}
-    >
-      {children}
-    </OfflineQueueContext.Provider>
-  );
+    update(owner, rows);
+    if (rows[0]?.blockedReason) Alert.alert('Offline action needs review', rows[0].blockedReason + '. Refresh the class before submitting a new attendance revision.');
+    await queryClient.invalidateQueries();
+  }, [owner, update]);
+  useEffect(() => NetInfo.addEventListener(state => {
+    const online = !!state.isConnected && state.isInternetReachable !== false;
+    setIsOnline(online);
+    if (online) void syncPendingActions().catch(() => {});
+  }), [syncPendingActions]);
+  return <OfflineQueueContext.Provider value={{ isOnline, queuedCount: actions.length,
+    pendingActions: { CAMPUS_SIGN_IN: actions.find(a => a.type === 'CAMPUS_SIGN_IN') || null, PERIOD_MARKING: actions.find(a => a.type === 'PERIOD_MARKING') || null },
+    enqueueAction, clearAction, syncPendingActions }}>{children}</OfflineQueueContext.Provider>;
 };
-
-export const useOfflineQueue = (): OfflineQueueContextType => {
+export const useOfflineQueue = () => {
   const context = useContext(OfflineQueueContext);
-  if (!context) {
-    throw new Error('useOfflineQueue must be used within an OfflineQueueProvider');
-  }
+  if (!context) throw new Error('useOfflineQueue must be used within an OfflineQueueProvider');
   return context;
 };

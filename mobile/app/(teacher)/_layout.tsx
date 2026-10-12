@@ -1,9 +1,11 @@
 import React from 'react';
+import { useAuth } from '../../src/context/AuthContext';
 import { Tabs } from 'expo-router';
 import { useTabScreenOptions } from '../../src/hooks/useTabScreenOptions';
 import { TabBarIcon } from '../../src/components/layout/TabBarIcon';
 
 export default function TeacherLayout() {
+  const { role } = useAuth();
   const screenOptions = useTabScreenOptions();
 
   return (
@@ -21,6 +23,7 @@ export default function TeacherLayout() {
         name="mark"
         options={{
           title: 'Mark',
+          href: role === 'teaching_staff' ? null : undefined,
           headerTitle: 'Period Attendance',
           tabBarLabel: 'Mark',
           tabBarIcon: ({ color }) => <TabBarIcon name="checkbox-outline" color={color} />,

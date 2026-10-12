@@ -1,6 +1,8 @@
 'use client'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -212,6 +214,7 @@ function CustomPaperSelect({
 }
 
 export default function TeacherDashboard() {
+  const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
 
@@ -267,7 +270,7 @@ export default function TeacherDashboard() {
   // 1. Fetch Teacher Assigned Papers
   const fetchTeacherCourses = useCallback(async () => {
     try {
-      const res = await fetch('/api/faculty/courses')
+      const res = await entryFetch('/api/faculty/courses')
       const data = await res.json()
       if (!res.ok) {
         router.push('/login')
@@ -280,7 +283,7 @@ export default function TeacherDashboard() {
     } finally {
       setLoadingProfile(false)
     }
-  }, [router])
+  }, [router, entryFetch])
 
   // 2. Fetch Teacher Schedule for target date
   const fetchTeacherSchedule = useCallback(async (dateToFetch: string) => {
@@ -620,11 +623,7 @@ export default function TeacherDashboard() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   return (

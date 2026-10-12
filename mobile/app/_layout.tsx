@@ -9,6 +9,7 @@ import { queryClient } from '../src/lib/query-client';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SemesterProvider } from '../src/context/SemesterContext';
 import { OfflineQueueProvider } from '../src/context/OfflineQueueContext';
+import { AccountAccessGate } from '../src/components/AccountAccessGate';
 import { useTheme } from '../src/hooks/useTheme';
 
 function NavigationGuard() {
@@ -36,7 +37,7 @@ function NavigationGuard() {
       // If currently on login screen, redirect to the role-appropriate group
       if (role === 'student') {
         router.replace('/(student)');
-      } else if (role === 'teaching_staff') {
+      } else if ((role === 'teacher' || role === 'teaching_staff')) {
         router.replace('/(teacher)');
       } else if (role === 'hod') {
         router.replace('/(hod)');
@@ -50,7 +51,7 @@ function NavigationGuard() {
     const currentGroup = segments[0];
     if (role === 'student' && currentGroup !== '(student)') {
       router.replace('/(student)');
-    } else if (role === 'teaching_staff' && currentGroup !== '(teacher)') {
+    } else if ((role === 'teacher' || role === 'teaching_staff') && currentGroup !== '(teacher)') {
       router.replace('/(teacher)');
     } else if (role === 'hod' && currentGroup !== '(hod)') {
       router.replace('/(hod)');
@@ -135,7 +136,7 @@ export default function RootLayout() {
         <AuthProvider>
           <SemesterProvider>
             <OfflineQueueProvider>
-              <NavigationGuard />
+              <AccountAccessGate><NavigationGuard /></AccountAccessGate>
             </OfflineQueueProvider>
           </SemesterProvider>
         </AuthProvider>

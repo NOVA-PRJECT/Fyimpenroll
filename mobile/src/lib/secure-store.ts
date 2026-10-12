@@ -18,7 +18,7 @@ export const secureStorage = {
     try {
       await SecureStore.setItemAsync(key, value);
     } catch (error) {
-      console.warn(`[SecureStore] Error writing key "${key}":`, error);
+      throw new Error('Could not save encrypted local data');
     }
   },
 

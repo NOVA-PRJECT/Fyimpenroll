@@ -1,9 +1,11 @@
 'use client'
 
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
 import NavigationLink from '@/components/NavigationLink'
 import { sessionRedirect } from '@/core/security/session-response'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
@@ -20,6 +22,7 @@ import {
 } from '@/core/utils/dateTime'
 
 export default function DirectorDashboard() {
+  const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
 
@@ -81,7 +84,7 @@ export default function DirectorDashboard() {
 
   const loadSettingsData = useCallback(async (isBackground = false) => {
     try {
-      const response = await fetch('/api/director/settings')
+      const response = await entryFetch('/api/director/settings')
       const data = await response.json().catch(() => ({}))
       const destination = sessionRedirect(response.status, data)
       if (destination) { router.replace(destination); return }
@@ -108,7 +111,7 @@ export default function DirectorDashboard() {
     } finally {
       if (!isBackground) setLoadingDirector(false)
     }
-  }, [router])
+  }, [router, entryFetch])
 
   useEffect(() => {
     // Check sessionStorage cache for instant render, but revalidate in background (F59)
@@ -208,7 +211,7 @@ export default function DirectorDashboard() {
     setShowWindowOpenWarning(false)
     const nowIso = new Date().toISOString()
     try {
-      await fetch('/api/director/settings', {
+      await entryFetch('/api/director/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deadline: nowIso }),
@@ -280,7 +283,7 @@ export default function DirectorDashboard() {
     setWindowSuccess('')
 
     try {
-      const response = await fetch('/api/director/settings', {
+      const response = await entryFetch('/api/director/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -319,7 +322,7 @@ export default function DirectorDashboard() {
     setWindowSuccess('')
 
     try {
-      const response = await fetch('/api/director/settings', {
+      const response = await entryFetch('/api/director/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deadline: nowIso }),
@@ -431,11 +434,7 @@ export default function DirectorDashboard() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   return (

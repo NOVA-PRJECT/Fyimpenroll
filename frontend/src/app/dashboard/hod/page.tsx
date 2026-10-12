@@ -1,6 +1,8 @@
 'use client'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
+import { logoutPortal } from '@/core/security/logout'
 
 import dynamic from 'next/dynamic'
 import PageLoading from '@/components/PageLoading'
@@ -74,6 +76,7 @@ function getDefaultAcademicYear(): string {
 }
 
 export default function HodDashboard() {
+  const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -155,7 +158,7 @@ export default function HodDashboard() {
     const controller = new AbortController()
     async function loadHodInfo() {
       try {
-        const response = await fetch('/api/auth/profile', { signal: controller.signal })
+        const response = await entryFetch('/api/auth/profile', { signal: controller.signal })
         const data = await response.json().catch(() => ({}))
         const destination = sessionRedirect(response.status, data)
         if (destination) { router.replace(destination); return }
@@ -170,7 +173,7 @@ export default function HodDashboard() {
     }
     loadHodInfo()
     return () => controller.abort()
-  }, [router, profileRetry])
+  }, [router, profileRetry, entryFetch])
 
   // Load active tab from sessionStorage on mount (hydration-safe)
   useEffect(() => {
@@ -511,11 +514,7 @@ export default function HodDashboard() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   const notSubmittedStudents = deptData?.students.filter(s => !s.submitted) ?? []

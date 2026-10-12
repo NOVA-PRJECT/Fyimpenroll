@@ -1,5 +1,6 @@
 'use client'
 
+import { saveDashboardEntry } from '@/core/security/dashboard-entry'
 import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
 
 export const dynamic = 'force-dynamic'
@@ -59,7 +60,7 @@ function LoginForm() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, preloadDashboard: true }),
       })
 
       const data = await response.json()
@@ -76,7 +77,8 @@ function LoginForm() {
         return
       }
 
-      clearSessionStorage()
+      try { clearSessionStorage() } catch { /* Storage may be disabled. */ }
+      saveDashboardEntry(data.dashboardEntry)
       navigateAfterSessionChange(data.redirectTo)
     } catch {
       setError('Something went wrong. Please try again.')

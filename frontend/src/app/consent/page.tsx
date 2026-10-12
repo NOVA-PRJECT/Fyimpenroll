@@ -1,5 +1,6 @@
 'use client'
 
+import { logoutPortal } from '@/core/security/logout'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -97,11 +98,7 @@ export default function ConsentPage() {
   }
 
   const handleSignOut = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-    } finally {
-      router.replace('/login')
-    }
+    await logoutPortal()
   }
 
   if (checking) {

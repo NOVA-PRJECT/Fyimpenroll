@@ -4,16 +4,21 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { UserRole } from '../config/constants';
 import { queryClient } from '../lib/query-client';
-import { setOnUnauthorizedCallback } from '../api/client';
+import { apiClient, setOnUnauthorizedCallback } from '../api/client';
 import { ProfileResponseSchema } from '../api/schemas/auth.schema';
 import { API_ENDPOINTS } from '../api/endpoints';
+import { ENV } from '../config/env';
+import { Alert } from 'react-native';
+import { ProfileRequests, withAuthDeadline } from '../lib/auth-network';
 
 export interface UserProfile {
+  must_change_password?: boolean;
   id?: string;
   full_name?: string | null;
   current_semester?: number | null;
@@ -45,64 +50,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const authEpoch = useRef(0);
+  const activeToken = useRef<string | null>(null);
+  const loggingIn = useRef(false);
+  const signingOut = useRef<Promise<void> | null>(null);
+  const profiles = useRef(new ProfileRequests<{ role: UserRole; profile: UserProfile } | null>());
+
   // Resolve roles only from the authenticated backend profile endpoint.
   const fetchProfileAndRole = useCallback(
     async (currentSession: Session): Promise<{ role: UserRole; profile: UserProfile } | null> => {
-      try {
-        const token = currentSession.access_token;
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.0.2.2:4000'}${API_ENDPOINTS.AUTH_PROFILE}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+      return profiles.current.load(currentSession.access_token, () => withAuthDeadline(async signal => {
+        try {
+          const token = currentSession.access_token;
+          const response = await fetch(
+            `${ENV.API_BASE_URL.replace(/\/$/, '')}${API_ENDPOINTS.AUTH_PROFILE}`,
+            {
+              signal,
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-        if (response.ok) {
-          const rawData = await response.json();
-          const parsed = ProfileResponseSchema.safeParse(rawData);
-          if (parsed.success) {
-            const fetchedRole = parsed.data.role as UserRole;
-            const p = parsed.data.profile;
-            const profileData: UserProfile = {
-              id: currentSession.user.id,
-              full_name: p.full_name,
-              current_semester: p.current_semester,
-              department_id: p.department_id,
-              campus_id: p.campus_id,
-              department_name: p.departments?.name,
-              campus_name: p.campuses?.name,
-            };
-            return { role: fetchedRole, profile: profileData };
+          if (response.ok) {
+            const rawData = await response.json();
+            const parsed = ProfileResponseSchema.safeParse(rawData);
+            if (parsed.success) {
+              const fetchedRole = parsed.data.role as UserRole;
+              const p = parsed.data.profile;
+              const profileData: UserProfile = {
+                id: currentSession.user.id,
+                must_change_password: parsed.data.must_change_password ?? false,
+                full_name: p.full_name,
+                current_semester: p.current_semester,
+                department_id: p.department_id,
+                campus_id: p.campus_id,
+                department_name: p.departments?.name,
+                campus_name: p.campuses?.name,
+              };
+              return { role: fetchedRole, profile: profileData };
+            }
           }
+        } catch (err) {
+          console.warn('[AuthContext] Backend profile fetch failed:', err);
         }
-      } catch (err) {
-        console.warn('[AuthContext] Backend profile fetch failed:', err);
-      }
-      return null;
+        return null;
+      }));
     },
     []
   );
 
-  const logout = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn('[AuthContext] Sign out error:', err);
-    } finally {
-      setSession(null);
-      setUser(null);
-      setRole(null);
-      setProfile(null);
-      queryClient.clear();
-    }
+  const logout = useCallback((): Promise<void> => {
+    if (signingOut.current) return signingOut.current;
+    authEpoch.current++;
+    activeToken.current = null;
+    profiles.current.clear();
+    setIsLoading(true);
+    queryClient.clear();
+    const operation = (async () => {
+      try {
+        // The SDK's global logout fetch is routed through the backend once.
+        // The SDK still removes encrypted credentials and emits SIGNED_OUT.
+        const { error } = await supabase.auth.signOut();
+        if (error) Alert.alert('Session revocation', 'Signed out on this device. Server session revocation could not be confirmed.');
+      } catch {
+        Alert.alert('Sign out', 'Sign out could not be fully confirmed. Check your connection and retry.');
+      } finally {
+        setSession(null); setUser(null); setRole(null); setProfile(null);
+        queryClient.clear();
+        setIsLoading(false);
+        signingOut.current = null;
+      }
+    })();
+    signingOut.current = operation;
+    return operation;
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!session) return;
+    const epoch = authEpoch.current;
     const result = await fetchProfileAndRole(session);
+    if (epoch !== authEpoch.current || activeToken.current !== session.access_token) return;
     if (result) {
       setRole(result.role);
       setProfile(result.profile);
@@ -115,8 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Handle 401 interceptor trigger
   useEffect(() => {
     setOnUnauthorizedCallback(() => {
-      logout();
+      if (!signingOut.current) void logout();
     });
+    return () => setOnUnauthorizedCallback(null);
   }, [logout]);
 
   // Initial session restoration on mount
@@ -124,8 +154,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     let isMounted = true;
 
     async function initAuth() {
+      const epoch = authEpoch.current;
       try {
         const { data, error } = await supabase.auth.getSession();
+        if (!isMounted || epoch !== authEpoch.current) return;
         if (error || !data.session) {
           if (isMounted) {
             setSession(null);
@@ -138,13 +170,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         const currentSession = data.session;
+        activeToken.current = currentSession.access_token;
         if (isMounted) {
           setSession(currentSession);
           setUser(currentSession.user);
         }
 
         const roleResult = await fetchProfileAndRole(currentSession);
-        if (isMounted) {
+        if (isMounted && epoch === authEpoch.current && activeToken.current === currentSession.access_token) {
           if (roleResult) {
             setRole(roleResult.role);
             setProfile(roleResult.profile);
@@ -165,28 +198,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Listen to token refresh and auth events from Supabase
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
-
       if (event === 'SIGNED_OUT' || !newSession) {
-        setSession(null);
-        setUser(null);
-        setRole(null);
-        setProfile(null);
+        authEpoch.current++;
+        activeToken.current = null;
+        profiles.current.clear();
+        setSession(null); setUser(null); setRole(null); setProfile(null);
         queryClient.clear();
         setIsLoading(false);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (signingOut.current || loggingIn.current) return;
+        activeToken.current = newSession.access_token;
+        const epoch = ++authEpoch.current;
         setSession(newSession);
         setUser(newSession.user);
-        const result = await fetchProfileAndRole(newSession);
-        if (result && isMounted) {
-          setRole(result.role);
-          setProfile(result.profile);
-        } else if (isMounted) {
-          setRole(null);
-          setProfile(null);
-        }
-        setIsLoading(false);
+        // Do not await network work inside the SDK's auth notification lock.
+        void fetchProfileAndRole(newSession).then(result => {
+          if (!isMounted || epoch !== authEpoch.current || activeToken.current !== newSession.access_token) return;
+          setRole(result?.role ?? null);
+          setProfile(result?.profile ?? null);
+          setIsLoading(false);
+        });
       }
     });
 
@@ -200,21 +233,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     email: string,
     password: string
   ): Promise<{ role: UserRole; redirectTo?: string }> => {
+    if (signingOut.current || loggingIn.current) throw new Error('A session change is already in progress.');
+    loggingIn.current = true;
+    const epoch = ++authEpoch.current;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const loginResult = await apiClient.post(API_ENDPOINTS.AUTH_LOGIN, { email: email.trim(), password }, { skipAuth: true });
+      if (epoch !== authEpoch.current) throw new Error('Session changed during login.');
+      const { data, error } = await supabase.auth.setSession({ access_token: loginResult.token, refresh_token: loginResult.refreshToken });
+      if (error || !data.session) throw new Error(error?.message || 'Could not establish session');
 
-      if (error || !data.session) {
-        throw new Error(error?.message || 'Invalid email or password');
-      }
-
+      if (epoch !== authEpoch.current) throw new Error('Session changed during login.');
+      activeToken.current = data.session.access_token;
       setSession(data.session);
       setUser(data.user);
 
       const result = await fetchProfileAndRole(data.session);
+      if (epoch !== authEpoch.current) throw new Error('Session changed during login.');
       if (!result) {
         throw new Error('Could not resolve user role. Contact administration.');
       }
@@ -222,9 +257,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setRole(result.role);
       setProfile(result.profile);
 
-      return { role: result.role };
+      return { role: result.role, redirectTo: loginResult.redirectTo };
     } finally {
-      setIsLoading(false);
+      loggingIn.current = false;
+      if (epoch === authEpoch.current) setIsLoading(false);
     }
   };
 

@@ -3,7 +3,7 @@
 import NavigationLink from '@/components/NavigationLink'
 import { sessionRedirect } from '@/core/security/session-response'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/navigation'
@@ -596,11 +596,7 @@ export default function RegisterPage() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   function handleChangeTrack() {

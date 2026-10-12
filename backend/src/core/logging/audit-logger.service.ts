@@ -1,5 +1,8 @@
 ﻿import { Injectable, Logger } from '@nestjs/common'
 import { SupabaseService } from '../database/supabase.service'
+import { Optional } from '@nestjs/common'
+import { randomUUID } from 'node:crypto'
+import { AuditDeliveryService } from './audit-delivery.service'
 
 export interface AuditLogEntry {
   eventType: string
@@ -44,7 +47,7 @@ export const AuditEvents = {
 export class AuditLoggerService {
   private readonly logger = new Logger(AuditLoggerService.name)
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly supabase: SupabaseService, @Optional() private readonly delivery?: AuditDeliveryService) {}
 
   private static readonly UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -97,6 +100,8 @@ export class AuditLoggerService {
       }
 
       const logPayload = {
+        id: randomUUID(),
+        created_at: new Date().toISOString(),
         log_type: 'audit_event',
         event_type: entry.eventType,
         user_id: validUserId,
@@ -110,8 +115,13 @@ export class AuditLoggerService {
         metadata: enrichedMetadata,
       }
 
-      // 1. Attempt writing to unified system_logs table
-      const { error } = await this.supabase.admin.from('system_logs').insert(logPayload)
+      const isSessionEvent = [AuditEvents.USER_LOGIN, AuditEvents.USER_LOGOUT, 'login_failed'].includes(entry.eventType)
+      if (isSessionEvent && await this.delivery?.enqueue(logPayload)) return
+
+      // An ambiguous queue acknowledgement can produce a later redelivery.
+      const { error } = isSessionEvent && this.delivery
+        ? await this.supabase.admin.from('system_logs').upsert(logPayload, { onConflict: 'id', ignoreDuplicates: true })
+        : await this.supabase.admin.from('system_logs').insert(logPayload)
 
       if (error) this.logger.warn(`Failed to persist audit log in system_logs: ${error.message}`)
     } catch (err: any) {

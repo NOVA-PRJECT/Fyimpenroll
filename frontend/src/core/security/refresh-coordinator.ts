@@ -18,6 +18,16 @@ let activeRefreshPromise: Promise<RefreshResult> | null = null
 let isInterceptionInstalled = false
 let sessionGeneration = 0
 let refreshRevision = 0
+let sessionEnding = false
+let refreshController: AbortController | null = null
+
+export function beginSessionLogout(): void {
+  sessionEnding = true
+  refreshController?.abort()
+  invalidateRefreshSession()
+}
+
+export function resumeSessionAfterLogoutFailure(): void { sessionEnding = false }
 
 export function invalidateRefreshSession(): void {
   sessionGeneration += 1
@@ -25,11 +35,15 @@ export function invalidateRefreshSession(): void {
 }
 
 export async function coordinateRefresh(): Promise<RefreshResult> {
+  if (sessionEnding) return { success: false, error: 'Session ending' }
   if (activeRefreshPromise) {
     return activeRefreshPromise
   }
 
   const generation = sessionGeneration
+  const controller = new AbortController()
+  refreshController = controller
+  const timeout = setTimeout(() => controller.abort(), 10000)
   activeRefreshPromise = (async (): Promise<RefreshResult> => {
     try {
       const response = await fetch('/api/auth/refresh', {
@@ -37,6 +51,7 @@ export async function coordinateRefresh(): Promise<RefreshResult> {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         cache: 'no-store',
+        signal: controller.signal,
       })
 
       if (generation !== sessionGeneration) return { success: false, error: 'Session ended' }
@@ -56,6 +71,8 @@ export async function coordinateRefresh(): Promise<RefreshResult> {
       // Network disconnect or DNS failure: transient outage
       return { success: false, outage: true, error: (err instanceof Error ? err.message : '') || 'Network error during session refresh' }
     } finally {
+      clearTimeout(timeout)
+      if (refreshController === controller) refreshController = null
       if (generation === sessionGeneration) activeRefreshPromise = null
     }
   })()

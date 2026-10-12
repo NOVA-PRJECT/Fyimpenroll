@@ -120,6 +120,8 @@ export class AuthService {
       redirectTo: effectiveMustChange ? '/change-password' : consent.accepted ? redirectTo : '/consent',
       consent,
       userId,
+      department_id,
+      campus_id,
       must_change_password: effectiveMustChange,
     }
   }
@@ -194,15 +196,15 @@ export class AuthService {
           ? (userRoleInfo.must_change_password ?? existingMustChange ?? false)
           : false
 
-        // Preserve app_metadata during refresh
-        await this.supabase.admin.auth.admin.updateUserById(user.id, {
-          app_metadata: {
-            role,
-            department_id: userRoleInfo.department_id ?? null,
-            campus_id: userRoleInfo.campus_id ?? null,
-            must_change_password: mustChange,
-          },
-        }).catch(() => {})
+        const metadata = {
+          role,
+          department_id: userRoleInfo.department_id ?? null,
+          campus_id: userRoleInfo.campus_id ?? null,
+          must_change_password: mustChange,
+        }
+        if (Object.entries(metadata).some(([key, value]) => user.app_metadata?.[key] !== value)) {
+          await this.supabase.admin.auth.admin.updateUserById(user.id, { app_metadata: metadata }).catch(() => {})
+        }
 
         const result = {
           token: data.session.access_token,
@@ -352,6 +354,15 @@ export class AuthService {
     }
 
     return { role: null, redirectTo: null }
+  }
+
+  /** Refresh only to revoke: no profile lookup, metadata write or credential cache. */
+  async refreshForLogout(refreshToken: string): Promise<AuthUser | undefined> {
+    const { data, error } = await authProviderCall(this.supabase.createAuthClient().auth.refreshSession({ refresh_token: refreshToken }))
+    assertAuthProviderAvailable(error)
+    if (error || !data?.user || !data?.session) return undefined
+    this.invalidateUserRefreshes(data.user.id)
+    return { userId: data.user.id, email: data.user.email || '', role: data.user.app_metadata?.role as Role, token: data.session.access_token }
   }
 
   async logout(userOrToken: AuthUser | string | undefined, ip: string) {

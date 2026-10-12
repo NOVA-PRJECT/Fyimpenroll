@@ -17,11 +17,24 @@ export class ApiError extends Error {
 interface FetchOptions extends RequestInit {
   schema?: z.ZodType<any, any>;
   skipAuth?: boolean;
+  expectedUserId?: string;
+}
+
+let refreshInFlight: ReturnType<typeof supabase.auth.refreshSession> | null = null;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  options.signal?.addEventListener('abort', abort);
+  const timer = setTimeout(abort, 15000);
+  try { return await fetch(url, { ...options, signal: controller.signal }); }
+  finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
 }
 
 let onUnauthorizedCallback: (() => void) | null = null;
 
-export const setOnUnauthorizedCallback = (cb: () => void) => {
+export const setOnUnauthorizedCallback = (cb: (() => void) | null) => {
   onUnauthorizedCallback = cb;
 };
 
@@ -34,7 +47,7 @@ export async function apiFetch<T = any>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { schema, skipAuth = false, headers = {}, ...fetchOptions } = options;
+  const { schema, skipAuth = false, expectedUserId, headers = {}, ...fetchOptions } = options;
 
   const url = `${ENV.API_BASE_URL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
 
@@ -43,21 +56,24 @@ export async function apiFetch<T = any>(
     ...(headers as Record<string, string>),
   };
 
+  let requestOwner: string | undefined;
   if (!skipAuth) {
     try {
       const { data } = await supabase.auth.getSession();
+      requestOwner = data.session?.user.id;
+      if (expectedUserId && expectedUserId !== requestOwner) throw new ApiError('Account changed; offline action paused', 409);
       const token = data.session?.access_token;
       if (token) {
         requestHeaders['Authorization'] = `Bearer ${token}`;
       }
     } catch (e) {
-      console.warn('[ApiClient] Failed to retrieve session for Bearer token:', e);
+      throw e;
     }
   }
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithTimeout(url, {
       ...fetchOptions,
       headers: requestHeaders,
     });
@@ -68,12 +84,21 @@ export async function apiFetch<T = any>(
     );
   }
 
-  // Handle 401 Unauthorized
-  if (response.status === 401) {
-    if (onUnauthorizedCallback) {
-      onUnauthorizedCallback();
+  if (response.status === 401 && !skipAuth) {
+    refreshInFlight ??= supabase.auth.refreshSession().finally(() => { refreshInFlight = null; });
+    const { data, error } = await refreshInFlight;
+    if (error && (!error.status || error.status === 429 || error.status >= 500)) {
+      throw new ApiError('Authentication service is temporarily unavailable', 503);
     }
-    throw new ApiError('Session expired. Please log in again.', 401);
+    if (data.session && data.session.user.id === requestOwner) {
+      response = await fetchWithTimeout(url, { ...fetchOptions, headers: { ...requestHeaders, Authorization: `Bearer ${data.session.access_token}` } });
+    } else if (data.session) {
+      throw new ApiError('Account changed; request paused', 409);
+    }
+    if (response.status === 401) {
+      onUnauthorizedCallback?.();
+      throw new ApiError('Session expired. Please log in again.', 401);
+    }
   }
 
   // Parse JSON response body

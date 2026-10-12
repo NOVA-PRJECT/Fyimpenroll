@@ -1,6 +1,8 @@
 'use client'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
@@ -144,6 +146,7 @@ function CustomPaperSelect({
 }
 
 export default function TeachingStaffDashboard() {
+  const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
   const [facultyName, setFacultyName] = useState('')
@@ -167,7 +170,7 @@ export default function TeachingStaffDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/api/faculty/courses')
+        const response = await entryFetch('/api/faculty/courses')
         const data = await response.json()
         if (!response.ok) {
           router.push('/login')
@@ -184,7 +187,7 @@ export default function TeachingStaffDashboard() {
       }
     }
     loadData()
-  }, [router])
+  }, [router, entryFetch])
 
   // Derive unique semesters present in fetched courses
   const availableSemesters = useMemo(() => {
@@ -280,11 +283,7 @@ export default function TeachingStaffDashboard() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   return (

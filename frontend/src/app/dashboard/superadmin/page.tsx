@@ -1,6 +1,8 @@
 'use client'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useEffectEvent } from 'react'
 import Image from 'next/image'
@@ -49,6 +51,7 @@ interface Faculty {
 }
 
 export default function SuperAdminDashboard() {
+  const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('campuses')
@@ -127,14 +130,14 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     async function loadAdmin() {
-      const response = await fetch('/api/auth/profile')
+      const response = await entryFetch('/api/auth/profile')
       const data = await response.json()
       if (!response.ok) { router.push('/login'); return }
       if (data.profile) setAdminName(data.profile.full_name)
       setLoadingAdmin(false)
     }
     loadAdmin()
-  }, [router])
+  }, [router, entryFetch])
 
   const loadActiveTab = useEffectEvent(() => {
     if (activeTab === 'campuses') fetchCampuses()
@@ -375,11 +378,7 @@ export default function SuperAdminDashboard() {
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
 

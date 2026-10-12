@@ -1,5 +1,7 @@
 'use client'
 
+import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
+
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -40,6 +42,7 @@ export interface RegistrationWindow {
 }
 
 export default function StudentDashboardPage() {
+  const entryFetch = useDashboardEntryFetch()
   const router = useRouter()
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [hasSubmission, setHasSubmission] = useState(false)
@@ -82,7 +85,7 @@ export default function StudentDashboardPage() {
     // 2. Background fresh revalidation
     async function loadSummary() {
       try {
-        const res = await fetch('/api/student/dashboard-summary', { signal: controller.signal })
+        const res = await entryFetch('/api/student/dashboard-summary', { signal: controller.signal })
         const data = await res.json().catch(() => ({}))
         const destination = sessionRedirect(res.status, data)
         if (destination) { router.replace(destination); return }
@@ -110,7 +113,7 @@ export default function StudentDashboardPage() {
     }
     loadSummary()
     return () => controller.abort()
-  }, [router, retry])
+  }, [router, retry, entryFetch])
 
   function retrySummary() {
     setSummaryError('')

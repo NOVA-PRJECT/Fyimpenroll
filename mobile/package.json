@@ -28,7 +28,8 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.27.0",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "@fyimp/contracts": "file:../contracts"
   },
   "devDependencies": {
     "@types/react": "~19.2.4",

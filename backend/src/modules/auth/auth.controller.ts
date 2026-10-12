@@ -18,10 +18,13 @@ import { AuthUser } from '../../core/auth/types'
 import { z } from 'zod'
 import { RateLimitGuard } from '../../core/security/rate-limit.guard'
 import { RateLimit } from '../../core/security/rate-limit.decorator'
+import { Optional } from '@nestjs/common'
+import { DashboardEntryService } from './dashboard-entry.service'
 
 const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+  preloadDashboard: z.boolean().optional(),
 })
 
 const ChangePasswordSchema = z.object({
@@ -31,7 +34,7 @@ const ChangePasswordSchema = z.object({
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, @Optional() private readonly entry?: DashboardEntryService) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -46,7 +49,9 @@ export class AuthController {
     }
 
     const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+    const startedAt = performance.now()
     const result = await this.authService.login(parsed.data.email, parsed.data.password, ip)
+    const authenticatedAt = performance.now()
 
     const cookieBase = {
       httpOnly: true,
@@ -69,7 +74,18 @@ export class AuthController {
       })
     }
 
+    const dashboardEntry = parsed.data.preloadDashboard
+      ? await this.entry?.load({
+        userId: result.userId, email: parsed.data.email, role: result.role,
+        department_id: result.department_id, campus_id: result.campus_id,
+        must_change_password: result.must_change_password, consent: result.consent,
+      }, result.redirectTo)
+      : undefined
+
+    res.setHeader?.('Server-Timing', `authentication;dur=${(authenticatedAt - startedAt).toFixed(1)}, dashboard_preload;dur=${(performance.now() - authenticatedAt).toFixed(1)}`)
+
     return {
+      dashboardEntry,
       redirectTo: result.redirectTo,
       role: result.role,
       token: result.token,
@@ -138,17 +154,19 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    const startedAt = performance.now()
     const ip = req.ip || req.socket?.remoteAddress || 'unknown'
     const authHeader = (req.headers as any).authorization as string | undefined
     let token = (req as any).cookies?.auth_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined)
-    const user = (req as any).user as AuthUser | undefined
+    let user = (req as any).user as AuthUser | undefined
 
     // An expired access cookie must not prevent logout from revoking the
     // remaining refresh session. Renew internally without issuing new cookies.
     const refreshToken = (req as any).cookies?.refresh_token
     if (!token && typeof refreshToken === 'string' && refreshToken && refreshToken.length <= 8192) {
       try {
-        token = (await this.authService.refreshSession(refreshToken)).token
+        user = await this.authService.refreshForLogout(refreshToken)
+        token = user?.token
       } catch {
         // Even an invalid/unavailable provider must allow local cookie cleanup.
       }
@@ -160,6 +178,7 @@ export class AuthController {
     res.clearCookie('auth_token', { path: '/' })
     res.clearCookie('refresh_token', { path: '/' })
     res.clearCookie('user_role', { path: '/' })
+    res.setHeader?.('Server-Timing', `logout;dur=${(performance.now() - startedAt).toFixed(1)}`)
 
     return result
   }

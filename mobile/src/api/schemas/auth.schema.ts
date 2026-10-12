@@ -1,15 +1,11 @@
 import { z } from 'zod';
 
-export const UserRoleSchema = z.enum([
-  'student',
-  'teaching_staff',
-  'hod',
-  'campus_director',
-  'superadmin',
-]);
+import { ROLE_VALUES } from '@fyimp/contracts';
+export const UserRoleSchema = z.enum(ROLE_VALUES);
 
 export const ProfileResponseSchema = z.object({
   role: UserRoleSchema,
+  must_change_password: z.boolean().optional(),
   profile: z.object({
     id: z.string().optional(),
     full_name: z.string().nullable().optional(),

@@ -23,6 +23,8 @@
     "lint": "npm run lint --workspace=frontend",
     "test:frontend": "npm run test --workspace=frontend",
     "verify:clean": "node scripts/verify-clean-build.cjs",
+    "test:mobile": "node --test mobile/test/*.test.cjs",
+    "typecheck:mobile": "npm exec --workspace=mobile -- tsc --noEmit --incremental false",
     "verify:deploy": "node scripts/verify-clean-build.cjs --deploy"
   },
   "devDependencies": {

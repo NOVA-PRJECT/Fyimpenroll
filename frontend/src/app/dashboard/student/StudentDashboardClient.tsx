@@ -1,6 +1,6 @@
 'use client'
 
-import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security/session-navigation'
+import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
@@ -119,11 +119,7 @@ export default function StudentDashboardClient({
 
   async function handleLogout() {
     setLoggingOut(true)
-    if (typeof window !== 'undefined') {
-      clearSessionStorage()
-    }
-    await fetch('/api/auth/logout', { method: 'POST' })
-    navigateAfterSessionChange('/login')
+    if (!await logoutPortal()) setLoggingOut(false)
   }
 
   // Set of enrolled course IDs & codes for timetable filtering
