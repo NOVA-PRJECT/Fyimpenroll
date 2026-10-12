@@ -206,3 +206,44 @@
 .app[data-role=hod].hod-dark .hod-period-slot-footer .text-link{background:#253641;border-color:#4a5d68;color:#e5edf1}
 .app[data-role=hod].hod-dark .hod-inline-search{background:#17232d;border-color:#465866;color:#eaf0f3}
 .app[data-role=hod].hod-dark .hod-inline-search::placeholder{color:#bdc9d0}
+.app[data-role=hod] .hod-period-slot{cursor:pointer;transition:border-color .15s,background .15s}
+.app[data-role=hod] .hod-period-slot:hover,.app[data-role=hod] .hod-period-slot.selected{border-color:#157b9a;background:#eef7fa}
+.app[data-role=hod] .hod-period-slot:focus-visible{outline:3px solid #65a9c0;outline-offset:2px}
+.app[data-role=hod] .hod-empty-state{padding:30px 16px;text-align:center;color:#617487;background:#f7f9fb;border-radius:9px}
+.app[data-role=hod] .hod-period-roster-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.app[data-role=hod] .hod-period-roster-controls select{min-height:36px;padding:0 34px 0 12px;border:1px solid #b9c9d6;border-radius:8px;background-color:#fff;color:#263f54}
+.app[data-role=hod].hod-dark .hod-period-slot:hover,.app[data-role=hod].hod-dark .hod-period-slot.selected{background:#203a46;border-color:#2588a0}
+.app[data-role=hod].hod-dark .hod-empty-state{background:#1b2a37;color:#c2d0d9}
+.app[data-role=hod].hod-dark .hod-period-roster-controls select{background-color:#17232d;border-color:#465866;color:#eaf0f3}
+.app[data-role=student] .student-course-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:16px}
+.app[data-role=student] .student-course-card{display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.app[data-role=student] .student-course-card .card-top-row,.app[data-role=student] .student-course-card .card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.app[data-role=student] .student-course-card>small{font-family:monospace;color:var(--muted)}
+.app[data-role=student] .student-course-card h3{margin:0;color:var(--ink);font-size:15px}
+.app[data-role=student] .student-course-card .card-footer{margin-top:auto;padding-top:8px;color:var(--muted);font-size:12px}
+.app[data-role=director] .director-section-title{margin:12px 0 10px;color:var(--ink);font-size:18px;font-weight:750}
+.app[data-role=director] .window-status-banner{padding:12px 14px;margin-bottom:18px;border:1px solid #96d8b6;border-radius:9px;background:#effaf3;color:#176446;font-size:13px;font-weight:700}
+.app[data-role=director] .field-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.app[data-role=director] .field-group .field{display:flex;flex-direction:column;gap:7px;color:#364c60}
+.app[data-role=director] .field-group label{font-size:12px;font-weight:700}
+.app[data-role=director] .field-label-row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.app[data-role=director] .field-label-row small,.app[data-role=director] .field>small{display:block;color:#687c8d;font-size:11px;font-weight:400;margin-top:5px}
+.app[data-role=director] .field-group input,.app[data-role=director] .field-group select{min-height:38px;border:1px solid #b9c9d6;border-radius:8px;padding:8px 11px;background:#fff;color:#263f54}
+.app[data-role=director] .readonly-field,.app[data-role=director] .promotion-last,.app[data-role=director] .allocation-run-status{padding:14px;border:1px solid var(--line);border-radius:9px;background:#f7f9fb;color:var(--ink)}
+.app[data-role=director] .readonly-field{display:flex;justify-content:space-between;align-items:center}
+.app[data-role=director] .promotion-last{display:flex;flex-direction:column;gap:6px;margin:16px 0}
+.app[data-role=director] .director-actions{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0}
+.app[data-role=director] .btn-danger{background:#b42332!important;color:#fff!important;border:1px solid #a11728!important}
+@media(max-width:620px){.app[data-role=director] .field-group{grid-template-columns:1fr}}
+.app[data-role=teacher] .teacher-schedule-summary{margin:10px 0;color:#53697a;font-size:12px}
+.app[data-role=teacher] .teacher-period-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px}
+.app[data-role=teacher] .teacher-period-card{display:flex;flex-direction:column;gap:9px}
+.app[data-role=teacher] .teacher-period-head{display:flex;justify-content:space-between;gap:8px;color:#53697a;font-size:11px}
+.app[data-role=teacher] .teacher-period-card h3{margin:0;color:var(--ink);font-size:15px}
+.app[data-role=teacher] .teacher-period-card p{margin:0;color:#617487;font-size:12px}
+.app[data-role=teacher] .teacher-attendance-live{padding:11px;border:1px solid var(--line);border-radius:8px;background:#f7f9fb;font-size:12px}
+.app[data-role=teacher] .teacher-marking-list{display:grid;gap:7px;max-height:310px;overflow:auto;margin:12px 0}
+.app[data-role=teacher] .teacher-marking-row{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.app[data-role=teacher] .teacher-marking-row small{display:block;color:#718194;margin-top:4px}
+.app[data-role=teacher] .teacher-mark-toggle{min-width:86px;padding:7px;border:1px solid #9bd2ae;border-radius:7px;background:#edf9f1;color:#17683b;font-size:10px;font-weight:800}
+.app[data-role=teacher] .teacher-mark-toggle.is-absent{border-color:#edb1b1;background:#fff1f1;color:#a62525}
