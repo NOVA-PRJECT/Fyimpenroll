@@ -1,6 +1,6 @@
 .container {
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: var(--portal-info-bg,#f8fafc);
   padding-bottom: 3rem;
 }
 
@@ -15,8 +15,8 @@
 
 /* Unified Top Header Card (Merged Top Bar and Overview) */
 .ledgerHeaderCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.875rem;
   padding:1.5rem 1.75rem;
   display: flex;
@@ -38,21 +38,21 @@
 .ledgerHeaderTitle {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   letter-spacing: -0.01em;
 }
 
 .ledgerHeaderSub {
   font-size: 0.82rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
   line-height: 1.4;
 }
 
 .totalCreditsBox {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.75rem;
   padding: 0.85rem 1.5rem;
   text-align: center;
@@ -63,14 +63,14 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-weight: 700;
 }
 
 .totalCreditsValue {
   font-size: 2.25rem;
   font-weight: 900;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   line-height: 1.1;
   margin-top: 0.25rem;
 }
@@ -83,8 +83,8 @@
 }
 
 .circularCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.875rem;
   padding: 1.25rem 1rem;
   display: flex;
@@ -117,13 +117,13 @@
 }
 
 .circleTrack {
-  stroke: #f1f5f9;
+  stroke: var(--portal-info-text,#f1f5f9);
   stroke-width: 8;
   fill: none;
 }
 
 .circleFill {
-  stroke: #002147;
+  stroke: var(--portal-brand-text,#002147);
   stroke-width: 8;
   fill: none;
   stroke-linecap: round;
@@ -142,14 +142,14 @@
 .circleCreditNum {
   font-size: 1.45rem;
   font-weight: 900;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   line-height: 1;
 }
 
 .circleCreditUnit {
   font-size: 0.65rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-top: 0.15rem;
@@ -166,7 +166,7 @@
 .categoryCardTitle {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   margin: 0;
   line-height: 1.25;
 }
@@ -174,8 +174,8 @@
 .categoryCardCode {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #0284c7;
-  background: #e0f2fe;
+  color: var(--portal-info-text,#0284c7);
+  background: var(--portal-info-bg,#e0f2fe);
   padding: 0.15rem 0.5rem;
   border-radius: 0.25rem;
   display: inline-block;
@@ -183,7 +183,7 @@
 
 .categoryTarget {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin-top: 0.15rem;
 }
 
@@ -211,12 +211,12 @@
 
 .barDeptTitle {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 .barDeptMeta {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-weight: 500;
 }
 
@@ -230,15 +230,15 @@
   flex: 1;
   position: relative;
   height: 1.5rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f1f5f9);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   border-radius: 0.45rem;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -246,7 +246,7 @@
 .barBadge {
   font-size: 0.82rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   letter-spacing: 0.02em;
   white-space: nowrap;
   min-width: 72px;
@@ -255,15 +255,15 @@
 }
 
 .barEmpty {
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-size: 0.85rem;
   font-style: italic;
 }
 
 /* Sections */
 .sectionCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -279,13 +279,13 @@
 .sectionTitle {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   margin: 0;
 }
 
 .sectionSub {
   font-size: 0.8125rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0.25rem 0 0 0;
 }
 
@@ -303,25 +303,25 @@
 }
 
 .ledgerTable th {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-info-text,#475569);
   font-weight: 700;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.75rem 1rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .ledgerTable td {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #1e293b;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
+  color: var(--portal-brand-text,#1e293b);
   vertical-align: middle;
 }
 
 .ledgerTable tbody tr:hover {
-  background: #f8fafc;
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .statusTag {
@@ -335,18 +335,18 @@
 }
 
 .statusTag.met {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#15803d);
 }
 
 .statusTag.shortfall {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--portal-danger-bg,#fee2e2);
+  color: var(--portal-danger-text,#b91c1c);
 }
 
 .statusTag.info {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-info-text,#475569);
 }
 
 /* Department Breakdown */
@@ -357,8 +357,8 @@
 }
 
 .deptCard {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1rem;
   display: flex;
@@ -368,20 +368,20 @@
 
 .deptName {
   font-weight: 600;
-  color: #1e293b;
+  color: var(--portal-brand-text,#1e293b);
   font-size: 0.875rem;
 }
 
 .deptCount {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin-top: 0.125rem;
 }
 
 .deptCredits {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #1e3a8a;
+  color: var(--portal-info-text,#1e3a8a);
 }
 
 /* Loading and Error states */
@@ -393,14 +393,14 @@
   justify-content: center;
   min-height: 400px;
   gap: 1rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top-color: #1e3a8a;
+  border: 4px solid var(--portal-strong-border,#e2e8f0);
+  border-top-color: var(--portal-info-border,#1e3a8a);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

@@ -155,7 +155,7 @@ export default function CreditLedgerView({
     return (
       <div className={styles.container}>
         <div className={styles.errorContainer}>
-          <p style={{ color: '#be123c', fontWeight: 600 }}>{error || 'Unable to load credit ledger.'}</p>
+          <p style={{ color: "var(--portal-danger-text,#be123c)", fontWeight: 600 }}>{error || 'Unable to load credit ledger.'}</p>
           <button onClick={fetchLedger} className={styles.backBtn}>
             Try Again
           </button>
@@ -188,7 +188,7 @@ export default function CreditLedgerView({
           <div className={styles.ledgerHeaderLeft}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <h1 className={styles.ledgerHeaderTitle}>KU-FYIMP Registered-Credit Ledger</h1>
-              <span style={{ fontSize: '0.75rem', background: '#dbeafe', color: '#1e40af', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.75rem', background: "var(--portal-info-bg,#dbeafe)", color: "var(--portal-info-text,#1e40af)", padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                 {advisoryMatrixVersion || 'Academic matrix pending'}
               </span>
             </div>
@@ -217,7 +217,7 @@ export default function CreditLedgerView({
           <div className={styles.totalCreditsBox}>
             <div className={styles.totalCreditsLabel}>Total Registered Credits</div>
             <div className={styles.totalCreditsValue}>{totalCredits}</div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", marginTop: '0.25rem' }}>
               Core: {coreCredits} cr | Addl: {additionalCredits} cr
             </div>
           </div>
@@ -226,19 +226,19 @@ export default function CreditLedgerView({
         {/* Advisory Disclaimer Box (F50, F52) */}
         {disclaimer && (
           <div style={{
-            background: '#fffbeb',
-            border: '1px solid #fef3c7',
-            borderLeft: '4px solid #f59e0b',
+            background: "var(--portal-warning-bg,#fffbeb)",
+            border: "1px solid var(--portal-warning-border,#fef3c7)",
+            borderLeft: "4px solid var(--portal-warning-border,#f59e0b)",
             borderRadius: '8px',
             padding: '0.85rem 1.25rem',
             marginBottom: '1.25rem',
             fontSize: '0.85rem',
-            color: '#92400e',
+            color: "var(--portal-warning-text,#92400e)",
             lineHeight: 1.45,
           }}>
             <strong>Advisory Notice:</strong> {disclaimer}
             {unresolvedRequirementNote && (
-              <div style={{ marginTop: '0.4rem', color: '#78350f', fontSize: '0.8rem' }}>
+              <div style={{ marginTop: '0.4rem', color: "var(--portal-warning-text,#78350f)", fontSize: '0.8rem' }}>
                 ℹ️ {unresolvedRequirementNote}
               </div>
             )}
@@ -279,7 +279,7 @@ export default function CreditLedgerView({
                       <span>{band.title}</span>
                     </td>
                     <td>
-                      <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{band.earned} Credits</strong>
+                      <strong style={{ fontSize: '1rem', color: "var(--portal-brand-text,#0f172a)" }}>{band.earned} Credits</strong>
                     </td>
                   </tr>
                 ))}
@@ -360,17 +360,17 @@ export default function CreditLedgerView({
                       <span className={`${styles.statusTag} ${styles.info}`}>{c.semester}</span>
                     </td>
                     <td>
-                      <code style={{ fontWeight: 700, color: '#1e3a8a' }}>{c.courseCode}</code>
+                      <code style={{ fontWeight: 700, color: "var(--portal-info-text,#1e3a8a)" }}>{c.courseCode}</code>
                     </td>
                     <td>{c.title}</td>
                     <td>{c.normalizedCategory}</td>
                     <td>
-                      <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', background: "var(--portal-info-bg,#f1f5f9)", padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
                         {c.levelBand}
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontSize: '0.75rem', color: c.isAdditional ? '#b45309' : '#047857' }}>
+                      <span style={{ fontSize: '0.75rem', color: c.isAdditional ? "var(--portal-warning-text,#b45309)" : "var(--portal-success-text,#047857)" }}>
                         {c.isAdditional ? 'Additional' : 'Core'}
                       </span>
                     </td>

@@ -623,7 +623,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div className={styles.facultyTableWrapper}>
                         {directors.length === 0 ? (
-                          <p style={{ padding: '1.25rem 1rem', color: '#9ba1ab', textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
+                          <p style={{ padding: '1.25rem 1rem', color: "var(--portal-subtle,#9ba1ab)", textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
                             No Campus Directors assigned yet.
                           </p>
                         ) : (
@@ -643,7 +643,7 @@ export default function SuperAdminDashboard() {
                                   <td>{i + 1}</td>
                                   <td>
                                     <p style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem' }}>{f.full_name}</p>
-                                    <p style={{ margin: 0, fontSize: '0.68rem', color: '#9ba1ab' }}>{f.email}</p>
+                                    <p style={{ margin: 0, fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{f.email}</p>
                                   </td>
                                   <td>{f.campuses?.name ?? '—'}</td>
                                   <td><span className={styles.rolePillDirector}>Campus Director</span></td>
@@ -676,7 +676,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div className={styles.facultyTableWrapper}>
                         {hods.length === 0 ? (
-                          <p style={{ padding: '1.25rem 1rem', color: '#9ba1ab', textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
+                          <p style={{ padding: '1.25rem 1rem', color: "var(--portal-subtle,#9ba1ab)", textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
                             No Heads of Department (HODs) assigned yet.
                           </p>
                         ) : (
@@ -697,7 +697,7 @@ export default function SuperAdminDashboard() {
                                   <td>{i + 1}</td>
                                   <td>
                                     <p style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem' }}>{f.full_name}</p>
-                                    <p style={{ margin: 0, fontSize: '0.68rem', color: '#9ba1ab' }}>{f.email}</p>
+                                    <p style={{ margin: 0, fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{f.email}</p>
                                   </td>
                                   <td>{f.campuses?.name ?? '—'}</td>
                                   <td>{f.departments?.name ?? '—'}</td>
@@ -731,7 +731,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div className={styles.facultyTableWrapper}>
                         {staff.length === 0 ? (
-                          <p style={{ padding: '1.25rem 1rem', color: '#9ba1ab', textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
+                          <p style={{ padding: '1.25rem 1rem', color: "var(--portal-subtle,#9ba1ab)", textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
                             No Teaching Staff members assigned yet.
                           </p>
                         ) : (
@@ -752,7 +752,7 @@ export default function SuperAdminDashboard() {
                                   <td>{i + 1}</td>
                                   <td>
                                     <p style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem' }}>{f.full_name}</p>
-                                    <p style={{ margin: 0, fontSize: '0.68rem', color: '#9ba1ab' }}>{f.email}</p>
+                                    <p style={{ margin: 0, fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{f.email}</p>
                                   </td>
                                   <td>{f.campuses?.name ?? '—'}</td>
                                   <td>{f.departments?.name ?? '—'}</td>
@@ -869,7 +869,7 @@ export default function SuperAdminDashboard() {
 
                       return (
                         <tr key={log.id} className={styles.tableRow}>
-                          <td style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                          <td style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", whiteSpace: 'nowrap' }}>
                             {new Date(log.created_at).toLocaleString('en-IN', {
                               dateStyle: 'short',
                               timeStyle: 'medium',
@@ -889,11 +889,11 @@ export default function SuperAdminDashboard() {
                             </span>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#0f172a' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: "var(--portal-brand-text,#0f172a)" }}>
                               {log.action || log.event_type || 'System Event'}
                             </div>
                             {log.error_message && (
-                              <div style={{ fontSize: '0.72rem', color: '#dc2626', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.72rem', color: "var(--portal-danger-text,#dc2626)", marginTop: '2px' }}>
                                 ⚠️ {log.error_message}
                               </div>
                             )}
@@ -1247,12 +1247,12 @@ export default function SuperAdminDashboard() {
             )}
 
             {selectedLog.error_message && (
-              <div style={{ marginBottom: '0.75rem', color: '#dc2626', fontSize: '0.8rem' }}>
+              <div style={{ marginBottom: '0.75rem', color: "var(--portal-danger-text,#dc2626)", fontSize: '0.8rem' }}>
                 <strong>Error:</strong> {selectedLog.error_message}
               </div>
             )}
 
-            <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
+            <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: "var(--portal-info-text,#475569)" }}>
               Recorded Metadata:
             </div>
             <pre className={styles.metaBox}>

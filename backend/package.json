@@ -3,12 +3,10 @@
   "version": "7.0.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
-    "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "test": "nest build && node --test test/**/*.test.js"
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:prod": "node dist/main"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.11",
@@ -31,7 +29,6 @@
     "@nestjs/schematics": "^11.0.2",
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^22.13.9",
     "@types/papaparse": "^5.5.2",
     "ts-node": "^10.9.2",

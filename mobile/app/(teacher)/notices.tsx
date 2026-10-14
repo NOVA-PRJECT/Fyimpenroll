@@ -5,6 +5,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useTheme } from '../../src/hooks/useTheme';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
+import { NoticesSchema } from '../../src/api/schemas/portal.schema';
 import { queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
@@ -19,7 +20,7 @@ export default function TeacherNoticesScreen() {
 
   const { data: notices, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.teacher.notices(deptId ?? undefined),
-    queryFn: () => apiClient.get(API_ENDPOINTS.NOTICES),
+    queryFn: () => apiClient.get(API_ENDPOINTS.NOTICES, { schema: NoticesSchema }),
   });
 
   return (

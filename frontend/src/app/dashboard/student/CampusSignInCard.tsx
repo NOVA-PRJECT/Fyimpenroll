@@ -97,25 +97,25 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
   }
 
   return (
-    <section aria-label="Campus sign-in" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '1rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
+    <section aria-label="Campus sign-in" style={{ background: "var(--portal-surface,#fff)", border: "1px solid var(--portal-strong-border,#e2e8f0)", borderRadius: '1rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ margin: 0 }}>Campus Physical Sign-In</h3>
-          <p style={{ color: '#64748b', fontSize: '.85rem' }}>{status?.campus.name || campusName} · Twice-daily GPS check</p>
+          <p style={{ color: "var(--portal-muted,#64748b)", fontSize: '.85rem' }}>{status?.campus.name || campusName} · Twice-daily GPS check</p>
         </div>
         <button type="button" onClick={() => void fetchStatus()} disabled={loading || locating}>Refresh status</button>
       </div>
-      {statusError && <p role="alert" style={{ color: '#991b1b' }}>{statusError}</p>}
+      {statusError && <p role="alert" style={{ color: "var(--portal-danger-text,#991b1b)" }}>{statusError}</p>}
       {!studentId && <p role="alert">Your student profile is unavailable. Reload the page or contact your administrator.</p>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.75rem', margin: '1rem 0' }}>
         {(['morning', 'evening'] as const).map(session => {
           const record = status?.[session]
           const completed = record?.state === 'completed'
           const onTime = record?.status === 'on_time'
-          return <div key={session} style={{ padding: '.9rem', borderRadius: '.625rem', border: '1px solid #e2e8f0', background: completed ? onTime ? '#f0fdf4' : '#fffbeb' : '#f8fafc' }}>
+          return <div key={session} style={{ padding: '.9rem', borderRadius: '.625rem', border: "1px solid var(--portal-strong-border,#e2e8f0)", background: completed ? onTime ? "var(--portal-success-bg,#f0fdf4)" : "var(--portal-warning-bg,#fffbeb)" : "var(--portal-info-bg,#f8fafc)" }}>
             <strong>{session === 'morning' ? 'Morning arrival' : 'Evening departure'}</strong>
             <p aria-live="polite">{loading && !status ? 'Loading…' : campusSessionLabel(record)}</p>
-            {status && <p style={{ fontSize: '.8rem', color: '#64748b' }}>
+            {status && <p style={{ fontSize: '.8rem', color: "var(--portal-muted,#64748b)" }}>
               {session === 'morning'
                 ? `On time until ${formatCampusTime(status.campus.morning_cutoff)}; closes at ${formatCampusTime(status.campus.midday_split)} IST`
                 : `On time from ${formatCampusTime(status.campus.evening_cutoff)}; closes at ${formatCampusTime(status.campus.day_end)} IST`}
@@ -130,9 +130,9 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
         style={{ background: !status?.can_sign_in || locating || loading ? '#64748b' : '#0369a1', color: '#fff', border: 0, borderRadius: '.5rem', padding: '.8rem 1.25rem' }}>
         {locating ? 'Checking location and recording…' : 'Verify Campus Presence (GPS Sign-In)'}
       </button>
-      {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} style={{ color: feedback.type === 'error' ? '#991b1b' : '#065f46' }}>{feedback.message}</p>}
-      {status && <p style={{ fontSize: '.8rem', color: '#64748b' }}>Sign in within {status.campus.radius_meters} metres of the campus centre, with location accuracy of 50 metres or better.</p>}
-      <p style={{ fontSize: '.75rem', color: '#64748b' }}>Location coordinates are used for this check and are not saved. We retain the time, result, location accuracy and audit details. An internet connection is required.</p>
+      {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} style={{ color: feedback.type === 'error' ? "var(--portal-danger-text,#991b1b)" : "var(--portal-success-text,#065f46)" }}>{feedback.message}</p>}
+      {status && <p style={{ fontSize: '.8rem', color: "var(--portal-muted,#64748b)" }}>Sign in within {status.campus.radius_meters} metres of the campus centre, with location accuracy of 50 metres or better.</p>}
+      <p style={{ fontSize: '.75rem', color: "var(--portal-muted,#64748b)" }}>Location coordinates are used for this check and are not saved. We retain the time, result, location accuracy and audit details. An internet connection is required.</p>
     </section>
   )
 }

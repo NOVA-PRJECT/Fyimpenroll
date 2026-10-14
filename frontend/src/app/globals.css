@@ -15,28 +15,28 @@
   --font-label-sm: 'Hanken Grotesk', 'Inter', sans-serif;
   --font-label-eyebrow: 'Inter', sans-serif;
 
-  --color-primary-container: #082042;
-  --color-midnight-text: #0B192C;
-  --color-gold-tint: #FFF9EB;
-  --color-gold-border: #F3D89A;
-  --color-canvas-slate: #F8F9FF;
-  --color-surface-card: #FFFFFF;
-  --color-surface-bright: #F8F9FF;
-  --color-surface-input: #EEF3FB;
-  --color-surface-container: #e5eeff;
-  --color-surface-container-low: #eff4ff;
-  --color-surface-container-high: #dce9ff;
-  --color-surface-container-lowest: #ffffff;
-  --color-on-surface: #0b1c30;
-  --color-on-surface-variant: #44474e;
+  --color-primary-container: var(--portal-primary,#082042);
+  --color-midnight-text: var(--portal-brand-text,#0B192C);
+  --color-gold-tint: var(--portal-warning-bg,#FFF9EB);
+  --color-gold-border: var(--portal-warning-border,#F3D89A);
+  --color-canvas-slate: var(--portal-canvas,#F8F9FF);
+  --color-surface-card: var(--portal-surface,#FFFFFF);
+  --color-surface-bright: var(--portal-canvas,#F8F9FF);
+  --color-surface-input: var(--portal-info-bg,#EEF3FB);
+  --color-surface-container: var(--portal-info-bg,#e5eeff);
+  --color-surface-container-low: var(--portal-info-bg,#eff4ff);
+  --color-surface-container-high: var(--portal-info-bg,#dce9ff);
+  --color-surface-container-lowest: var(--portal-surface,#ffffff);
+  --color-on-surface: var(--portal-brand-text,#0b1c30);
+  --color-on-surface-variant: var(--portal-muted,#44474e);
   --color-on-primary: #ffffff;
-  --color-outline: #75777f;
-  --color-subtle-border: #CBD5E1;
-  --color-hairline-border: #E2E8F0;
-  --color-secondary-fixed: #ffdea4;
-  --color-secondary-fixed-dim: #f7bd40;
-  --color-on-secondary-fixed: #261900;
-  --color-surface-variant: #d3e4fe;
+  --color-outline: var(--portal-border,#75777f);
+  --color-subtle-border: var(--portal-strong-border,#CBD5E1);
+  --color-hairline-border: var(--portal-strong-border,#E2E8F0);
+  --color-secondary-fixed: var(--portal-warning-bg, #ffdea4);
+  --color-secondary-fixed-dim: var(--portal-warning-bg, #f7bd40);
+  --color-on-secondary-fixed: var(--portal-warning-text,#261900);
+  --color-surface-variant: var(--portal-info-bg,#d3e4fe);
 }
 
 *, *::before, *::after {
@@ -48,26 +48,13 @@ html, body {
   padding: 0;
 }
 
-.material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 20px;
-  line-height: 1;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-}
-
 /* Custom scrollbar styling */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--portal-info-bg,#cbd5e1);
   border-radius: 4px;
 }
 
@@ -78,7 +65,7 @@ input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
   -webkit-text-fill-color: #0b1c30 !important;
-  caret-color: #0b1c30 !important;
+  caret-color: var(--portal-brand-text,#0b1c30) !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
@@ -99,7 +86,7 @@ input:-webkit-autofill:active {
   background: none !important;
   border: none !important;
   cursor: pointer;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -109,7 +96,7 @@ input:-webkit-autofill:active {
 }
 
 .password-toggle-btn:hover {
-  color: #002147 !important;
+  color: var(--portal-brand-text,#002147) !important;
 }
 
 .password-toggle-btn:focus {

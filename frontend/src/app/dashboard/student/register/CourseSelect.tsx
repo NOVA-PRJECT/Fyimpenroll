@@ -57,7 +57,7 @@ export default function CustomSelect({
               {selectedCourse.course_code ? `${selectedCourse.course_code} • ` : ''}
               {selectedCourse.department_name || 'General'} • {selectedCourse.credits} cr
               {selectedCourse.remaining_seats !== undefined && (
-                <> • <strong style={{ color: selectedCourse.remaining_seats > 5 ? '#059669' : '#d97706' }}>{selectedCourse.remaining_seats} seats left</strong></>
+                <> • <strong style={{ color: selectedCourse.remaining_seats > 5 ? "var(--portal-success-text,#059669)" : "var(--portal-warning-text,#d97706)" }}>{selectedCourse.remaining_seats} seats left</strong></>
               )}
             </span>
           </div>
@@ -108,9 +108,9 @@ export default function CustomSelect({
                             fontWeight: 700,
                             padding: '0.1rem 0.4rem',
                             borderRadius: '4px',
-                            background: course.remaining_seats > 5 ? '#ecfdf5' : '#fffbeb',
-                            color: course.remaining_seats > 5 ? '#059669' : '#d97706',
-                            border: `1px solid ${course.remaining_seats > 5 ? '#a7f3d0' : '#fde68a'}`,
+                            background: course.remaining_seats > 5 ? "var(--portal-success-bg,#ecfdf5)" : "var(--portal-warning-bg,#fffbeb)",
+                            color: course.remaining_seats > 5 ? "var(--portal-success-text,#059669)" : "var(--portal-warning-text,#d97706)",
+                            border: `1px solid ${course.remaining_seats > 5 ? "var(--portal-success-border,#a7f3d0)" : "var(--portal-warning-border,#fde68a)"}`,
                           }}
                         >
                           {course.remaining_seats} seat{course.remaining_seats === 1 ? '' : 's'} left

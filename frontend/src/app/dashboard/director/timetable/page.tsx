@@ -690,9 +690,9 @@ export default function CampusDirectorTimetablePage() {
           <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
         </div>}
         {!rulesReady && !rulesError && <p role="status">Loading scheduling rules…</p>}
-        {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-800">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
+        {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
         {!settingsReady && !settingsError && <p role="status">Loading campus settings…</p>}
-        {settingsError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-red-50 p-4 text-red-800">{settingsError}<button onClick={() => setSettingsRetry(value => value + 1)}>Try again</button></div>}
+        {settingsError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{settingsError}<button onClick={() => setSettingsRetry(value => value + 1)}>Try again</button></div>}
         {/* Registration Window Warning Banner */}
         {settingsReady && !registrationClosed && (
           <div className={styles.registrationWarningBanner}>
@@ -844,7 +844,7 @@ export default function CampusDirectorTimetablePage() {
               <p style={{ fontWeight: 700, margin: '0 0 0.25rem 0', fontSize: '0.95rem' }}>
                 ⚠️ {allConflicts.length} Course Scheduling Conflict(s) Require Attention
               </p>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#78350f' }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: "var(--portal-warning-text,#78350f)" }}>
                 Required sessions remain unscheduled under the current hours, available periods and scheduling rules.
               </p>
             </div>
@@ -900,13 +900,13 @@ export default function CampusDirectorTimetablePage() {
                 <h3 className={styles.conflictsSectionTitle}>
                   ⚠️ Campus Scheduling Conflicts ({allConflicts.length})
                 </h3>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: "var(--portal-muted,#64748b)" }}>
                   These required sessions remain unscheduled. Partially scheduled courses may still appear in the timetable grid.
                 </p>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>Filter Department:</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: "var(--portal-info-text,#334155)" }}>Filter Department:</span>
                 <select
                   className={styles.select}
                   value={conflictDeptFilter}
@@ -962,7 +962,7 @@ export default function CampusDirectorTimetablePage() {
                     {departments.some(d => entriesForDepartment([c], d.id).length) && (
                       <button
                         style={{
-                          background: '#002147',
+                          background: "var(--portal-primary,#002147)",
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '0.3rem',
@@ -985,7 +985,7 @@ export default function CampusDirectorTimetablePage() {
           /* VIEW 2: Regular Department Timetable Grid */
           <div>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '4rem', color: '#6366f1', background: '#ffffff', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ textAlign: 'center', padding: '4rem', color: "var(--portal-info-text,#6366f1)", background: "var(--portal-surface,#ffffff)", borderRadius: '0.75rem', border: "1px solid var(--portal-strong-border,#e2e8f0)" }}>
                 <p style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Loading timetable data...</p>
               </div>
             ) : departments.length > 0 ? (
@@ -1018,7 +1018,7 @@ export default function CampusDirectorTimetablePage() {
                     <tbody>
                       {DAYS_LIST.map((dayNum) => (
                         <tr key={dayNum}>
-                          <td style={{ fontWeight: 700, background: '#f8fafc' }}>{DAYS_MAP[dayNum]}</td>
+                          <td style={{ fontWeight: 700, background: "var(--portal-info-bg,#f8fafc)" }}>{DAYS_MAP[dayNum]}</td>
                           {PERIODS.map((p) => {
                             const entries = getEntriesAt(dayNum, p.num);
                             const isParallelSlot = entries.length > 1;
@@ -1035,8 +1035,8 @@ export default function CampusDirectorTimetablePage() {
                                               style={{
                                                 fontSize: '0.62rem',
                                                 fontWeight: 700,
-                                                background: '#dbeafe',
-                                                color: '#1d4ed8',
+                                                background: "var(--portal-info-bg,#dbeafe)",
+                                                color: "var(--portal-info-text,#1d4ed8)",
                                                 padding: '0.05rem 0.25rem',
                                                 borderRadius: '0.2rem',
                                               }}
@@ -1052,7 +1052,7 @@ export default function CampusDirectorTimetablePage() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <span style={{ color: '#cbd5e1' }}>—</span>
+                                  <span style={{ color: "var(--portal-info-text,#cbd5e1)" }}>—</span>
                                 )}
                               </td>
                             );
@@ -1064,7 +1064,7 @@ export default function CampusDirectorTimetablePage() {
                 </div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', background: '#ffffff', borderRadius: '0.5rem' }}>
+              <div style={{ textAlign: 'center', padding: '3rem', color: "var(--portal-muted,#64748b)", background: "var(--portal-surface,#ffffff)", borderRadius: '0.5rem' }}>
                 <p>No timetable entries generated yet for Semester {semester} ({academicYear}).</p>
                 <p style={{ fontSize: '0.85rem' }}>Click <strong>&quot;Generate AI Timetable&quot;</strong> above to run the scheduler.</p>
               </div>
@@ -1117,7 +1117,7 @@ export default function CampusDirectorTimetablePage() {
                     ))}
 
                   {visibleConflicts.length === 0 && (
-                    <p style={{ margin: '0.5rem 0', color: '#166534', fontWeight: 600, fontSize: '0.85rem' }}>
+                    <p style={{ margin: '0.5rem 0', color: "var(--portal-success-text,#166534)", fontWeight: 600, fontSize: '0.85rem' }}>
                       ✓ Zero conflicts in this department! (The remaining {allConflicts.length} conflict(s) are in other campus departments).
                     </p>
                   )}
@@ -1140,7 +1140,7 @@ export default function CampusDirectorTimetablePage() {
                 <h3 className={styles.generationModalTitle}>
                   <span>AI Timetable Scheduler</span>
                   {(jobStatus === 'running' || jobStatus === 'queued') && !jobError && (
-                    <span style={{ fontSize: '0.7rem', color: '#818cf8', background: 'rgba(99, 102, 241, 0.2)', padding: '0.15rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.7rem', color: "var(--portal-info-text,#818cf8)", background: 'rgba(99, 102, 241, 0.2)', padding: '0.15rem 0.5rem', borderRadius: '0.25rem', fontWeight: 600 }}>
                       LIVE PROCESSING
                     </span>
                   )}
@@ -1153,7 +1153,7 @@ export default function CampusDirectorTimetablePage() {
                     : (stepMessage || '🧠 Processing scheduling constraints and student registrations with OR-Tools...')}
                 </p>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#818cf8' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: "var(--portal-info-text,#818cf8)" }}>
                 {jobProgress}%
               </div>
             </div>
@@ -1164,7 +1164,7 @@ export default function CampusDirectorTimetablePage() {
                 className={styles.aiProgressFill}
                 style={{
                   width: `${jobProgress}%`,
-                  background: jobStatus === 'failed' ? '#ef4444' : 'linear-gradient(90deg, #6366f1, #a855f7)',
+                  background: jobStatus === 'failed' ? '#ef4444' : "linear-gradient(90deg, var(--portal-info-bg,#6366f1), var(--portal-purple-bg,#a855f7))",
                 }}
               />
             </div>
@@ -1205,13 +1205,13 @@ export default function CampusDirectorTimetablePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <span style={{ fontSize: '1.1rem' }}>⏱</span>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.65rem', color: '#a5b4fc', letterSpacing: '0.05em', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.65rem', color: "var(--portal-info-text,#a5b4fc)", letterSpacing: '0.05em', fontWeight: 600 }}>
                       ESTIMATED TIME REMAINING
                     </span>
                     <span style={{
                       fontSize: '1.7rem',
                       fontWeight: 800,
-                      color: etcSeconds <= 30 ? '#f87171' : etcSeconds <= 60 ? '#fb923c' : '#c4b5fd',
+                      color: etcSeconds <= 30 ? "var(--portal-danger-text,#f87171)" : etcSeconds <= 60 ? "var(--portal-warning-text,#fb923c)" : "var(--portal-info-text,#c4b5fd)",
                       fontVariantNumeric: 'tabular-nums',
                       letterSpacing: '0.04em',
                       lineHeight: 1.1,
@@ -1223,7 +1223,7 @@ export default function CampusDirectorTimetablePage() {
                   </div>
                 </div>
                 {etcSeconds <= 30 && etcSeconds > 0 && (
-                  <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700, background: 'rgba(52,211,153,0.15)', padding: '0.25rem 0.6rem', borderRadius: '0.3rem' }}>
+                  <span style={{ fontSize: '0.72rem', color: "var(--portal-success-text,#34d399)", fontWeight: 700, background: 'rgba(52,211,153,0.15)', padding: '0.25rem 0.6rem', borderRadius: '0.3rem' }}>
                     Almost done!
                   </span>
                 )}
@@ -1236,7 +1236,7 @@ export default function CampusDirectorTimetablePage() {
                 {(jobStatus === 'failed' || !!jobError) && (
                   <button
                     style={{
-                      background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                      background: "linear-gradient(135deg, #4f46e5, var(--portal-info-bg,#6366f1))",
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '0.5rem',
@@ -1299,7 +1299,7 @@ export default function CampusDirectorTimetablePage() {
                 <tbody>
                   {DAYS_LIST.map((dayNum) => (
                     <tr key={dayNum}>
-                      <td style={{ fontWeight: 700, background: '#f8fafc' }}>{DAYS_MAP[dayNum]}</td>
+                      <td style={{ fontWeight: 700, background: "var(--portal-info-bg,#f8fafc)" }}>{DAYS_MAP[dayNum]}</td>
                       {PERIODS.map((p) => {
                         const entries = deptEntries.filter((e) => e.day === dayNum && e.period === p.num);
                         const isParallelSlot = entries.length > 1;
@@ -1316,8 +1316,8 @@ export default function CampusDirectorTimetablePage() {
                                           style={{
                                             fontSize: '0.62rem',
                                             fontWeight: 700,
-                                            background: '#dbeafe',
-                                            color: '#1d4ed8',
+                                            background: "var(--portal-info-bg,#dbeafe)",
+                                            color: "var(--portal-info-text,#1d4ed8)",
                                             padding: '0.05rem 0.25rem',
                                             borderRadius: '0.2rem',
                                           }}
@@ -1332,7 +1332,7 @@ export default function CampusDirectorTimetablePage() {
                                 ))}
                               </div>
                             ) : (
-                              <span style={{ color: '#cbd5e1' }}>—</span>
+                              <span style={{ color: "var(--portal-info-text,#cbd5e1)" }}>—</span>
                             )}
                           </td>
                         );
@@ -1379,7 +1379,7 @@ export default function CampusDirectorTimetablePage() {
                 className={styles.modalCancelBtn}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #cbd5e1',
+                  border: "1px solid var(--portal-strong-border,#cbd5e1)",
                   padding: '0.5rem 1rem',
                   borderRadius: '0.375rem',
                   fontWeight: 600,
@@ -1430,7 +1430,7 @@ export default function CampusDirectorTimetablePage() {
                   background: 'transparent',
                   border: 'none',
                   fontSize: '1.1rem',
-                  color: '#94a3b8',
+                  color: "var(--portal-info-text,#94a3b8)",
                   cursor: 'pointer',
                   padding: '0.25rem',
                 }}
@@ -1446,13 +1446,13 @@ export default function CampusDirectorTimetablePage() {
             {publishModalError && (
               <div
                 style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
+                  background: "var(--portal-danger-bg,#fef2f2)",
+                  border: "1px solid var(--portal-danger-border,#fecaca)",
                   borderRadius: '0.5rem',
                   padding: '0.75rem 1rem',
                   marginBottom: '1rem',
                   fontSize: '0.85rem',
-                  color: '#991b1b',
+                  color: "var(--portal-danger-text,#991b1b)",
                 }}
               >
                 <strong>⚠️ Note:</strong> {publishModalError}
@@ -1462,15 +1462,15 @@ export default function CampusDirectorTimetablePage() {
             {publishConflicts && publishConflicts.length > 0 && (
               <div
                 style={{
-                  background: '#fffbeb',
-                  border: '1px solid #fde68a',
+                  background: "var(--portal-warning-bg,#fffbeb)",
+                  border: "1px solid var(--portal-warning-border,#fde68a)",
                   borderRadius: '0.5rem',
                   padding: '0.75rem 1rem',
                   marginBottom: '1rem',
                   maxHeight: '160px',
                   overflowY: 'auto',
                   fontSize: '0.8rem',
-                  color: '#92400e',
+                  color: "var(--portal-warning-text,#92400e)",
                 }}
               >
                 <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
@@ -1491,13 +1491,13 @@ export default function CampusDirectorTimetablePage() {
                 type="button"
                 style={{
                   background: 'transparent',
-                  border: '1px solid #cbd5e1',
+                  border: "1px solid var(--portal-strong-border,#cbd5e1)",
                   padding: '0.55rem 1rem',
                   borderRadius: '0.375rem',
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  color: '#475569',
+                  color: "var(--portal-info-text,#475569)",
                 }}
                 onClick={() => {
                   setShowPublishModal(false);
@@ -1569,11 +1569,11 @@ export default function CampusDirectorTimetablePage() {
               </button>
             </div>
             <div style={{ padding: '1.25rem 1.5rem' }}>
-              <p style={{ margin: '0 0 0.85rem 0', color: '#1e293b', fontSize: '0.92rem', lineHeight: '1.5' }}>
+              <p style={{ margin: '0 0 0.85rem 0', color: "var(--portal-brand-text,#1e293b)", fontSize: '0.92rem', lineHeight: '1.5' }}>
                 Student registration is currently open until{' '}
                 <strong>{currentDeadline ? new Date(currentDeadline).toLocaleString('en-IN') : 'the set deadline'}</strong>.
               </p>
-              <p style={{ margin: '0 0 1.5rem 0', color: '#64748b', fontSize: '0.85rem', lineHeight: '1.5' }}>
+              <p style={{ margin: '0 0 1.5rem 0', color: "var(--portal-muted,#64748b)", fontSize: '0.85rem', lineHeight: '1.5' }}>
                 To schedule an accurate timetable with no course conflicts, student registrations must be closed before generating. Would you like to close registrations now and generate the timetable?
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -1581,13 +1581,13 @@ export default function CampusDirectorTimetablePage() {
                   type="button"
                   style={{
                     background: 'transparent',
-                    border: '1px solid #cbd5e1',
+                    border: "1px solid var(--portal-strong-border,#cbd5e1)",
                     padding: '0.55rem 1rem',
                     borderRadius: '0.45rem',
                     fontWeight: 600,
                     fontSize: '0.85rem',
                     cursor: 'pointer',
-                    color: '#475569',
+                    color: "var(--portal-info-text,#475569)",
                   }}
                   onClick={() => setShowCloseWindowConfirmModal(false)}
                   disabled={closingWindow}
@@ -1597,7 +1597,7 @@ export default function CampusDirectorTimetablePage() {
                 <button
                   type="button"
                   style={{
-                    background: '#002147',
+                    background: "var(--portal-primary,#002147)",
                     color: '#ffffff',
                     border: 'none',
                     padding: '0.55rem 1.25rem',

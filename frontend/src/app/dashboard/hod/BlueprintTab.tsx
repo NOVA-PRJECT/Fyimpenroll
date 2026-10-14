@@ -861,9 +861,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   flexWrap: 'wrap',
                   gap: '0.5rem',
                   padding: '0.5rem',
-                  border: '1px solid #dde1e7',
+                  border: "1px solid var(--portal-border,#dde1e7)",
                   borderRadius: '0.4rem',
-                  background: '#ffffff',
+                  background: "var(--portal-surface,#ffffff)",
                   maxHeight: '120px',
                   overflowY: 'auto'
                 }}>
@@ -878,9 +878,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         fontSize: '0.75rem',
                         cursor: 'pointer',
                         padding: '0.25rem 0.5rem',
-                        border: '1px solid #f0f2f5',
+                        border: "1px solid var(--portal-strong-border,#f0f2f5)",
                         borderRadius: '3px',
-                        background: isChecked ? '#e6f0fa' : '#fafafa'
+                        background: isChecked ? "var(--portal-info-bg,#e6f0fa)" : "var(--portal-surface-soft,#fafafa)"
                       }}>
                         <input
                           type="checkbox"
@@ -931,8 +931,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                       top: '100%',
                       left: 0,
                       right: 0,
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #dde1e7',
+                      backgroundColor: "var(--portal-surface,#ffffff)",
+                      border: "1px solid var(--portal-border,#dde1e7)",
                       borderRadius: '0.4rem',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                       maxHeight: '200px',
@@ -940,7 +940,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                       zIndex: 200,
                     }}>
                       {courses.length === 0 ? (
-                        <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: '#9ba1ab' }}>
+                        <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: "var(--portal-subtle,#9ba1ab)" }}>
                           No courses found for Semester {semester}. Add courses first.
                         </div>
                       ) : (() => {
@@ -966,7 +966,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         })
                         if (filtered.length === 0) {
                           return (
-                            <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: '#9ba1ab' }}>
+                            <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: "var(--portal-subtle,#9ba1ab)" }}>
                               No matching courses found
                             </div>
                           )
@@ -982,8 +982,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                               padding: '0.55rem 0.75rem',
                               fontSize: '0.75rem',
                               cursor: 'pointer',
-                              borderBottom: '1px solid #f0f2f5',
-                              color: '#002147',
+                              borderBottom: "1px solid var(--portal-strong-border,#f0f2f5)",
+                              color: "var(--portal-brand-text,#002147)",
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '0.15rem'
@@ -992,8 +992,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                             <div>
                               <strong style={{ fontFamily: 'monospace' }}>{c.course_code}</strong> — {c.title}
                             </div>
-                            <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>
-                              <span style={{ fontWeight: 700, color: '#002147' }}>{c.category}</span>
+                            <div style={{ fontSize: '0.68rem', color: "var(--portal-muted,#6b7280)" }}>
+                              <span style={{ fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>{c.category}</span>
                               {c.department_name ? ` • ${c.department_name}` : ''}
                             </div>
                           </div>
@@ -1085,18 +1085,18 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
 
               {/* Credit Feasibility Indicator */}
               <div style={{
-                background: '#ffffff',
-                border: '1.5px solid #dde1e7',
+                background: "var(--portal-surface,#ffffff)",
+                border: "1.5px solid var(--portal-border,#dde1e7)",
                 borderRadius: '0.45rem',
                 padding: '0.85rem 1rem',
                 marginBottom: '1.5rem',
                 boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#44474e', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.78rem', color: "var(--portal-muted,#44474e)", fontWeight: 600 }}>
                     Overall Credit Bounds (across all pathways):
                   </span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#002147' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                     {overallMin} — {overallMax} credits
                   </span>
                 </div>
@@ -1104,10 +1104,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   <div style={{
                     marginTop: '0.6rem',
                     padding: '0.5rem 0.75rem',
-                    backgroundColor: '#fee2e2',
-                    border: '1px solid #fca5a5',
+                    backgroundColor: "var(--portal-danger-bg,#fee2e2)",
+                    border: "1px solid var(--portal-danger-border,#fca5a5)",
                     borderRadius: '0.35rem',
-                    color: '#dc2626',
+                    color: "var(--portal-danger-text,#dc2626)",
                     fontSize: '0.72rem',
                     fontWeight: 500,
                     display: 'flex',
@@ -1121,10 +1121,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   <div style={{
                     marginTop: '0.6rem',
                     padding: '0.5rem 0.75rem',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
+                    backgroundColor: "var(--portal-info-bg,#eff6ff)",
+                    border: "1px solid var(--portal-info-border,#bfdbfe)",
                     borderRadius: '0.35rem',
-                    color: '#1d4ed8',
+                    color: "var(--portal-info-text,#1d4ed8)",
                     fontSize: '0.72rem',
                     fontWeight: 500,
                     display: 'flex',
@@ -1144,14 +1144,14 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     marginBottom: '1rem'
                   }}>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#002147' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                       Pathways ({pathways.length})
                     </p>
                     <button
                       type="button"
                       onClick={addPathway}
                       style={{
-                        background: '#002147', color: '#fff', border: 'none', borderRadius: '0.4rem',
+                        background: "var(--portal-primary,#002147)", color: '#fff', border: 'none', borderRadius: '0.4rem',
                         padding: '0.45rem 1rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                       }}
                     >
@@ -1165,8 +1165,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                       const validSlots = pw.slots.filter(s => s.rule)
                       return (
                         <div key={idx} style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #dde1e7',
+                          background: "var(--portal-surface,#ffffff)",
+                          border: "1.5px solid var(--portal-border,#dde1e7)",
                           borderRadius: '0.45rem',
                           padding: '0.85rem 1rem',
                           display: 'flex',
@@ -1175,10 +1175,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                           boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
                         }}>
                           <div>
-                            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#002147', marginBottom: '0.2rem' }}>
-                              {pw.name || <span style={{ color: '#9ba1ab', fontStyle: 'italic' }}>Untitled Pathway</span>}
+                            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", marginBottom: '0.2rem' }}>
+                              {pw.name || <span style={{ color: "var(--portal-subtle,#9ba1ab)", fontStyle: 'italic' }}>Untitled Pathway</span>}
                             </p>
-                            <p style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                            <p style={{ fontSize: '0.72rem', color: "var(--portal-muted,#6b7280)" }}>
                               {validSlots.length} slot{validSlots.length !== 1 ? 's' : ''} • {min}–{max} credits
                             </p>
                           </div>
@@ -1187,7 +1187,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                               type="button"
                               onClick={() => setEditingPathwayIndex(idx)}
                               style={{
-                                background: '#e6f0fa', color: '#002147', border: '1px solid #bfdbfe',
+                                background: "var(--portal-info-bg,#e6f0fa)", color: "var(--portal-brand-text,#002147)", border: "1px solid var(--portal-info-border,#bfdbfe)",
                                 borderRadius: '0.35rem', padding: '0.35rem 0.75rem',
                                 fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                               }}
@@ -1199,9 +1199,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                               onClick={() => removePathway(idx)}
                               disabled={pathways.length <= 1}
                               style={{
-                                background: pathways.length <= 1 ? '#f3f4f6' : '#fee2e2',
-                                color: pathways.length <= 1 ? '#9ba1ab' : '#dc2626',
-                                border: `1px solid ${pathways.length <= 1 ? '#e5e7eb' : '#fca5a5'}`,
+                                background: pathways.length <= 1 ? "var(--portal-surface-soft,#f3f4f6)" : "var(--portal-danger-bg,#fee2e2)",
+                                color: pathways.length <= 1 ? "var(--portal-subtle,#9ba1ab)" : "var(--portal-danger-text,#dc2626)",
+                                border: `1px solid ${pathways.length <= 1 ? "var(--portal-border,#e5e7eb)" : "var(--portal-danger-border,#fca5a5)"}`,
                                 borderRadius: '0.35rem', padding: '0.35rem 0.75rem',
                                 fontSize: '0.72rem', fontWeight: 600,
                                 cursor: pathways.length <= 1 ? 'not-allowed' : 'pointer',
@@ -1222,14 +1222,14 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     marginBottom: '1rem',
                   }}>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#002147' }}>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                       Editing Pathway
                     </p>
                     <button
                       type="button"
                       onClick={() => setEditingPathwayIndex(null)}
                       style={{
-                        background: '#e6f0fa', color: '#002147', border: '1px solid #bfdbfe',
+                        background: "var(--portal-info-bg,#e6f0fa)", color: "var(--portal-brand-text,#002147)", border: "1px solid var(--portal-info-border,#bfdbfe)",
                         borderRadius: '0.4rem', padding: '0.45rem 1rem',
                         fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                       }}
@@ -1239,7 +1239,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   </div>
 
                   <div style={{
-                    background: '#ffffff', border: '1.5px solid #dde1e7', borderRadius: '0.45rem',
+                    background: "var(--portal-surface,#ffffff)", border: "1.5px solid var(--portal-border,#dde1e7)", borderRadius: '0.45rem',
                     padding: '1rem', marginBottom: '1rem',
                   }}>
                     <label className={styles.label}>Pathway Name</label>
@@ -1257,9 +1257,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     const { min, max } = getPathwayCreditRange(pathways[editingPathwayIndex])
                     return (
                       <div style={{
-                        background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.35rem',
+                        background: "var(--portal-info-bg,#f8fafc)", border: "1px solid var(--portal-strong-border,#e2e8f0)", borderRadius: '0.35rem',
                         padding: '0.5rem 0.75rem', marginBottom: '1rem',
-                        fontSize: '0.75rem', color: '#44474e',
+                        fontSize: '0.75rem', color: "var(--portal-muted,#44474e)",
                       }}>
                         Pathway credit range: <b>{min} — {max}</b>
                       </div>
@@ -1277,7 +1277,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     onClick={() => addSlotToPathway(editingPathwayIndex)}
                     disabled={pathways[editingPathwayIndex].slots.length >= 10}
                     style={{
-                      background: '#ffffff', color: '#002147', border: '1.5px dashed #bfdbfe',
+                      background: "var(--portal-surface,#ffffff)", color: "var(--portal-brand-text,#002147)", border: "1.5px dashed var(--portal-info-border,#bfdbfe)",
                       borderRadius: '0.4rem', padding: '0.6rem 1rem', width: '100%',
                       fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                       marginTop: '0.75rem', marginBottom: '1.5rem',
@@ -1294,9 +1294,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                 <div style={{
                   position: 'sticky',
                   bottom: 0,
-                  background: '#f0f2f5',
+                  background: "var(--portal-canvas,#f0f2f5)",
                   padding: '1rem 0',
-                  borderTop: '1.5px solid #dde1e7',
+                  borderTop: "1.5px solid var(--portal-border,#dde1e7)",
                   zIndex: 10,
                   display: 'flex',
                   gap: '0.75rem',
@@ -1305,7 +1305,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   <button
                     type="button"
                     className={styles.saveBtn}
-                    style={{ flex: 1, background: '#ffffff', color: '#44474e', border: '1.5px solid #dde1e7' }}
+                    style={{ flex: 1, background: "var(--portal-surface,#ffffff)", color: "var(--portal-muted,#44474e)", border: "1.5px solid var(--portal-border,#dde1e7)" }}
                     onClick={() => setShowCancelConfirm(true)}
                     disabled={saving}
                   >
@@ -1392,7 +1392,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                           <td>{course.theory_hours_per_week ?? course.credits}</td>
                           <td>{course.practical_hours_per_week ?? 0}</td>
                           <td><span className={styles.codeBadge}>{course.category}</span></td>
-                          <td style={{ fontSize: '0.68rem', color: '#9ba1ab' }}>{course.tag ?? '—'}</td>
+                          <td style={{ fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{course.tag ?? '—'}</td>
                           <td>
                             <div className={styles.actionBtns}>
                               <button
@@ -1605,19 +1605,19 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     <div className={styles.courseModalRightCol}>
                       <div className={styles.courseModalSectionTitle}>
                         <span>Constraints &amp; Eligibility</span>
-                        <span style={{ fontSize: '0.7rem', color: '#002147', fontWeight: 600, background: '#e0f2fe', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', color: "var(--portal-brand-text,#002147)", fontWeight: 600, background: "var(--portal-info-bg,#e0f2fe)", padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                           Hard Eligibility
                         </span>
                       </div>
 
-                      <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                      <div style={{ fontSize: '0.74rem', color: "var(--portal-muted,#64748b)", lineHeight: 1.45 }}>
                         Define hard eligibility constraints for this course. Students who do not meet these constraints cannot register for this paper.
                       </div>
 
                       {/* Active Constraints List (Light University Theme) */}
                       <div style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #e2e8f0',
+                        background: "var(--portal-info-bg,#f8fafc)",
+                        border: "1.5px solid var(--portal-strong-border,#e2e8f0)",
                         borderRadius: '8px',
                         padding: '0.65rem',
                         minHeight: '110px',
@@ -1628,20 +1628,20 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         gap: '0.45rem'
                       }}>
                         {loadingRules ? (
-                          <div style={{ padding: '0.8rem', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                          <div style={{ padding: '0.8rem', textAlign: 'center', fontSize: '0.75rem', color: "var(--portal-muted,#64748b)" }}>
                             Loading constraints...
                           </div>
                         ) : courseRules.length === 0 ? (
                           <div style={{
                             fontSize: '0.75rem',
-                            color: '#64748b',
+                            color: "var(--portal-muted,#64748b)",
                             fontStyle: 'italic',
                             padding: '1rem',
                             textAlign: 'center',
                             lineHeight: 1.5
                           }}>
                             No constraints configured.<br />
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            <span style={{ fontSize: '0.7rem', color: "var(--portal-info-text,#94a3b8)" }}>
                               All eligible students matching the blueprint can register.
                             </span>
                           </div>
@@ -1659,13 +1659,13 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                         textTransform: 'uppercase',
                                         padding: '0.15rem 0.45rem',
                                         borderRadius: '3px',
-                                        background: '#e0f2fe',
-                                        color: '#0369a1',
+                                        background: "var(--portal-info-bg,#e0f2fe)",
+                                        color: "var(--portal-info-text,#0369a1)",
                                         letterSpacing: '0.04em'
                                       }}>
                                         Department Match
                                       </span>
-                                      <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 500 }}>
+                                      <span style={{ fontSize: '0.74rem', color: "var(--portal-info-text,#475569)", fontWeight: 500 }}>
                                         ({codes.length} department{codes.length === 1 ? '' : 's'} allowed)
                                       </span>
                                     </div>
@@ -1678,11 +1678,11 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                             style={{
                                               fontSize: '0.7rem',
                                               fontWeight: 600,
-                                              background: '#f1f5f9',
-                                              color: '#0f172a',
+                                              background: "var(--portal-info-bg,#f1f5f9)",
+                                              color: "var(--portal-brand-text,#0f172a)",
                                               padding: '0.1rem 0.4rem',
                                               borderRadius: '3px',
-                                              border: '1px solid #cbd5e1'
+                                              border: "1px solid var(--portal-strong-border,#cbd5e1)"
                                             }}
                                             title={dept ? dept.name : c}
                                           >
@@ -1696,9 +1696,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     type="button"
                                     onClick={() => handleDeleteRule(rule, idx)}
                                     style={{
-                                      background: '#fee2e2',
+                                      background: "var(--portal-danger-bg,#fee2e2)",
                                       border: 'none',
-                                      color: '#dc2626',
+                                      color: "var(--portal-danger-text,#dc2626)",
                                       cursor: 'pointer',
                                       fontSize: '0.72rem',
                                       fontWeight: 600,
@@ -1724,14 +1724,14 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                         textTransform: 'uppercase',
                                         padding: '0.15rem 0.45rem',
                                         borderRadius: '3px',
-                                        background: '#f3e8ff',
-                                        color: '#7e22ce',
+                                        background: "var(--portal-purple-bg,#f3e8ff)",
+                                        color: "var(--portal-purple-text,#7e22ce)",
                                         letterSpacing: '0.04em'
                                       }}>
                                         Completed Course
                                       </span>
                                     </div>
-                                    <div style={{ fontSize: '0.76rem', color: '#1e293b', fontWeight: 600 }}>
+                                    <div style={{ fontSize: '0.76rem', color: "var(--portal-brand-text,#1e293b)", fontWeight: 600 }}>
                                       {rule.target} {match ? `— ${match.title} (Sem ${match.semester})` : ''}
                                     </div>
                                   </div>
@@ -1739,9 +1739,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     type="button"
                                     onClick={() => handleDeleteRule(rule, idx)}
                                     style={{
-                                      background: '#fee2e2',
+                                      background: "var(--portal-danger-bg,#fee2e2)",
                                       border: 'none',
-                                      color: '#dc2626',
+                                      color: "var(--portal-danger-text,#dc2626)",
                                       cursor: 'pointer',
                                       fontSize: '0.72rem',
                                       fontWeight: 600,
@@ -1765,17 +1765,17 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.75rem',
-                        background: '#ffffff',
+                        background: "var(--portal-surface,#ffffff)",
                         padding: '0.85rem',
                         borderRadius: '8px',
-                        border: '1.5px solid #dde1e7'
+                        border: "1.5px solid var(--portal-border,#dde1e7)"
                       }}>
                         {/* Rule Type Tabs */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          borderBottom: '1.5px solid #f1f5f9',
+                          borderBottom: "1.5px solid var(--portal-strong-border,#f1f5f9)",
                           paddingBottom: '0.6rem'
                         }}>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -1786,8 +1786,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                 setPriorCourseOpen(false)
                               }}
                               style={{
-                                background: newRuleType === 'DEPARTMENT' ? '#002147' : '#f1f5f9',
-                                color: newRuleType === 'DEPARTMENT' ? '#ffffff' : '#475569',
+                                background: newRuleType === 'DEPARTMENT' ? "var(--portal-primary,#002147)" : "var(--portal-info-bg,#f1f5f9)",
+                                color: newRuleType === 'DEPARTMENT' ? '#ffffff' : "var(--portal-info-text,#475569)",
                                 border: 'none',
                                 borderRadius: '5px',
                                 padding: '0.35rem 0.75rem',
@@ -1806,8 +1806,8 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                 setPriorCourseOpen(false)
                               }}
                               style={{
-                                background: newRuleType === 'COMPLETED_COURSE' ? '#002147' : '#f1f5f9',
-                                color: newRuleType === 'COMPLETED_COURSE' ? '#ffffff' : '#475569',
+                                background: newRuleType === 'COMPLETED_COURSE' ? "var(--portal-primary,#002147)" : "var(--portal-info-bg,#f1f5f9)",
+                                color: newRuleType === 'COMPLETED_COURSE' ? '#ffffff' : "var(--portal-info-text,#475569)",
                                 border: 'none',
                                 borderRadius: '5px',
                                 padding: '0.35rem 0.75rem',
@@ -1829,7 +1829,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#334155' }}>
+                                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: "var(--portal-info-text,#334155)" }}>
                                   Select Allowed Departments ({selectedDeptCodes.length} selected):
                                 </label>
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1839,7 +1839,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     style={{
                                       background: 'none',
                                       border: 'none',
-                                      color: '#0284c7',
+                                      color: "var(--portal-info-text,#0284c7)",
                                       cursor: 'pointer',
                                       fontSize: '0.72rem',
                                       fontWeight: 600,
@@ -1848,14 +1848,14 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                   >
                                     Select All
                                   </button>
-                                  <span style={{ color: '#cbd5e1', fontSize: '0.7rem' }}>•</span>
+                                  <span style={{ color: "var(--portal-info-text,#cbd5e1)", fontSize: '0.7rem' }}>•</span>
                                   <button
                                     type="button"
                                     onClick={() => updateDepartmentCodes([])}
                                     style={{
                                       background: 'none',
                                       border: 'none',
-                                      color: '#dc2626',
+                                      color: "var(--portal-danger-text,#dc2626)",
                                       cursor: 'pointer',
                                       fontSize: '0.72rem',
                                       fontWeight: 600,
@@ -1881,13 +1881,13 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                         onChange={(e) => handleDepartmentToggle(d.code, e.target.checked)}
                                       />
                                       <span>{d.code}</span>
-                                      <span style={{ color: '#64748b', fontSize: '0.7rem' }}>({d.name})</span>
+                                      <span style={{ color: "var(--portal-muted,#64748b)", fontSize: '0.7rem' }}>({d.name})</span>
                                     </label>
                                   )
                                 })}
                               </div>
 
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.4 }}>
+                              <div style={{ fontSize: '0.7rem', color: "var(--portal-muted,#64748b)", lineHeight: 1.4 }}>
                                 Tip: Matches Blueprint slot rules (`DEPT_RESTRICTED`). Only students in selected departments can register. If none selected, the rule is removed and all departments can register.
                               </div>
                             </div>
@@ -1901,10 +1901,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                             return (
                               <div style={{
                                 padding: '0.85rem',
-                                background: '#f8fafc',
-                                border: '1px solid #e2e8f0',
+                                background: "var(--portal-info-bg,#f8fafc)",
+                                border: "1px solid var(--portal-strong-border,#e2e8f0)",
                                 borderRadius: '6px',
-                                color: '#64748b',
+                                color: "var(--portal-muted,#64748b)",
                                 fontSize: '0.76rem',
                                 lineHeight: 1.45,
                                 textAlign: 'center'
@@ -1916,7 +1916,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                              <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#334155' }}>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 600, color: "var(--portal-info-text,#334155)" }}>
                                 Select Prerequisite Course (Prior Semesters Only):
                               </label>
 
@@ -1936,10 +1936,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                           : newRuleTarget
                                       })()
                                     ) : (
-                                      <span style={{ color: '#94a3b8' }}>-- Select Prior Course --</span>
+                                      <span style={{ color: "var(--portal-info-text,#94a3b8)" }}>-- Select Prior Course --</span>
                                     )}
                                   </span>
-                                  <ChevronDown size={16} style={{ color: '#64748b', transform: priorCourseOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                                  <ChevronDown size={16} style={{ color: "var(--portal-muted,#64748b)", transform: priorCourseOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
                                 </button>
 
                                 {priorCourseOpen && (
@@ -1978,7 +1978,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     {/* Courses List */}
                                     <div className={styles.priorCourseList}>
                                       {loadingPriorCourses ? (
-                                        <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                                        <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: "var(--portal-muted,#64748b)" }}>
                                           Loading prior courses...
                                         </div>
                                       ) : (
@@ -1998,7 +1998,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
 
                                           if (filtered.length === 0) {
                                             return (
-                                              <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                              <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: "var(--portal-info-text,#94a3b8)", fontStyle: 'italic' }}>
                                                 No prior courses found
                                               </div>
                                             )
@@ -2014,7 +2014,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                                 className={styles.priorCourseOption}
                                                 style={{
                                                   opacity: isAlreadyAdded ? 0.6 : 1,
-                                                  background: isSelected ? '#e0f2fe' : undefined,
+                                                  background: isSelected ? "var(--portal-info-bg,#e0f2fe)" : undefined,
                                                 }}
                                                 onClick={() => {
                                                   setNewRuleTarget(c.course_code)
@@ -2022,16 +2022,16 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                                 }}
                                               >
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                  <span style={{ fontWeight: 600, color: '#002147' }}>
+                                                  <span style={{ fontWeight: 600, color: "var(--portal-brand-text,#002147)" }}>
                                                     {c.course_code} — {c.title}
                                                   </span>
                                                   {isAlreadyAdded && (
-                                                    <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600 }}>
+                                                    <span style={{ fontSize: '0.68rem', color: "var(--portal-info-text,#0284c7)", fontWeight: 600 }}>
                                                       (Already Added)
                                                     </span>
                                                   )}
                                                 </div>
-                                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                                <div style={{ fontSize: '0.7rem', color: "var(--portal-muted,#64748b)" }}>
                                                   Semester {c.semester} • {c.credits} Credits • {c.category || 'General'}
                                                 </div>
                                               </div>
@@ -2058,7 +2058,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                   onClick={handleAddRule}
                                   disabled={!newRuleTarget.trim()}
                                   style={{
-                                    background: !newRuleTarget.trim() ? '#94a3b8' : '#002147',
+                                    background: !newRuleTarget.trim() ? "var(--portal-info-bg,#94a3b8)" : "var(--portal-primary,#002147)",
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '4px',

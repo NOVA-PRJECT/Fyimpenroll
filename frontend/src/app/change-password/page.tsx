@@ -144,7 +144,7 @@ export default function SharedChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-[color:var(--portal-info-bg,#f8fafc)] flex flex-col font-sans">
       <PortalHeader
         variant="none"
         rightAction={
@@ -152,7 +152,7 @@ export default function SharedChangePasswordPage() {
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="text-xs font-medium px-3.5 py-1.5 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600 rounded-lg transition-colors flex items-center gap-1.5"
+            className="text-xs font-medium px-3.5 py-1.5 border border-[color:var(--portal-strong-border,#e2e8f0)] hover:bg-[color:var(--portal-info-bg,#f1f5f9)] hover:text-[color:var(--portal-brand-text,#0f172a)] text-[color:var(--portal-info-text,#475569)] rounded-lg transition-colors flex items-center gap-1.5"
           >
             <LogOut size={13} />
             <span>{loggingOut ? 'Signing out...' : 'Sign Out'}</span>
@@ -161,12 +161,12 @@ export default function SharedChangePasswordPage() {
       />
 
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="w-full max-w-md bg-[color:var(--portal-surface,white)] border border-[color:var(--portal-strong-border,#e2e8f0)] rounded-2xl shadow-sm overflow-hidden">
           {/* Header Banner */}
-          <div className="px-6 pt-6 pb-4 border-b border-slate-100 text-center">
-            <div className="inline-flex items-center justify-center p-2 rounded-xl bg-slate-100 mb-3">
+          <div className="px-6 pt-6 pb-4 border-b border-[color:var(--portal-strong-border,#f1f5f9)] text-center">
+            <div className="inline-flex items-center justify-center p-2 rounded-xl bg-[color:var(--portal-info-bg,#f1f5f9)] mb-3">
               <Image
-                src="/kannur-university-logo.png"
+                src="/knrunilogo.png"
                 alt="Kannur University"
                 width={48}
                 height={48}
@@ -174,8 +174,8 @@ export default function SharedChangePasswordPage() {
               />
             </div>
             <p className="text-xs font-semibold text-emerald-800 tracking-wider uppercase">Kannur University</p>
-            <h1 className="text-lg font-bold text-slate-900 mt-1">Update Your Password</h1>
-            <p className="text-xs text-slate-500 mt-1">
+            <h1 className="text-lg font-bold text-[color:var(--portal-brand-text,#0f172a)] mt-1">Update Your Password</h1>
+            <p className="text-xs text-[color:var(--portal-muted,#64748b)] mt-1">
               {role === 'teacher'
                 ? 'Faculty account security: please establish your permanent password.'
                 : 'Student account security: please establish your permanent password.'}
@@ -191,17 +191,17 @@ export default function SharedChangePasswordPage() {
             </div>
 
             {error && (
-              <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2" role="alert">
-                <AlertCircle size={15} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="p-3 mb-4 rounded-xl bg-[color:var(--portal-danger-bg,#fef2f2)] border border-[color:var(--portal-danger-border,#fecaca)] text-xs text-[color:var(--portal-danger-text,#991b1b)] flex items-start gap-2" role="alert">
+                <AlertCircle size={15} className="text-[color:var(--portal-danger-text,#dc2626)] flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
 
             {canRetrySync && (
-              <div className="p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col gap-2 text-xs">
+              <div className="p-3 mb-4 rounded-xl bg-[color:var(--portal-warning-bg,#fffbeb)] border border-[color:var(--portal-warning-border,#fde68a)] text-[color:var(--portal-warning-text,#78350f)] flex flex-col gap-2 text-xs">
                 <div>
                   <p className="font-semibold text-amber-950">Pending Profile Synchronization</p>
-                  <p className="text-amber-800">Your password was updated in the authentication system. Click retry to complete profile synchronization.</p>
+                  <p className="text-[color:var(--portal-warning-text,#92400e)]">Your password was updated in the authentication system. Click retry to complete profile synchronization.</p>
                 </div>
                 <button
                   type="button"
@@ -216,18 +216,18 @@ export default function SharedChangePasswordPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="current-password">
+                <label className="block text-xs font-semibold text-[color:var(--portal-info-text,#334155)] mb-1" htmlFor="current-password">
                   Current Password
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)]">
                     <KeyRound size={15} />
                   </span>
                   <input
                     id="current-password"
                     type={showCurrentPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
-                      fieldErrors.current_password ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-emerald-200'
+                      fieldErrors.current_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Enter temporary password"
                     value={currentPassword}
@@ -236,30 +236,30 @@ export default function SharedChangePasswordPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   >
                     {showCurrentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.current_password && (
-                  <p className="text-[11px] text-red-600 mt-1">{fieldErrors.current_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.current_password}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="new-password">
+                <label className="block text-xs font-semibold text-[color:var(--portal-info-text,#334155)] mb-1" htmlFor="new-password">
                   New Password
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)]">
                     <Lock size={15} />
                   </span>
                   <input
                     id="new-password"
                     type={showNewPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
-                      fieldErrors.new_password ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-emerald-200'
+                      fieldErrors.new_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Create strong permanent password"
                     value={newPassword}
@@ -268,30 +268,30 @@ export default function SharedChangePasswordPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                   >
                     {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.new_password && (
-                  <p className="text-[11px] text-red-600 mt-1">{fieldErrors.new_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.new_password}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="confirm-password">
+                <label className="block text-xs font-semibold text-[color:var(--portal-info-text,#334155)] mb-1" htmlFor="confirm-password">
                   Confirm New Password
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)]">
                     <Lock size={15} />
                   </span>
                   <input
                     id="confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
-                      fieldErrors.confirm_password ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-emerald-200'
+                      fieldErrors.confirm_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Re-type new password"
                     value={confirmPassword}
@@ -300,30 +300,30 @@ export default function SharedChangePasswordPage() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.confirm_password && (
-                  <p className="text-[11px] text-red-600 mt-1">{fieldErrors.confirm_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.confirm_password}</p>
                 )}
               </div>
 
               {/* Password Requirements */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
-                <p className="font-semibold text-slate-700 mb-1">Password Requirements:</p>
+              <div className="p-3 rounded-lg bg-[color:var(--portal-info-bg,#f8fafc)] border border-[color:var(--portal-strong-border,#e2e8f0)] text-[11px] text-[color:var(--portal-info-text,#475569)] space-y-1">
+                <p className="font-semibold text-[color:var(--portal-info-text,#334155)] mb-1">Password Requirements:</p>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className={minLengthMet ? 'text-emerald-600' : 'text-slate-300'} />
+                  <CheckCircle2 size={12} className={minLengthMet ? 'text-emerald-600' : 'text-[color:var(--portal-info-text,#cbd5e1)]'} />
                   <span className={minLengthMet ? 'text-emerald-700 font-medium' : ''}>At least 10 characters</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className={letterMet ? 'text-emerald-600' : 'text-slate-300'} />
+                  <CheckCircle2 size={12} className={letterMet ? 'text-emerald-600' : 'text-[color:var(--portal-info-text,#cbd5e1)]'} />
                   <span className={letterMet ? 'text-emerald-700 font-medium' : ''}>At least one letter (a-z, A-Z)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className={numberMet ? 'text-emerald-600' : 'text-slate-300'} />
+                  <CheckCircle2 size={12} className={numberMet ? 'text-emerald-600' : 'text-[color:var(--portal-info-text,#cbd5e1)]'} />
                   <span className={numberMet ? 'text-emerald-700 font-medium' : ''}>At least one number (0-9)</span>
                 </div>
               </div>

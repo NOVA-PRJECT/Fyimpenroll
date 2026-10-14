@@ -7,6 +7,7 @@ import { useSemester } from '../../../src/hooks/useSemester';
 import { useTheme } from '../../../src/hooks/useTheme';
 import { apiClient } from '../../../src/api/client';
 import { API_ENDPOINTS } from '../../../src/api/endpoints';
+import { CourseSchema } from '../../../src/api/schemas/student.schema';
 import { queryKeys } from '../../../src/lib/query-client';
 import { ScreenContainer } from '../../../src/components/layout/ScreenContainer';
 import { Card } from '../../../src/components/common/Card';
@@ -26,7 +27,7 @@ export default function CoursesListScreen() {
     queryKey: queryKeys.student.courses(userId, activeSemester),
     queryFn: () =>
       apiClient.get(
-        `${API_ENDPOINTS.STUDENT_COURSES}?semester=${activeSemester}`
+        `${API_ENDPOINTS.STUDENT_COURSES}?semester=${activeSemester}`, { schema: CourseSchema.array() }
       ),
     enabled: !!userId,
   });

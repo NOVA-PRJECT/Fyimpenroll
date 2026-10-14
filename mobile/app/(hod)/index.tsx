@@ -5,6 +5,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useTheme } from '../../src/hooks/useTheme';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
+import { summarizeCampusRoster } from '../../src/api/schemas/portal.schema';
 import { queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
@@ -17,14 +18,15 @@ export default function HodHomeScreen() {
   const { colors, typography, spacing } = useTheme();
 
   const deptId = profile?.department_id || '';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.hod.absenceSummary(deptId, todayStr),
-    queryFn: () =>
-      apiClient.get(`${API_ENDPOINTS.HOD_ABSENCE_SUMMARY}?date=${todayStr}`),
+    queryFn: async () => summarizeCampusRoster(await apiClient.get(`${API_ENDPOINTS.HOD_ABSENCE_SUMMARY}?date=${todayStr}`)),
     enabled: !!deptId,
   });
+
+  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
 
   return (
     <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
@@ -77,10 +79,10 @@ export default function HodHomeScreen() {
         <View style={styles.rateRow}>
           <View>
             <Text style={[typography.h3, { color: colors.textPrimary }]}>
-              Department Attendance Rate
+              Campus Checkpoint Completion
             </Text>
             <Text style={[typography.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
-              Combined morning & evening verified presence
+              Verified checkpoints; pending sessions excluded
             </Text>
           </View>
           {isLoading ? (
@@ -98,7 +100,7 @@ export default function HodHomeScreen() {
                 },
               ]}
             >
-              {data?.attendanceRate ?? 100}%
+              {data?.attendanceRate == null ? '—' : `${data.attendanceRate}%`}
             </Text>
           )}
         </View>
@@ -107,7 +109,7 @@ export default function HodHomeScreen() {
       {/* Critical Absence Flags */}
       <View style={styles.sectionHeader}>
         <Text style={[typography.h3, { color: colors.textPrimary }]}>
-          Critical Attendance Alerts ({'<'}75%)
+          Missed Campus Checkpoints
         </Text>
       </View>
 
@@ -125,17 +127,17 @@ export default function HodHomeScreen() {
                   {student.full_name}
                 </Text>
                 <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                  Roll: {student.roll_number || 'N/A'} • Sem {student.current_semester}
+                  Roll: {student.cap_application_number} • Sem {student.current_semester}
                 </Text>
               </View>
-              <Badge label={`${student.attendance_percentage}%`} variant="danger" />
+              <Badge label={student.morning.status === 'absent' && student.evening.status === 'absent' ? 'Both missed' : student.morning.status === 'absent' ? 'Morning missed' : 'Evening missed'} variant="danger" />
             </View>
           </Card>
         ))
       ) : (
         <Card variant="flat" style={styles.emptyCard}>
           <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            No students currently below the critical 75% attendance threshold.
+            No missed campus checkpoints for this date.
           </Text>
         </Card>
       )}

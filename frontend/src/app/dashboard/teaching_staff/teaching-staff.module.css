@@ -6,7 +6,7 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   min-height: 100dvh;
   width: 100%;
-  background-color: #f8fafc;
+  background-color: var(--portal-info-bg,#f8fafc);
   display: flex;
   flex-direction: column;
 }
@@ -14,7 +14,7 @@
 /* ── TOP BAR ── */
 /* ── UNIFIED EXECUTIVE TOP BAR ── */
 .topBar {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   padding: 0.4rem 1.25rem;
   display: flex;
   align-items: center;
@@ -65,7 +65,7 @@
 }
 
 .topBarTitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.85rem;
   font-weight: 700;
   margin: 0;
@@ -73,7 +73,7 @@
 }
 
 .topBarSubtitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.65rem;
   font-weight: 600;
   margin: 0;
@@ -101,7 +101,7 @@
 .teacherNameHeader {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   margin-bottom: 0.2rem;
   line-height: 1.2;
@@ -124,7 +124,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -138,7 +138,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.06);
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   border: 1px solid rgba(0, 33, 71, 0.2);
   white-space: nowrap;
   overflow: hidden;
@@ -186,7 +186,7 @@
 }
 
 .logoutBtn:hover {
-  background: #001633;
+  background: var(--portal-primary,#001633);
   border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   transform: translateY(-1px);
@@ -230,9 +230,9 @@
 }
 
 .errorBanner {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: var(--portal-danger-bg,#fef2f2);
+  border: 1px solid var(--portal-danger-border,#fecaca);
+  color: var(--portal-danger-text,#b91c1c);
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   font-size: 0.82rem;
@@ -242,8 +242,8 @@
 
 /* ── FILTER CARD ── */
 .filterCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.25rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
@@ -256,13 +256,13 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
 }
 
 .filterCardTitle {
   font-size: 0.92rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
@@ -288,7 +288,7 @@
 .filterLabel {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -298,9 +298,9 @@
   padding: 0.65rem 0.85rem;
   font-family: inherit;
   font-size: 0.85rem;
-  color: #0f172a;
-  background: #f8fafc;
-  border: 1.5px solid #cbd5e1;
+  color: var(--portal-brand-text,#0f172a);
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -308,8 +308,8 @@
 }
 
 .filterSelect:focus {
-  border-color: #002147;
-  background: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-surface,#ffffff);
   box-shadow: 0 0 0 3px rgba(0, 33, 71, 0.08);
 }
 
@@ -330,8 +330,8 @@
   padding: 0.7rem 0.9rem;
   font-family: inherit;
   font-size: 0.85rem;
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
   cursor: pointer;
   display: flex;
@@ -342,11 +342,11 @@
 }
 
 .customSelectTrigger:hover:not(:disabled) {
-  border-color: #94a3b8;
+  border-color: var(--portal-strong-border,#94a3b8);
 }
 
 .customSelectTrigger:disabled {
-  background: #f1f5f9;
+  background: var(--portal-info-bg,#f1f5f9);
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -360,7 +360,7 @@
 
 .triggerTitle {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   font-size: 0.88rem;
   white-space: nowrap;
   overflow: hidden;
@@ -369,16 +369,16 @@
 
 .triggerMeta {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 .placeholderText {
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   font-size: 0.85rem;
 }
 
 .triggerArrow {
-  border: solid #64748b;
+  border: solid var(--portal-border,#64748b);
   border-width: 0 2px 2px 0;
   display: inline-block;
   padding: 3px;
@@ -398,8 +398,8 @@
   right: 0;
   max-height: 280px;
   overflow-y: auto;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 50;
@@ -408,7 +408,7 @@
 .customOption {
   padding: 0.65rem 0.9rem;
   cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
   transition: background 0.12s ease;
 }
 
@@ -417,12 +417,12 @@
 }
 
 .customOption:hover {
-  background: #f8fafc;
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .customOption.selected {
-  background: #f0fdf4;
-  border-left: 3px solid #16a34a;
+  background: var(--portal-success-bg,#f0fdf4);
+  border-left: 3px solid var(--portal-success-border,#16a34a);
 }
 
 .optionUpper {
@@ -434,12 +434,12 @@
 .optionTitle {
   font-weight: 600;
   font-size: 0.84rem;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 .optionCode {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 .optionLower {
@@ -451,26 +451,26 @@
 
 .optionSemTag {
   font-size: 0.68rem;
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-info-text,#334155);
   padding: 0.1rem 0.4rem;
   border-radius: 0.25rem;
 }
 
 .optionCountBadge {
   font-size: 0.68rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
 }
 
 .customOptionNoData {
   padding: 1.5rem;
   text-align: center;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   font-size: 0.82rem;
 }
 
 .placeholderOption {
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-size: 0.82rem;
   font-style: italic;
 }
@@ -487,8 +487,8 @@
 .spinner {
   width: 2rem;
   height: 2rem;
-  border: 3px solid #e2e8f0;
-  border-top-color: #002147;
+  border: 3px solid var(--portal-strong-border,#e2e8f0);
+  border-top-color: var(--portal-info-border,#002147);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -500,20 +500,20 @@
 .loadingText {
   margin-top: 0.75rem;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 /* ── DETAILS CONTAINER ── */
 .detailsContainer {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.25rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .courseInfoBanner {
-  background: linear-gradient(135deg, #002147 0%, #1e3a8a 100%);
+  background: linear-gradient(135deg, var(--portal-primary,#002147) 0%, #1e3a8a 100%);
   color: #ffffff;
   padding: 1rem 1.25rem;
   border-radius: 0.5rem;
@@ -542,8 +542,8 @@
 }
 
 .statCard {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   padding: 0.85rem 1rem;
   text-align: center;
@@ -552,13 +552,13 @@
 .statValue {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0 0 0.15rem 0;
 }
 
 .statLabel {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
@@ -566,8 +566,8 @@
 }
 
 .breakdownCard {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
@@ -576,7 +576,7 @@
 .breakdownTitle {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--portal-info-text,#334155);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 0 0 0.5rem 0;
@@ -588,7 +588,7 @@
   align-items: center;
   padding: 0.35rem 0;
   font-size: 0.82rem;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed var(--portal-strong-border,#e2e8f0);
 }
 
 .breakdownRow:last-child {
@@ -596,12 +596,12 @@
 }
 
 .breakdownDept {
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   font-weight: 500;
 }
 
 .breakdownCount {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-weight: 700;
 }
 
@@ -625,23 +625,23 @@
 .sectionTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   margin: 0;
 }
 
 .tableFilterSelect {
   padding: 0.35rem 0.65rem;
   font-size: 0.78rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.35rem;
-  background: #ffffff;
-  color: #334155;
+  background: var(--portal-surface,#ffffff);
+  color: var(--portal-info-text,#334155);
   font-weight: 500;
 }
 
 .tableWrapper {
   overflow-x: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
 }
 
@@ -653,11 +653,11 @@
 }
 
 .tableHead th {
-  background: #f8fafc;
+  background: var(--portal-info-bg,#f8fafc);
   padding: 0.65rem 0.85rem;
   font-weight: 600;
-  color: #475569;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--portal-info-text,#475569);
+  border-bottom: 1px solid var(--portal-strong-border,#e2e8f0);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -665,8 +665,8 @@
 
 .tableRow td {
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #1e293b;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
+  color: var(--portal-brand-text,#1e293b);
 }
 
 .tableRow:last-child td {
@@ -674,15 +674,15 @@
 }
 
 .tableRow:hover {
-  background: #f8fafc;
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .deptBadge {
   display: inline-block;
   font-size: 0.7rem;
   font-weight: 600;
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-info-text,#334155);
   padding: 0.15rem 0.45rem;
   border-radius: 0.25rem;
 }
@@ -701,12 +701,12 @@
 .emptyTitle {
   font-size: 0.92rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--portal-info-text,#334155);
   margin: 0 0 0.25rem 0;
 }
 
 .emptySubtitle {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
 }

@@ -6,6 +6,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useTheme } from '../../src/hooks/useTheme';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
+import { TeacherScheduleSchema } from '../../src/api/schemas/portal.schema';
 import { queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
@@ -20,16 +21,17 @@ export default function TeacherHomeScreen() {
   const { colors, typography, spacing } = useTheme();
 
   const teacherId = user?.id || '';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
   const { data: periods, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.teacher.scheduledPeriods(teacherId, todayStr),
-    queryFn: () =>
-      apiClient.get(
-        `${API_ENDPOINTS.FACULTY_SCHEDULED_PERIODS}?date=${todayStr}`
-      ),
+    queryFn: async () => (await apiClient.get(
+      `${API_ENDPOINTS.FACULTY_SCHEDULED_PERIODS}?date=${todayStr}`, { schema: TeacherScheduleSchema }
+    )).periods,
     enabled: !!teacherId,
   });
+
+  if (error && !periods) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
 
   return (
     <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
@@ -80,14 +82,14 @@ export default function TeacherHomeScreen() {
         </View>
       ) : periods && periods.length > 0 ? (
         periods.map((period: any) => (
-          <Card key={period.id} variant="outlined" style={styles.periodCard}>
+          <Card key={period.timetable_slot_id} variant="outlined" style={styles.periodCard}>
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <View style={styles.timeBadgeRow}>
                   <Text style={[typography.bodyMedium, { color: colors.primary, fontWeight: '700' }]}>
                     {period.start_time} - {period.end_time}
                   </Text>
-                  <Badge label={`Period ${period.period_index || 1}`} variant="primary" style={{ marginLeft: 8 }} />
+                  <Badge label={`Period ${period.period_number}`} variant="primary" style={{ marginLeft: 8 }} />
                 </View>
 
                 <Text style={[typography.h3, { color: colors.textPrimary, marginTop: 4 }]}>

@@ -269,7 +269,7 @@ export default function StudentAttendanceScreen() {
         </View>
       ) : courseAttendanceData?.courses && courseAttendanceData.courses.length > 0 ? (
         courseAttendanceData.courses.map((course: any) => {
-          const isAdequate = course.percentage >= 75;
+          const isAdequate = course.percentage == null || course.percentage >= 75;
           return (
             <Card key={course.course_id} variant="outlined" style={styles.courseCard}>
               <View style={styles.courseRow}>
@@ -292,7 +292,7 @@ export default function StudentAttendanceScreen() {
                       { color: isAdequate ? colors.success : colors.danger },
                     ]}
                   >
-                    {course.percentage}%
+                    {course.percentage == null ? '—' : `${course.percentage}%`}
                   </Text>
                   <Badge
                     label={isAdequate ? 'Eligible' : 'Low Attendance'}

@@ -566,7 +566,7 @@ export default function DirectorDashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label className={styles.label}>
                       Registration Deadline
-                      <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: '#64748b', fontWeight: 'normal' }}>
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: "var(--portal-muted,#64748b)", fontWeight: 'normal' }}>
                         (Asia/Kolkata IST, UTC+05:30)
                       </span>
                     </label>
@@ -574,21 +574,21 @@ export default function DirectorDashboard() {
                       <button
                         type="button"
                         onClick={() => handleSetPreset(7)}
-                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', color: '#334155' }}
+                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: "1px solid var(--portal-strong-border,#cbd5e1)", background: "var(--portal-info-bg,#f8fafc)", cursor: 'pointer', color: "var(--portal-info-text,#334155)" }}
                       >
                         +7 Days
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSetPreset(14)}
-                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', color: '#334155' }}
+                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: "1px solid var(--portal-strong-border,#cbd5e1)", background: "var(--portal-info-bg,#f8fafc)", cursor: 'pointer', color: "var(--portal-info-text,#334155)" }}
                       >
                         +14 Days
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSetPreset(30)}
-                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', color: '#334155' }}
+                        style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', border: "1px solid var(--portal-strong-border,#cbd5e1)", background: "var(--portal-info-bg,#f8fafc)", cursor: 'pointer', color: "var(--portal-info-text,#334155)" }}
                       >
                         +30 Days
                       </button>
@@ -672,8 +672,8 @@ export default function DirectorDashboard() {
           >
             <div
               style={{
-                background: '#0f172a',
-                border: '1px solid #dc2626',
+                background: "var(--portal-primary,#0f172a)",
+                border: "1px solid var(--portal-danger-border,#dc2626)",
                 borderRadius: '12px',
                 padding: '1.75rem',
                 maxWidth: '460px',
@@ -683,13 +683,13 @@ export default function DirectorDashboard() {
                 gap: '1rem',
               }}
             >
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f87171', margin: 0 }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-danger-text,#f87171)", margin: 0 }}>
                 🔒 Close Registration Window?
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                 This will <strong>immediately close</strong> course registration for this campus. Students will no longer be able to submit or change their elective preferences.
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+              <p style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", margin: 0 }}>
                 Are you sure you want to proceed?
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
@@ -717,13 +717,13 @@ export default function DirectorDashboard() {
           <div>
             <p className={styles.sectionTitle}>Timetable Generation & Management</p>
             <div className={styles.windowCard}>
-              <p style={{ fontSize: '0.85rem', color: '#44474e', margin: '0 0 1rem 0' }}>
+              <p style={{ fontSize: '0.85rem', color: "var(--portal-muted,#44474e)", margin: '0 0 1rem 0' }}>
                 Generate, publish, and re-validate automated timetables for all departments in {campusName || 'this campus'}.
               </p>
               <NavigationLink
                 className={styles.primaryBtn}
                 href="/dashboard/director/timetable"
-                style={{ background: '#002147' }}
+                style={{ background: "var(--portal-primary,#002147)" }}
               >
                 Open Timetable Generator Dashboard →
               </NavigationLink>
@@ -740,12 +740,12 @@ export default function DirectorDashboard() {
             {promoteSuccess && <div className={styles.successBanner}>✓ {promoteSuccess}</div>}
             {failedGraduations.length > 0 && (
               <div style={{
-                background: '#fff3cd',
-                color: '#856404',
+                background: "var(--portal-warning-bg,#fff3cd)",
+                color: "var(--portal-warning-text,#856404)",
                 padding: '0.75rem 1rem',
                 borderRadius: '6px',
                 marginBottom: '1rem',
-                border: '1px solid #ffeeba',
+                border: "1px solid var(--portal-warning-border,#ffeeba)",
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -766,7 +766,7 @@ export default function DirectorDashboard() {
             )}
 
             <div className={styles.windowCard}>
-              <p style={{ fontSize: '0.82rem', color: '#44474e', margin: '0 0 1rem 0' }}>
+              <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#44474e)", margin: '0 0 1rem 0' }}>
                 Promote all students in this campus to the next semester.
                 Students in their final semester (10) will be removed from the system.
                 This action cannot be undone.
@@ -781,7 +781,7 @@ export default function DirectorDashboard() {
                     setPromoteError('')
                     setPromoteSuccess('')
                   }}
-                  style={{ background: '#c9a227', color: '#002147' }}
+                  style={{ background: '#c9a227', color: "var(--portal-brand-text,#002147)" }}
                 >
                   Promote All Students →
                 </button>
@@ -790,11 +790,11 @@ export default function DirectorDashboard() {
               {/* Step 1: Show last promotion time and ask to continue */}
               {promoteStep === 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div style={{ background: '#fff8e6', border: '1px solid #f5d78c', borderRadius: '0.6rem', padding: '0.9rem 1rem' }}>
-                    <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#8b6914', margin: '0 0 0.3rem' }}>
+                  <div style={{ background: "var(--portal-warning-bg,#fff8e6)", border: "1px solid var(--portal-warning-border,#f5d78c)", borderRadius: '0.6rem', padding: '0.9rem 1rem' }}>
+                    <p style={{ fontSize: '0.78rem', fontWeight: 700, color: "var(--portal-warning-text,#8b6914)", margin: '0 0 0.3rem' }}>
                       📅 Last Promotion
                     </p>
-                    <p style={{ fontSize: '0.85rem', color: '#44474e', margin: 0 }}>
+                    <p style={{ fontSize: '0.85rem', color: "var(--portal-muted,#44474e)", margin: 0 }}>
                       {lastPromotedAt
                         ? new Date(lastPromotedAt).toLocaleString('en-IN', {
                             day: 'numeric', month: 'long', year: 'numeric',
@@ -803,14 +803,14 @@ export default function DirectorDashboard() {
                         : 'Never promoted on this system'}
                     </p>
                   </div>
-                  <p style={{ fontSize: '0.82rem', color: '#44474e', margin: 0 }}>
+                  <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#44474e)", margin: 0 }}>
                     Please verify the date above before continuing. Only proceed if you intend to start a new semester now.
                   </p>
                   <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                     <button
                       className={styles.primaryBtn}
                       onClick={() => setPromoteStep(2)}
-                      style={{ background: '#c9a227', color: '#002147' }}
+                      style={{ background: '#c9a227', color: "var(--portal-brand-text,#002147)" }}
                     >
                       Continue →
                     </button>
@@ -835,8 +835,8 @@ export default function DirectorDashboard() {
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center' }}>
                       <div style={{
-                        background: '#fdf2f2',
-                        border: '2px solid #f5c6c6',
+                        background: "var(--portal-danger-bg,#fdf2f2)",
+                        border: "2px solid var(--portal-danger-border,#f5c6c6)",
                         borderRadius: '0.75rem',
                         padding: '1.25rem 1.5rem',
                         width: '100%',
@@ -845,10 +845,10 @@ export default function DirectorDashboard() {
                         textAlign: 'center',
                       }}>
                         <p style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>🔒</p>
-                        <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#c0392b', margin: '0 0 0.5rem' }}>
+                        <p style={{ fontSize: '0.92rem', fontWeight: 700, color: "var(--portal-danger-text,#c0392b)", margin: '0 0 0.5rem' }}>
                           Promotion Locked
                         </p>
-                        <p style={{ fontSize: '0.8rem', color: '#44474e', margin: 0, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#44474e)", margin: 0, lineHeight: 1.5 }}>
                           Students were last promoted on{' '}
                           <strong>{new Date(lastPromotedAt!).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
                           <br />
@@ -868,11 +868,11 @@ export default function DirectorDashboard() {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center' }}>
-                    <div style={{ background: '#fdf2f2', border: '1px solid #f5c6c6', borderRadius: '0.6rem', padding: '0.9rem 1rem', width: '100%', maxWidth: '28rem', boxSizing: 'border-box' }}>
-                      <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#c0392b', margin: 0 }}>
+                    <div style={{ background: "var(--portal-danger-bg,#fdf2f2)", border: "1px solid var(--portal-danger-border,#f5c6c6)", borderRadius: '0.6rem', padding: '0.9rem 1rem', width: '100%', maxWidth: '28rem', boxSizing: 'border-box' }}>
+                      <p style={{ fontSize: '0.85rem', fontWeight: 700, color: "var(--portal-danger-text,#c0392b)", margin: 0 }}>
                         ⚠️ Has the next semester officially started?
                       </p>
-                      <p style={{ fontSize: '0.78rem', color: '#44474e', margin: '0.35rem 0 0' }}>
+                      <p style={{ fontSize: '0.78rem', color: "var(--portal-muted,#44474e)", margin: '0.35rem 0 0' }}>
                         This will increment every student&apos;s semester by 1 and permanently remove Semester 10 graduates.
                       </p>
                     </div>
@@ -971,15 +971,15 @@ export default function DirectorDashboard() {
                   marginTop: '1.5rem',
                   padding: '1.25rem',
                   borderRadius: '10px',
-                  background: '#0f172a',
-                  border: '1px solid #334155',
+                  background: "var(--portal-primary,#0f172a)",
+                  border: "1px solid var(--portal-info-border,#334155)",
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.75rem',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: "var(--portal-info-text,#cbd5e1)" }}>
                     Latest Run Status ({allocationAcademicYear || 'Current Year'} • Semester {allocationSemester}):
                   </span>
 
@@ -991,7 +991,7 @@ export default function DirectorDashboard() {
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         background: '#334155',
-                        color: '#94a3b8',
+                        color: "var(--portal-info-text,#94a3b8)",
                       }}
                     >
                       Not Started
@@ -1004,7 +1004,7 @@ export default function DirectorDashboard() {
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         background: 'rgba(245, 158, 11, 0.2)',
-                        color: '#fbbf24',
+                        color: "var(--portal-warning-text,#fbbf24)",
                         border: '1px solid rgba(245, 158, 11, 0.4)',
                         display: 'flex',
                         alignItems: 'center',
@@ -1022,7 +1022,7 @@ export default function DirectorDashboard() {
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         background: 'rgba(34, 197, 94, 0.2)',
-                        color: '#4ade80',
+                        color: "var(--portal-success-text,#4ade80)",
                         border: '1px solid rgba(34, 197, 94, 0.4)',
                       }}
                     >
@@ -1036,7 +1036,7 @@ export default function DirectorDashboard() {
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#f87171',
+                        color: "var(--portal-danger-text,#f87171)",
                         border: '1px solid rgba(239, 68, 68, 0.4)',
                       }}
                     >
@@ -1046,7 +1046,7 @@ export default function DirectorDashboard() {
                 </div>
 
                 {allocationRun && (
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <div>
                       Triggered at: <strong>{new Date(allocationRun.triggered_at).toLocaleString()}</strong>
                     </div>
@@ -1066,19 +1066,19 @@ export default function DirectorDashboard() {
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                           gap: '0.5rem',
-                          color: '#f8fafc',
+                          color: "var(--portal-info-text,#f8fafc)",
                         }}
                       >
                         <div>Total Students: <strong>{allocationRun.total_students ?? 0}</strong></div>
-                        <div>Fully Allocated: <strong style={{ color: '#4ade80' }}>{allocationRun.fully_allocated ?? 0}</strong></div>
-                        <div>Partially Allocated: <strong style={{ color: '#fbbf24' }}>{allocationRun.partially_allocated ?? 0}</strong></div>
-                        <div>Unallocated: <strong style={{ color: '#f87171' }}>{allocationRun.unallocated ?? 0}</strong></div>
+                        <div>Fully Allocated: <strong style={{ color: "var(--portal-success-text,#4ade80)" }}>{allocationRun.fully_allocated ?? 0}</strong></div>
+                        <div>Partially Allocated: <strong style={{ color: "var(--portal-warning-text,#fbbf24)" }}>{allocationRun.partially_allocated ?? 0}</strong></div>
+                        <div>Unallocated: <strong style={{ color: "var(--portal-danger-text,#f87171)" }}>{allocationRun.unallocated ?? 0}</strong></div>
                       </div>
                     )}
                     {allocationRun.error_message && (
                       <div
                         style={{
-                          color: '#f87171',
+                          color: "var(--portal-danger-text,#f87171)",
                           background: 'rgba(239,68,68,0.1)',
                           border: '1px solid rgba(239,68,68,0.25)',
                           padding: '0.65rem 0.85rem',
@@ -1091,7 +1091,7 @@ export default function DirectorDashboard() {
                       >
                         <div>
                           <div><strong>Last Run Error:</strong> {allocationRun.error_message}</div>
-                          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.75rem', color: "var(--portal-info-text,#94a3b8)" }}>
                             Click &quot;Retry Course Allocation&quot; below to trigger a clean run with the current schema.
                           </p>
                         </div>
@@ -1111,7 +1111,7 @@ export default function DirectorDashboard() {
                           style={{
                             background: 'rgba(239,68,68,0.15)',
                             border: '1px solid rgba(239,68,68,0.4)',
-                            color: '#f87171',
+                            color: "var(--portal-danger-text,#f87171)",
                             borderRadius: '4px',
                             padding: '0.3rem 0.6rem',
                             fontSize: '0.75rem',
@@ -1136,7 +1136,7 @@ export default function DirectorDashboard() {
                     borderRadius: '8px',
                     background: 'rgba(245, 158, 11, 0.1)',
                     border: '1px solid rgba(245, 158, 11, 0.3)',
-                    color: '#fbbf24',
+                    color: "var(--portal-warning-text,#fbbf24)",
                     fontSize: '0.85rem',
                     display: 'flex',
                     alignItems: 'center',
@@ -1146,7 +1146,7 @@ export default function DirectorDashboard() {
                   <span style={{ fontSize: '1.1rem' }}>⚠️</span>
                   <div>
                     <strong>Registration Window is Currently Open</strong>
-                    <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    <div style={{ color: "var(--portal-info-text,#cbd5e1)", fontSize: '0.8rem', marginTop: '0.2rem' }}>
                       Student submissions are active (Deadline: {currentDeadline ? new Date(currentDeadline).toLocaleString() : 'Not configured'}). Academic protocol requires the registration window to close before course allocation can execute.
                     </div>
                   </div>
@@ -1159,7 +1159,7 @@ export default function DirectorDashboard() {
                     borderRadius: '8px',
                     background: 'rgba(34, 197, 94, 0.1)',
                     border: '1px solid rgba(34, 197, 94, 0.3)',
-                    color: '#4ade80',
+                    color: "var(--portal-success-text,#4ade80)",
                     fontSize: '0.85rem',
                     display: 'flex',
                     alignItems: 'center',
@@ -1169,7 +1169,7 @@ export default function DirectorDashboard() {
                   <span style={{ fontSize: '1.1rem' }}>✓</span>
                   <div>
                     <strong>Registration Window is Closed</strong>
-                    <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    <div style={{ color: "var(--portal-info-text,#94a3b8)", fontSize: '0.8rem', marginTop: '0.2rem' }}>
                       Student preference submissions are frozen and locked. Ready for deterministic course allocation.
                     </div>
                   </div>
@@ -1211,8 +1211,8 @@ export default function DirectorDashboard() {
                   </button>
                 </div>
                 {allocationRun?.status === 'completed' && (
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: '#10b981', fontSize: '1rem' }}>🔒</span>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: "var(--portal-success-text,#10b981)", fontSize: '1rem' }}>🔒</span>
                     In production, allocation can only be executed once per semester per academic year. Students can now make direct slot changes for available seats.
                   </p>
                 )}
@@ -1235,8 +1235,8 @@ export default function DirectorDashboard() {
               >
                 <div
                   style={{
-                    background: '#0f172a',
-                    border: '1px solid #ef4444',
+                    background: "var(--portal-primary,#0f172a)",
+                    border: "1px solid var(--portal-danger-border,#ef4444)",
                     borderRadius: '12px',
                     padding: '1.75rem',
                     maxWidth: '480px',
@@ -1246,13 +1246,13 @@ export default function DirectorDashboard() {
                     gap: '1rem',
                   }}
                 >
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f87171', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: "var(--portal-danger-text,#f87171)", margin: 0 }}>
                     ⚠️ Re-Run Allocation Confirmation
                   </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                     This will reset all elective allocations including any manual HOD placements. Fixed slot assignments are preserved.
                   </p>
-                  <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+                  <p style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", margin: 0 }}>
                     Are you sure you want to proceed with re-running the allocation engine for Semester {allocationSemester}?
                   </p>
 
@@ -1292,8 +1292,8 @@ export default function DirectorDashboard() {
               >
                 <div
                   style={{
-                    background: '#0f172a',
-                    border: '1px solid #f59e0b',
+                    background: "var(--portal-primary,#0f172a)",
+                    border: "1px solid var(--portal-warning-border,#f59e0b)",
                     borderRadius: '12px',
                     padding: '1.75rem',
                     maxWidth: '500px',
@@ -1303,13 +1303,13 @@ export default function DirectorDashboard() {
                     gap: '1rem',
                   }}
                 >
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fbbf24', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: "var(--portal-warning-text,#fbbf24)", margin: 0 }}>
                     ⚠️ Registration Window Still Open
                   </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                     The course registration window is currently <strong>OPEN</strong>. According to academic protocol, student preference submissions must be closed and frozen before executing the course allocation engine.
                   </p>
-                  <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+                  <p style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", margin: 0 }}>
                     Would you like to close the registration window immediately and proceed with running course allocation?
                   </p>
 

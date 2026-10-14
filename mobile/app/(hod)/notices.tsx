@@ -5,6 +5,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useTheme } from '../../src/hooks/useTheme';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
+import { NoticesSchema } from '../../src/api/schemas/portal.schema';
 import { queryClient, queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
@@ -26,7 +27,7 @@ export default function HodNoticesScreen() {
   // 1. Fetch notices
   const { data: notices, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.hod.notices(deptId),
-    queryFn: () => apiClient.get(`${API_ENDPOINTS.NOTICES}?department_id=${deptId}`),
+    queryFn: () => apiClient.get(`${API_ENDPOINTS.NOTICES}?department_id=${deptId}`, { schema: NoticesSchema }),
     enabled: !!deptId,
   });
 

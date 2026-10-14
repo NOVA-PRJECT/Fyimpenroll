@@ -7,14 +7,14 @@
   font-family: system-ui, -apple-system, sans-serif;
   min-height: 100dvh;
   width: 100%;
-  background-color: #f0f2f5;
+  background-color: var(--portal-canvas,#f0f2f5);
   display: flex;
   flex-direction: column;
 }
 
 /* ── UNIFIED EXECUTIVE TOP BAR ── */
 .topBar {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   padding: 0.4rem 1.25rem;
   display: flex;
   align-items: center;
@@ -63,7 +63,7 @@
 }
 
 .topBarTitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.85rem;
   font-weight: 700;
   margin: 0;
@@ -71,7 +71,7 @@
 }
 
 .topBarSubtitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.65rem;
   font-weight: 600;
   margin: 0;
@@ -99,7 +99,7 @@
 .directorName {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   margin-bottom: 0.3rem;
   line-height: 1.2;
@@ -122,7 +122,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -136,7 +136,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   white-space: nowrap;
   overflow: hidden;
@@ -179,7 +179,7 @@
 }
 
 .logoutBtn:hover {
-  background: #001633;
+  background: var(--portal-primary,#001633);
   border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   transform: translateY(-1px);
@@ -202,8 +202,8 @@
 .tabBar {
   display: flex;
   width: 100%;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
   padding: 0;
   box-sizing: border-box;
   overflow-x: auto;
@@ -225,7 +225,7 @@
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   background: transparent;
   border: none;
   border-bottom: 2.5px solid transparent;
@@ -235,15 +235,15 @@
 }
 
 .tabBtn:hover {
-  color: #002147;
-  background: #f8fafc;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .tabActive {
-  color: #002147;
-  border-bottom-color: #002147;
+  color: var(--portal-brand-text,#002147);
+  border-bottom-color: var(--portal-info-border,#002147);
   font-weight: 700;
-  background: #f0f4f8;
+  background: var(--portal-info-bg,#f0f4f8);
 }
 
 /* ── MAIN CONTENT ── */
@@ -259,7 +259,7 @@
 .sectionTitle {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0 0 0.85rem 0;
@@ -268,8 +268,8 @@
 
 /* Centered Cards & Containers */
 .windowCard {
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
   padding: 1.5rem;
   margin-bottom: 1.25rem;
@@ -285,13 +285,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  background: #f0faf4;
-  border: 1px solid #a8d5b5;
+  background: var(--portal-success-bg,#f0faf4);
+  border: 1px solid var(--portal-strong-border,#a8d5b5);
   border-radius: 0.6rem;
   padding: 0.65rem 0.9rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #1a6b3c;
+  color: var(--portal-success-text,#1a6b3c);
   margin-bottom: 1rem;
   width: 100%;
   max-width: 28rem;
@@ -302,13 +302,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  background: #fdf2f2;
-  border: 1px solid #f5c6c6;
+  background: var(--portal-danger-bg,#fdf2f2);
+  border: 1px solid var(--portal-danger-border,#f5c6c6);
   border-radius: 0.6rem;
   padding: 0.65rem 0.9rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #c0392b;
+  color: var(--portal-danger-text,#c0392b);
   margin-bottom: 1rem;
   width: 100%;
   max-width: 28rem;
@@ -344,7 +344,7 @@
 .label {
   font-size: 0.68rem;
   font-weight: 600;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-align: center;
@@ -355,9 +355,9 @@
   padding: 0.6rem 0.85rem;
   font-family: inherit;
   font-size: 0.85rem;
-  color: #191c1d;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   transition: border-color 0.15s ease;
@@ -368,25 +368,25 @@
 }
 
 .input:focus {
-  border-color: #002147;
-  background: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-surface,#ffffff);
 }
 
 .fieldHint {
   font-size: 0.68rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   margin: 0.2rem 0 0 0;
   line-height: 1.4;
   text-align: center;
 }
 
 .readOnlyField {
-  background: #f8f9fa;
+  background: var(--portal-canvas,#f8f9fa);
   padding: 0.6rem 0.85rem;
-  border: 1.5px solid #dde1e7;
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   font-size: 0.85rem;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -397,8 +397,8 @@
 
 .autoLabel {
   font-size: 0.65rem;
-  background: #e0e4ec;
-  color: #44474e;
+  background: var(--portal-info-bg,#e0e4ec);
+  color: var(--portal-muted,#44474e);
   padding: 0.15rem 0.4rem;
   border-radius: 0.3rem;
   font-weight: 600;
@@ -411,7 +411,7 @@
   font-size: 0.82rem;
   font-weight: 700;
   color: #ffffff;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
@@ -423,7 +423,7 @@
 }
 
 .primaryBtn:hover:not(:disabled) {
-  background: #001633;
+  background: var(--portal-primary,#001633);
 }
 
 .primaryBtn:disabled {
@@ -432,9 +432,9 @@
 }
 
 .errorBanner {
-  background: #fdf2f2;
-  border: 1px solid #f5c6c6;
-  color: #c0392b;
+  background: var(--portal-danger-bg,#fdf2f2);
+  border: 1px solid var(--portal-danger-border,#f5c6c6);
+  color: var(--portal-danger-text,#c0392b);
   padding: 0.65rem 0.9rem;
   border-radius: 0.6rem;
   font-size: 0.78rem;
@@ -447,9 +447,9 @@
 }
 
 .successBanner {
-  background: #f0faf4;
-  border: 1px solid #a8d5b5;
-  color: #1a6b3c;
+  background: var(--portal-success-bg,#f0faf4);
+  border: 1px solid var(--portal-strong-border,#a8d5b5);
+  color: var(--portal-success-text,#1a6b3c);
   padding: 0.65rem 0.9rem;
   border-radius: 0.6rem;
   font-size: 0.78rem;
@@ -467,7 +467,7 @@
   height: 0.8rem;
   border: 2px solid rgba(255,255,255,0.3);
   border-radius: 50%;
-  border-top-color: #fff;
+  border-top-color: var(--portal-border,#fff);
   animation: spin 0.8s linear infinite;
   margin-right: 0.4rem;
 }

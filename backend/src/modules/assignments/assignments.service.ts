@@ -17,6 +17,18 @@ export class AssignmentsService {
     private readonly auditLogger: AuditLoggerService
   ) {}
 
+  private async resolveAcademicYear(campusId: string | null | undefined, academicYear?: string) {
+    if (!campusId) throw new BadRequestException('A host campus is required for teacher assignments.');
+    if (academicYear?.trim()) return academicYear.trim();
+    const { data: settings, error } = await this.supabase.admin
+      .from('campus_settings').select('academic_year').eq('campus_id', campusId).maybeSingle();
+    if (error) throw new InternalServerErrorException('Unable to load the host campus academic year.');
+    if (!settings?.academic_year?.trim()) {
+      throw new BadRequestException('Configure the host campus academic year before assigning teachers.');
+    }
+    return settings.academic_year.trim();
+  }
+
   /**
    * Returns all courses in the HOD's department, each with their currently assigned teachers,
    * plus the department faculty roster for selection.
@@ -170,15 +182,7 @@ export class AssignmentsService {
 
     // Resolve campus and term identity
     const campusId = opts?.campus_id || user.campus_id;
-    let academicYear = opts?.academic_year;
-    if (!academicYear) {
-      const { data: settings } = await this.supabase.admin
-        .from('campus_settings')
-        .select('academic_year')
-        .eq('campus_id', campusId)
-        .maybeSingle();
-      academicYear = settings?.academic_year || '2025-26';
-    }
+    const academicYear = await this.resolveAcademicYear(campusId, opts?.academic_year);
     const semester = opts?.semester ?? course.semester ?? null;
 
     const assignedAt = new Date().toISOString();
@@ -352,6 +356,13 @@ export class AssignmentsService {
     }
 
     const courseMap = new Map((courses || []).map((c) => [c.id, c]));
+    const campusYears = new Map<string | null | undefined, string>();
+    for (const campusId of new Set(assignments.filter((a) => !a.academic_year?.trim()).map((a) => a.campus_id || user.campus_id))) {
+      campusYears.set(campusId, await this.resolveAcademicYear(campusId));
+    }
+    if (assignments.some((a) => !(a.campus_id || user.campus_id))) {
+      throw new BadRequestException('A host campus is required for teacher assignments.');
+    }
     const assignedAt = new Date().toISOString();
     const rowsToUpsert = assignments.map((a) => ({
       teacher_id: a.teacher_id,
@@ -359,7 +370,7 @@ export class AssignmentsService {
       assigned_by: user.userId,
       assigned_at: assignedAt,
       campus_id: a.campus_id || user.campus_id,
-      academic_year: a.academic_year || '2025-26',
+      academic_year: a.academic_year?.trim() || campusYears.get(a.campus_id || user.campus_id)!,
       semester: a.semester ?? courseMap.get(a.course_id)?.semester ?? null,
     }));
 

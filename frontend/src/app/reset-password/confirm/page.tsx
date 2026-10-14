@@ -13,6 +13,7 @@ import {
   getPasswordLevel,
   validatePassword,
 } from '@/core/validation/passwordValidation'
+import { AlertCircle, ArrowLeft, ArrowRight, Circle, CircleCheck, CircleX, Eye, EyeOff, Info, KeyRound, Link2Off, LoaderCircle, Lock, LockKeyhole, X } from 'lucide-react'
 
 function ConfirmResetForm() {
   const router = useRouter()
@@ -247,18 +248,16 @@ function ConfirmResetForm() {
   if (status === 'checking') {
     return (
       <div className="w-full max-w-[460px] flex flex-col items-center">
-        <div className="w-full bg-white rounded-xl shadow-md overflow-hidden relative border border-[#E2E8F0]">
-          <div className="bg-[#082042] py-7 px-8 text-center">
+        <div className="w-full bg-[color:var(--portal-surface,white)] rounded-xl shadow-md overflow-hidden relative border border-[color:var(--portal-strong-border,#E2E8F0)]">
+          <div className="bg-[color:var(--portal-primary,#082042)] py-7 px-8 text-center">
             <div className="w-10 h-10 rounded-full bg-white/10 mx-auto mb-3.5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#f7bd40] text-[20px] animate-spin">
-                progress_activity
-              </span>
+              <LoaderCircle size={20} className="text-[color:var(--portal-warning-text,#f7bd40)] animate-spin shrink-0" aria-hidden="true" />
             </div>
             <h1 className="font-serif text-2xl text-white font-medium tracking-tight">
               Verifying Reset Link
             </h1>
             <div className="w-12 h-0.5 bg-[#E0A92C] mx-auto my-3 rounded-full" />
-            <p className="text-xs text-[#dce9ff] max-w-xs mx-auto leading-relaxed">
+            <p className="text-xs text-[color:var(--portal-info-text,#dce9ff)] max-w-xs mx-auto leading-relaxed">
               Validating your security session with Kannur University...
             </p>
           </div>
@@ -271,27 +270,23 @@ function ConfirmResetForm() {
   if (status === 'error') {
     return (
       <div className="w-full max-w-[460px] flex flex-col items-center">
-        <div className="w-full bg-white rounded-xl shadow-md overflow-hidden relative border border-[#E2E8F0]">
-          <div className="bg-[#082042] py-7 px-8 text-center">
+        <div className="w-full bg-[color:var(--portal-surface,white)] rounded-xl shadow-md overflow-hidden relative border border-[color:var(--portal-strong-border,#E2E8F0)]">
+          <div className="bg-[color:var(--portal-primary,#082042)] py-7 px-8 text-center">
             <div className="w-10 h-10 rounded-full bg-white/10 mx-auto mb-3.5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#f7bd40] text-[20px]">
-                link_off
-              </span>
+              <Link2Off size={20} className="text-[color:var(--portal-warning-text,#f7bd40)] shrink-0" aria-hidden="true" />
             </div>
             <h1 className="font-serif text-2xl text-white font-medium tracking-tight">
               Link Expired
             </h1>
             <div className="w-12 h-0.5 bg-[#E0A92C] mx-auto my-3 rounded-full" />
-            <p className="text-xs text-[#dce9ff] max-w-xs mx-auto leading-relaxed">
+            <p className="text-xs text-[color:var(--portal-info-text,#dce9ff)] max-w-xs mx-auto leading-relaxed">
               {errorMessage || 'This reset link has expired or has already been used.'}
             </p>
           </div>
-          <div className="p-6 md:p-8 space-y-4 bg-white">
+          <div className="p-6 md:p-8 space-y-4 bg-[color:var(--portal-surface,white)]">
             {/* Anti-Spam Bot Pre-fetch Tip */}
-            <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-lg text-left text-xs text-amber-950 leading-relaxed flex items-start gap-2.5">
-              <span className="material-symbols-outlined text-amber-600 text-[18px] shrink-0 mt-0.5">
-                info
-              </span>
+            <div className="p-3.5 bg-[color:var(--portal-warning-bg,#fffbeb)] border border-[color:var(--portal-warning-border,#fde68a)]/80 rounded-lg text-left text-xs text-amber-950 leading-relaxed flex items-start gap-2.5">
+              <Info size={18} className="text-[color:var(--portal-warning-text,#d97706)] shrink-0 mt-0.5" aria-hidden="true" />
               <span>
                 <strong>Spam Folder Notice:</strong> If this email arrived in your{' '}
                 <strong>Spam</strong> or <strong>Junk</strong> folder, your email provider
@@ -303,17 +298,17 @@ function ConfirmResetForm() {
 
             <Link
               href="/reset-password"
-              className="w-full h-11 bg-[#082042] hover:bg-[#0B192C] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+              className="w-full h-11 bg-[color:var(--portal-primary,#082042)] hover:bg-[color:var(--portal-primary,#0B192C)] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
               <span>Request a new link</span>
-              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              <ArrowRight size={16} className="shrink-0" aria-hidden="true" />
             </Link>
             <div className="pt-1 text-center">
               <Link
                 href="/login"
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#44474e] hover:text-[#082042] transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--portal-muted,#44474e)] hover:text-[color:var(--portal-brand-text,#082042)] transition-colors"
               >
-                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <ArrowLeft size={16} className="shrink-0" aria-hidden="true" />
                 <span>Back to Sign In</span>
               </Link>
             </div>
@@ -326,39 +321,36 @@ function ConfirmResetForm() {
   // ── Step E: Password Reset Form ───────────────────────────────────────────
   return (
     <div className="w-full max-w-[460px] flex flex-col items-center">
-      <div className="w-full bg-white rounded-xl shadow-md overflow-hidden relative border border-[#E2E8F0]">
+      <div className="w-full bg-[color:var(--portal-surface,white)] rounded-xl shadow-md overflow-hidden relative border border-[color:var(--portal-strong-border,#E2E8F0)]">
         {/* Header */}
-        <div className="bg-[#082042] py-7 px-8 text-center">
+        <div className="bg-[color:var(--portal-primary,#082042)] py-7 px-8 text-center">
           <div className="w-10 h-10 rounded-full bg-white/10 mx-auto mb-3.5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-[#f7bd40] text-[20px]">
-              lock_reset
-            </span>
+            <KeyRound size={20} className="text-[color:var(--portal-warning-text,#f7bd40)] shrink-0" aria-hidden="true" />
           </div>
           <h1 className="font-serif text-2xl text-white font-medium tracking-tight">
             Set New Password
           </h1>
           <div className="w-12 h-0.5 bg-[#E0A92C] mx-auto my-3 rounded-full" />
-          <p className="text-xs text-[#dce9ff] max-w-xs mx-auto leading-relaxed">
+          <p className="text-xs text-[color:var(--portal-info-text,#dce9ff)] max-w-xs mx-auto leading-relaxed">
             Choose a strong password for your FYIMP portal account.
           </p>
         </div>
 
         {/* Body */}
-        <div className="p-6 md:p-8 space-y-5 bg-white">
+        <div className="p-6 md:p-8 space-y-5 bg-[color:var(--portal-surface,white)]">
           {/* Submit Error Banner */}
           {submitError && (
-            <div className="rounded-lg p-3.5 flex flex-col gap-2.5 text-xs bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a]">
+            <div className="rounded-lg p-3.5 flex flex-col gap-2.5 text-xs bg-[color:var(--portal-danger-bg,#ffdad6)] border border-[color:var(--portal-danger-border,#ba1a1a)]/30 text-[color:var(--portal-danger-text,#93000a)]">
               <div className="flex items-start gap-3">
-                <span className="material-symbols-outlined text-[#ba1a1a] text-[18px] mt-0.5 shrink-0">
-                  error
-                </span>
+                <AlertCircle size={18} className="text-[color:var(--portal-danger-text,#ba1a1a)] mt-0.5 shrink-0" aria-hidden="true" />
                 <span className="flex-1 leading-relaxed">{submitError}</span>
                 <button
                   type="button"
                   onClick={() => setSubmitError('')}
-                  className="text-[#93000a] hover:opacity-70"
+                  aria-label="Dismiss error"
+                  className="text-[color:var(--portal-danger-text,#93000a)] hover:opacity-70"
                 >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
+                  <X size={16} className="shrink-0" aria-hidden="true" />
                 </button>
               </div>
               {canRetrySync && (
@@ -380,19 +372,17 @@ function ConfirmResetForm() {
             {/* New Password Field */}
             <div className="flex flex-col gap-1.5">
               <label
-                className="text-[11px] font-bold text-[#44474e] uppercase tracking-wider"
+                className="text-[11px] font-bold text-[color:var(--portal-muted,#44474e)] uppercase tracking-wider"
                 htmlFor="newPassword"
               >
                 New Password
               </label>
-              <div className="h-11 px-3.5 bg-[#EEF3FB] border border-[#CBD5E1] rounded-lg text-sm focus-within:bg-white focus-within:border-[#082042] focus-within:ring-2 focus-within:ring-[#082042]/15 flex items-center gap-2.5 transition-all">
-                <span className="material-symbols-outlined text-[#75777f] text-[18px] shrink-0">
-                  lock
-                </span>
+              <div className="h-11 px-3.5 bg-[color:var(--portal-info-bg,#EEF3FB)] border border-[color:var(--portal-strong-border,#CBD5E1)] rounded-lg text-sm focus-within:bg-[color:var(--portal-surface,white)] focus-within:border-[color:var(--portal-info-border,#082042)] focus-within:ring-2 focus-within:ring-[color:var(--portal-info-border,#082042)]/15 flex items-center gap-2.5 transition-all">
+                <Lock size={18} className="text-[color:var(--portal-muted,#75777f)] shrink-0" aria-hidden="true" />
                 <input
                   id="newPassword"
                   type={showPassword ? 'text' : 'password'}
-                  className="text-sm text-[#0B192C] placeholder:text-[#75777f] w-full bg-transparent outline-none border-none p-0 focus:ring-0"
+                  className="text-sm text-[color:var(--portal-brand-text,#0B192C)] placeholder:text-[color:var(--portal-muted,#75777f)] w-full bg-transparent outline-none border-none p-0 focus:ring-0"
                   placeholder="Min. 10 characters"
                   value={password}
                   onChange={(e) => {
@@ -405,12 +395,11 @@ function ConfirmResetForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#75777f] hover:text-[#082042] transition-colors shrink-0"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="text-[color:var(--portal-muted,#75777f)] hover:text-[color:var(--portal-brand-text,#082042)] transition-colors shrink-0"
                   tabIndex={-1}
                 >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
+                  {showPassword ? <EyeOff size={18} className="shrink-0" aria-hidden="true" /> : <Eye size={18} className="shrink-0" aria-hidden="true" />}
                 </button>
               </div>
 
@@ -435,13 +424,8 @@ function ConfirmResetForm() {
                 <ul className="mt-1 space-y-1">
                   {checks.map((c) => (
                     <li key={c.label} className="flex items-center gap-2 text-[11px]">
-                      <span
-                        className="material-symbols-outlined text-[14px]"
-                        style={{ color: c.met ? '#22c55e' : '#94a3b8' }}
-                      >
-                        {c.met ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span style={{ color: c.met ? '#166534' : '#64748b' }}>{c.label}</span>
+                      {c.met ? <CircleCheck size={14} className="shrink-0" aria-hidden="true" style={{ color: c.met ? "var(--portal-success-text,#22c55e)" : "var(--portal-info-text,#94a3b8)" }} /> : <Circle size={14} className="shrink-0" aria-hidden="true" style={{ color: c.met ? "var(--portal-success-text,#22c55e)" : "var(--portal-info-text,#94a3b8)" }} />}
+                      <span style={{ color: c.met ? "var(--portal-success-text,#166534)" : "var(--portal-muted,#64748b)" }}>{c.label}</span>
                     </li>
                   ))}
                 </ul>
@@ -451,19 +435,17 @@ function ConfirmResetForm() {
             {/* Confirm Password Field */}
             <div className="flex flex-col gap-1.5">
               <label
-                className="text-[11px] font-bold text-[#44474e] uppercase tracking-wider"
+                className="text-[11px] font-bold text-[color:var(--portal-muted,#44474e)] uppercase tracking-wider"
                 htmlFor="confirmPassword"
               >
                 Confirm New Password
               </label>
-              <div className="h-11 px-3.5 bg-[#EEF3FB] border border-[#CBD5E1] rounded-lg text-sm focus-within:bg-white focus-within:border-[#082042] focus-within:ring-2 focus-within:ring-[#082042]/15 flex items-center gap-2.5 transition-all">
-                <span className="material-symbols-outlined text-[#75777f] text-[18px] shrink-0">
-                  lock_clock
-                </span>
+              <div className="h-11 px-3.5 bg-[color:var(--portal-info-bg,#EEF3FB)] border border-[color:var(--portal-strong-border,#CBD5E1)] rounded-lg text-sm focus-within:bg-[color:var(--portal-surface,white)] focus-within:border-[color:var(--portal-info-border,#082042)] focus-within:ring-2 focus-within:ring-[color:var(--portal-info-border,#082042)]/15 flex items-center gap-2.5 transition-all">
+                <LockKeyhole size={18} className="text-[color:var(--portal-muted,#75777f)] shrink-0" aria-hidden="true" />
                 <input
                   id="confirmPassword"
                   type={showConfirm ? 'text' : 'password'}
-                  className="text-sm text-[#0B192C] placeholder:text-[#75777f] w-full bg-transparent outline-none border-none p-0 focus:ring-0"
+                  className="text-sm text-[color:var(--portal-brand-text,#0B192C)] placeholder:text-[color:var(--portal-muted,#75777f)] w-full bg-transparent outline-none border-none p-0 focus:ring-0"
                   placeholder="Repeat your password"
                   value={confirmPassword}
                   onChange={(e) => {
@@ -476,12 +458,11 @@ function ConfirmResetForm() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="text-[#75777f] hover:text-[#082042] transition-colors shrink-0"
+                  aria-label={showConfirm ? 'Hide confirmation password' : 'Show confirmation password'}
+                  className="text-[color:var(--portal-muted,#75777f)] hover:text-[color:var(--portal-brand-text,#082042)] transition-colors shrink-0"
                   tabIndex={-1}
                 >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {showConfirm ? 'visibility_off' : 'visibility'}
-                  </span>
+                  {showConfirm ? <EyeOff size={18} className="shrink-0" aria-hidden="true" /> : <Eye size={18} className="shrink-0" aria-hidden="true" />}
                 </button>
               </div>
 
@@ -489,11 +470,9 @@ function ConfirmResetForm() {
               {confirmPassword && (
                 <p
                   className="text-[11px] flex items-center gap-1.5 mt-0.5"
-                  style={{ color: password === confirmPassword ? '#16a34a' : '#dc2626' }}
+                  style={{ color: password === confirmPassword ? "var(--portal-success-text,#16a34a)" : "var(--portal-danger-text,#dc2626)" }}
                 >
-                  <span className="material-symbols-outlined text-[13px]">
-                    {password === confirmPassword ? 'check_circle' : 'cancel'}
-                  </span>
+                  {password === confirmPassword ? <CircleCheck size={13} className="shrink-0" aria-hidden="true" /> : <CircleX size={13} className="shrink-0" aria-hidden="true" />}
                   {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
                 </p>
               )}
@@ -501,21 +480,19 @@ function ConfirmResetForm() {
 
             {/* Submit Button */}
             <button
-              className="w-full h-11 bg-[#082042] hover:bg-[#0B192C] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
+              className="w-full h-11 bg-[color:var(--portal-primary,#082042)] hover:bg-[color:var(--portal-primary,#0B192C)] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-[0.99] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
               type="submit"
               disabled={submitting}
             >
               {submitting ? (
                 <>
-                  <span className="material-symbols-outlined text-[16px] animate-spin">
-                    progress_activity
-                  </span>
+                  <LoaderCircle size={16} className="animate-spin shrink-0" aria-hidden="true" />
                   <span>Updating Password...</span>
                 </>
               ) : (
                 <>
                   <span>Set New Password</span>
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  <ArrowRight size={16} className="shrink-0" aria-hidden="true" />
                 </>
               )}
             </button>
@@ -524,20 +501,20 @@ function ConfirmResetForm() {
           <div className="pt-1 text-center">
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#44474e] hover:text-[#082042] transition-colors py-1"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[color:var(--portal-muted,#44474e)] hover:text-[color:var(--portal-brand-text,#082042)] transition-colors py-1"
             >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              <ArrowLeft size={16} className="shrink-0" aria-hidden="true" />
               <span>Back to Sign In</span>
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 text-center text-xs text-slate-500">
+      <div className="mt-6 text-center text-xs text-[color:var(--portal-muted,#64748b)]">
         Need help?{' '}
         <a
           href="mailto:itcentre@kannuruniversity.ac.in"
-          className="font-medium text-slate-700 underline underline-offset-2 hover:text-[#082042] transition-colors"
+          className="font-medium text-[color:var(--portal-info-text,#334155)] underline underline-offset-2 hover:text-[color:var(--portal-brand-text,#082042)] transition-colors"
         >
           Contact support
         </a>
@@ -548,31 +525,29 @@ function ConfirmResetForm() {
 
 export default function ConfirmResetPage() {
   return (
-    <div className="bg-[#f8f9ff] font-sans text-[#0b1c30] min-h-screen flex flex-col justify-between selection:bg-[#ffdea4] selection:text-[#261900]">
+    <div className="bg-[color:var(--portal-canvas,#f8f9ff)] font-sans text-[color:var(--portal-brand-text,#0b1c30)] min-h-screen flex flex-col justify-between selection:bg-[color:var(--portal-warning-bg,#ffdea4)] selection:text-[color:var(--portal-warning-text,#261900)]">
       <PortalHeader
         rightAction={
           <Link
             href="/login"
-            className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors inline-flex items-center gap-1.5"
+            className="text-xs font-medium text-[color:var(--portal-info-text,#475569)] hover:text-[color:var(--portal-brand-text,#0f172a)] transition-colors inline-flex items-center gap-1.5"
           >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            <ArrowLeft size={16} className="shrink-0" aria-hidden="true" />
             <span>Back to Sign In</span>
           </Link>
         }
       />
 
-      <main className="w-full flex-1 bg-[#f8f9ff] flex items-center justify-center p-4 md:p-6">
+      <main className="w-full flex-1 bg-[color:var(--portal-canvas,#f8f9ff)] flex items-center justify-center p-4 md:p-6">
         <div className="flex flex-col w-full">
           <div className="w-full flex items-center justify-center py-6 md:py-10">
             <Suspense
               fallback={
                 <div className="w-full max-w-[460px]">
-                  <div className="w-full bg-white rounded-xl shadow-md border border-[#E2E8F0] overflow-hidden">
-                    <div className="bg-[#082042] py-7 px-8 text-center">
+                  <div className="w-full bg-[color:var(--portal-surface,white)] rounded-xl shadow-md border border-[color:var(--portal-strong-border,#E2E8F0)] overflow-hidden">
+                    <div className="bg-[color:var(--portal-primary,#082042)] py-7 px-8 text-center">
                       <div className="w-10 h-10 rounded-full bg-white/10 mx-auto mb-3.5 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[#f7bd40] text-[20px] animate-spin">
-                          progress_activity
-                        </span>
+                        <LoaderCircle size={20} className="text-[color:var(--portal-warning-text,#f7bd40)] animate-spin shrink-0" aria-hidden="true" />
                       </div>
                       <h1 className="font-serif text-2xl text-white font-medium tracking-tight">
                         Verifying Link
@@ -580,7 +555,7 @@ export default function ConfirmResetPage() {
                       <div className="w-12 h-0.5 bg-[#E0A92C] mx-auto my-3 rounded-full" />
                     </div>
                     <div className="p-6 text-center">
-                      <p className="text-xs text-[#75777f]">Verifying your reset link...</p>
+                      <p className="text-xs text-[color:var(--portal-muted,#75777f)]">Verifying your reset link...</p>
                     </div>
                   </div>
                 </div>

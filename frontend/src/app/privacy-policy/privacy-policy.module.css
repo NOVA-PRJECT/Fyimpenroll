@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   background: #0a0a0a;
-  color: #e4e4e7;
+  color: var(--portal-subtle,#e4e4e7);
   font-family: inherit;
 }
 
@@ -49,7 +49,7 @@
 }
 
 .backButton {
-  color: #d4af37;
+  color: var(--portal-warning-text,#d4af37);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
@@ -85,7 +85,7 @@
 .versionBadge {
   display: inline-block;
   background: rgba(212, 175, 55, 0.15);
-  color: #d4af37;
+  color: var(--portal-warning-text,#d4af37);
   border: 1px solid rgba(212, 175, 55, 0.3);
   font-size: 0.75rem;
   font-weight: 600;
@@ -103,7 +103,7 @@
 }
 
 .docSubtitle {
-  color: #a1a1aa;
+  color: var(--portal-subtle,#a1a1aa);
   font-size: 0.9rem;
   margin: 0;
 }
@@ -123,12 +123,12 @@
   font-weight: 600;
   color: #ffffff;
   margin-bottom: 0.75rem;
-  border-left: 3px solid #d4af37;
+  border-left: 3px solid var(--portal-warning-border,#d4af37);
   padding-left: 0.75rem;
 }
 
 .section p {
-  color: #d4d4d8;
+  color: var(--portal-subtle,#d4d4d8);
   line-height: 1.7;
   margin-bottom: 0.75rem;
   font-size: 0.95rem;
@@ -140,7 +140,7 @@
 }
 
 .section li {
-  color: #d4d4d8;
+  color: var(--portal-subtle,#d4d4d8);
   line-height: 1.6;
   margin-bottom: 0.4rem;
   font-size: 0.95rem;
@@ -164,7 +164,7 @@
 .dataBlock p {
   margin: 0;
   font-size: 0.9rem;
-  color: #a1a1aa;
+  color: var(--portal-subtle,#a1a1aa);
 }
 
 .highlightBlock {
@@ -173,7 +173,7 @@
 }
 
 .highlightBlock h3 {
-  color: #d4af37;
+  color: var(--portal-warning-text,#d4af37);
 }
 
 .tableWrapper {
@@ -192,7 +192,7 @@
 
 .dataTable th {
   background: rgba(30, 58, 138, 0.35);
-  color: #93c5fd;
+  color: var(--portal-info-text,#93c5fd);
   padding: 0.75rem 1rem;
   font-weight: 600;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -201,7 +201,7 @@
 .dataTable td {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #d4d4d8;
+  color: var(--portal-subtle,#d4d4d8);
   vertical-align: top;
   line-height: 1.5;
 }

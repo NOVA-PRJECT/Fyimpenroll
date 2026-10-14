@@ -1,0 +1,63 @@
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --portal-canvas: #0b1120;
+  --portal-surface: #121d30;
+  --portal-glass: rgb(18 29 48 / 0.94);
+  --portal-surface-soft: #1b2940;
+  --portal-surface-raised: #26364e;
+  --portal-text: #e7edf7;
+  --portal-muted: #a8b7cc;
+  --portal-subtle: #8da0bc;
+  --portal-brand-text: #c5d9ff;
+  --portal-primary: #193858;
+  --portal-on-accent: #122033;
+  --portal-border: #31415a;
+  --portal-strong-border: #52657f;
+  --portal-success-bg: #102d27;
+  --portal-success-text: #7ee2aa;
+  --portal-success-border: #296347;
+  --portal-danger-bg: #361d27;
+  --portal-danger-text: #fda4af;
+  --portal-danger-border: #7f3b4d;
+  --portal-warning-bg: #322819;
+  --portal-warning-text: #f7c975;
+  --portal-warning-border: #785e2e;
+  --portal-info-bg: #172b46;
+  --portal-info-text: #93c5fd;
+  --portal-info-border: #365d8b;
+  --portal-purple-bg: #2c2043;
+  --portal-purple-text: #d8b4fe;
+  --portal-purple-border: #68438b;
+}
+
+html,
+body {
+  background: var(--portal-canvas, #f8f9ff);
+  color: var(--portal-text, #0f172a);
+}
+
+:root[data-theme='dark'] input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--portal-surface) inset !important;
+  -webkit-text-fill-color: var(--portal-text) !important;
+  caret-color: var(--portal-text) !important;
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: var(--portal-strong-border);
+}
+
+:root[data-theme='dark'] .react-flow {
+  --xy-node-background-color: var(--portal-surface);
+  --xy-node-color: var(--portal-text);
+  --xy-node-border: 1px solid var(--portal-border);
+  --xy-controls-button-background-color: var(--portal-surface);
+  --xy-controls-button-background-color-hover: var(--portal-surface-soft);
+  --xy-controls-button-color: var(--portal-text);
+  --xy-controls-button-border-color: var(--portal-border);
+  --xy-attribution-background-color: var(--portal-surface);
+  --xy-attribution-color: var(--portal-muted);
+}

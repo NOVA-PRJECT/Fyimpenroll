@@ -6,11 +6,14 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Param,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common'
 import { Response } from 'express'
 import { StudentService } from './student.service'
+import { StudentPortalService } from './student-portal.service'
 import { AuthGuard } from '../../core/auth/guards/auth.guard'
 import { RolesGuard } from '../../core/auth/guards/roles.guard'
 import { Roles } from '../../core/auth/decorators/roles.decorator'
@@ -40,7 +43,32 @@ const ChangePasswordSchema = z
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('student')
 export class StudentController {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(private readonly studentService: StudentService, private readonly portal: StudentPortalService) {}
+
+  @Get('overview')
+  overview(@CurrentUser() user: AuthUser, @Query('semester') semester?: string) {
+    return this.portal.overview(user, semester)
+  }
+
+  @Get('courses')
+  courses(@CurrentUser() user: AuthUser, @Query('semester') semester?: string) {
+    return this.portal.courses(user, semester)
+  }
+
+  @Get('courses/:id')
+  course(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query('semester') semester?: string) {
+    return this.portal.course(user, id, semester)
+  }
+
+  @Get('attendance')
+  attendance(@CurrentUser() user: AuthUser, @Query('semester') semester?: string) {
+    return this.portal.attendance(user, semester)
+  }
+
+  @Get('timetable')
+  timetable(@CurrentUser() user: AuthUser, @Query('semester') semester?: string) {
+    return this.portal.timetable(user, semester)
+  }
 
   @Get('dashboard-summary')
   async getDashboardSummary(@CurrentUser() user: AuthUser) {

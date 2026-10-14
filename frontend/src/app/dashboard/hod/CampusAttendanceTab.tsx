@@ -121,8 +121,8 @@ export default function CampusAttendanceTab() {
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '6px',
-              background: '#dcfce7',
-              color: '#15803d',
+              background: "var(--portal-success-bg,#dcfce7)",
+              color: "var(--portal-success-text,#15803d)",
               fontSize: '11px',
               fontWeight: 600,
             }}
@@ -140,8 +140,8 @@ export default function CampusAttendanceTab() {
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '6px',
-              background: '#fef3c7',
-              color: '#b45309',
+              background: "var(--portal-warning-bg,#fef3c7)",
+              color: "var(--portal-warning-text,#b45309)",
               fontSize: '11px',
               fontWeight: 600,
             }}
@@ -159,8 +159,8 @@ export default function CampusAttendanceTab() {
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '6px',
-              background: '#fef3c7',
-              color: '#b45309',
+              background: "var(--portal-warning-bg,#fef3c7)",
+              color: "var(--portal-warning-text,#b45309)",
               fontSize: '11px',
               fontWeight: 600,
             }}
@@ -178,8 +178,8 @@ export default function CampusAttendanceTab() {
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '6px',
-              background: '#f1f5f9',
-              color: '#64748b',
+              background: "var(--portal-info-bg,#f1f5f9)",
+              color: "var(--portal-muted,#64748b)",
               fontSize: '11px',
               fontWeight: 500,
             }}
@@ -198,8 +198,8 @@ export default function CampusAttendanceTab() {
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '6px',
-              background: '#fee2e2',
-              color: '#b91c1c',
+              background: "var(--portal-danger-bg,#fee2e2)",
+              color: "var(--portal-danger-text,#b91c1c)",
               fontSize: '11px',
               fontWeight: 600,
             }}
@@ -216,10 +216,10 @@ export default function CampusAttendanceTab() {
       {/* ── Top Header & Campus Info ── */}
       <div
         style={{
-          background: '#ffffff',
+          background: "var(--portal-surface,#ffffff)",
           borderRadius: '12px',
           padding: '1.25rem',
-          border: '1px solid #e2e8f0',
+          border: "1px solid var(--portal-strong-border,#e2e8f0)",
           display: 'flex',
           flexWrap: 'wrap',
           gap: '1rem',
@@ -232,7 +232,7 @@ export default function CampusAttendanceTab() {
             style={{
               fontSize: '1.25rem',
               fontWeight: 700,
-              color: '#002147',
+              color: "var(--portal-brand-text,#002147)",
               margin: 0,
               display: 'flex',
               alignItems: 'center',
@@ -241,7 +241,7 @@ export default function CampusAttendanceTab() {
           >
             <MapPin size={20} color="#c9a227" /> Campus Attendance Monitoring
           </h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0' }}>
+          <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#64748b)", margin: '4px 0 0' }}>
             Daily physical presence verification (Morning arrival and Evening departure) across university campus boundaries.
           </p>
         </div>
@@ -257,9 +257,9 @@ export default function CampusAttendanceTab() {
               style={{
                 padding: '6px 10px',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                border: "1px solid var(--portal-strong-border,#cbd5e1)",
                 fontSize: '13px',
-                background: '#fff',
+                background: "var(--portal-surface,#fff)",
                 outline: 'none',
               }}
             />
@@ -271,14 +271,14 @@ export default function CampusAttendanceTab() {
             style={{
               padding: '7px 12px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#fff',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
+              background: "var(--portal-surface,#fff)",
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '13px',
-              color: '#475569',
+              color: "var(--portal-info-text,#475569)",
             }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -292,9 +292,9 @@ export default function CampusAttendanceTab() {
           style={{
             padding: '10px 14px',
             borderRadius: '8px',
-            background: '#fee2e2',
-            border: '1px solid #f87171',
-            color: '#b91c1c',
+            background: "var(--portal-danger-bg,#fee2e2)",
+            border: "1px solid var(--portal-danger-border,#f87171)",
+            color: "var(--portal-danger-text,#b91c1c)",
             fontSize: '13px',
           }}
         >
@@ -314,9 +314,9 @@ export default function CampusAttendanceTab() {
           {/* Morning Session Card */}
           <div
             style={{
-              background: '#ffffff',
+              background: "var(--portal-surface,#ffffff)",
               borderRadius: '12px',
-              border: '1px solid #e2e8f0',
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               padding: '1rem',
               display: 'flex',
               flexDirection: 'column',
@@ -324,28 +324,28 @@ export default function CampusAttendanceTab() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#002147' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                 🌅 MORNING ARRIVAL (Cutoff: 09:30 AM)
               </span>
-              <span style={{ fontSize: '11px', color: '#64748b' }}>Window closes 01:30 PM</span>
+              <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>Window closes 01:30 PM</span>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-              <div style={{ flex: 1, background: '#f0fdf4', padding: '6px 8px', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#166534', fontWeight: 600 }}>On Time</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#15803d' }}>{data.summary.morning.on_time}</div>
+              <div style={{ flex: 1, background: "var(--portal-success-bg,#f0fdf4)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-success-border,#bbf7d0)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-success-text,#166534)", fontWeight: 600 }}>On Time</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-success-text,#15803d)" }}>{data.summary.morning.on_time}</div>
               </div>
-              <div style={{ flex: 1, background: '#fffbeb', padding: '6px 8px', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#854d0e', fontWeight: 600 }}>Late</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#b45309' }}>{data.summary.morning.late}</div>
+              <div style={{ flex: 1, background: "var(--portal-warning-bg,#fffbeb)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-warning-border,#fde68a)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-warning-text,#854d0e)", fontWeight: 600 }}>Late</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-warning-text,#b45309)" }}>{data.summary.morning.late}</div>
               </div>
-              <div style={{ flex: 1, background: '#fef2f2', padding: '6px 8px', borderRadius: '8px', border: '1px solid #fecaca', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#991b1b', fontWeight: 600 }}>Absent</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#dc2626' }}>{data.summary.morning.absent}</div>
+              <div style={{ flex: 1, background: "var(--portal-danger-bg,#fef2f2)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-danger-border,#fecaca)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-danger-text,#991b1b)", fontWeight: 600 }}>Absent</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-danger-text,#dc2626)" }}>{data.summary.morning.absent}</div>
               </div>
-              <div style={{ flex: 1, background: '#f8fafc', padding: '6px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Pending</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#64748b' }}>{data.summary.morning.pending}</div>
+              <div style={{ flex: 1, background: "var(--portal-info-bg,#f8fafc)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-strong-border,#e2e8f0)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-info-text,#475569)", fontWeight: 600 }}>Pending</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-muted,#64748b)" }}>{data.summary.morning.pending}</div>
               </div>
             </div>
           </div>
@@ -353,9 +353,9 @@ export default function CampusAttendanceTab() {
           {/* Evening Session Card */}
           <div
             style={{
-              background: '#ffffff',
+              background: "var(--portal-surface,#ffffff)",
               borderRadius: '12px',
-              border: '1px solid #e2e8f0',
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               padding: '1rem',
               display: 'flex',
               flexDirection: 'column',
@@ -363,28 +363,28 @@ export default function CampusAttendanceTab() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#002147' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                 🌆 EVENING CHECKPOINT (Cutoff: 03:30 PM)
               </span>
-              <span style={{ fontSize: '11px', color: '#64748b' }}>Day closes 05:00 PM</span>
+              <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>Day closes 05:00 PM</span>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-              <div style={{ flex: 1, background: '#f0fdf4', padding: '6px 8px', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#166534', fontWeight: 600 }}>On Time</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#15803d' }}>{data.summary.evening.on_time}</div>
+              <div style={{ flex: 1, background: "var(--portal-success-bg,#f0fdf4)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-success-border,#bbf7d0)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-success-text,#166534)", fontWeight: 600 }}>On Time</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-success-text,#15803d)" }}>{data.summary.evening.on_time}</div>
               </div>
-              <div style={{ flex: 1, background: '#fffbeb', padding: '6px 8px', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#854d0e', fontWeight: 600 }}>Early Leave</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#b45309' }}>{data.summary.evening.early_leave}</div>
+              <div style={{ flex: 1, background: "var(--portal-warning-bg,#fffbeb)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-warning-border,#fde68a)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-warning-text,#854d0e)", fontWeight: 600 }}>Early Leave</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-warning-text,#b45309)" }}>{data.summary.evening.early_leave}</div>
               </div>
-              <div style={{ flex: 1, background: '#fef2f2', padding: '6px 8px', borderRadius: '8px', border: '1px solid #fecaca', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#991b1b', fontWeight: 600 }}>Absent</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#dc2626' }}>{data.summary.evening.absent}</div>
+              <div style={{ flex: 1, background: "var(--portal-danger-bg,#fef2f2)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-danger-border,#fecaca)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-danger-text,#991b1b)", fontWeight: 600 }}>Absent</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-danger-text,#dc2626)" }}>{data.summary.evening.absent}</div>
               </div>
-              <div style={{ flex: 1, background: '#f8fafc', padding: '6px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Pending</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#64748b' }}>{data.summary.evening.pending}</div>
+              <div style={{ flex: 1, background: "var(--portal-info-bg,#f8fafc)", padding: '6px 8px', borderRadius: '8px', border: "1px solid var(--portal-strong-border,#e2e8f0)", textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: "var(--portal-info-text,#475569)", fontWeight: 600 }}>Pending</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: "var(--portal-muted,#64748b)" }}>{data.summary.evening.pending}</div>
               </div>
             </div>
           </div>
@@ -412,7 +412,7 @@ export default function CampusAttendanceTab() {
               style={{
                 padding: '8px 12px 8px 34px',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                border: "1px solid var(--portal-strong-border,#cbd5e1)",
                 fontSize: '13px',
                 minWidth: '260px',
                 outline: 'none',
@@ -426,9 +426,9 @@ export default function CampusAttendanceTab() {
             style={{
               padding: '8px 12px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
               fontSize: '13px',
-              background: '#fff',
+              background: "var(--portal-surface,#fff)",
               outline: 'none',
             }}
           >
@@ -441,7 +441,7 @@ export default function CampusAttendanceTab() {
           </select>
         </div>
 
-        <div style={{ fontSize: '12px', color: '#64748b' }}>
+        <div style={{ fontSize: '12px', color: "var(--portal-muted,#64748b)" }}>
           Sorted by urgency (absent students surfaced first) • Total: <strong>{filteredStudents.length}</strong>
         </div>
       </div>
@@ -449,25 +449,25 @@ export default function CampusAttendanceTab() {
       {/* ── Student Roster Table ── */}
       <div
         style={{
-          background: '#ffffff',
+          background: "var(--portal-surface,#ffffff)",
           borderRadius: '12px',
-          border: '1px solid #e2e8f0',
+          border: "1px solid var(--portal-strong-border,#e2e8f0)",
           overflow: 'hidden',
         }}
       >
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontSize: '13px' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>
             Loading campus attendance roster...
           </div>
         ) : filteredStudents.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontSize: '13px' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>
             No students found for this filter.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                <tr style={{ background: "var(--portal-info-bg,#f8fafc)", borderBottom: "1.5px solid var(--portal-strong-border,#e2e8f0)", textAlign: 'left', color: "var(--portal-info-text,#475569)" }}>
                   <th style={{ padding: '10px 14px', width: '40px' }}>#</th>
                   <th style={{ padding: '10px 14px' }}>Student Name</th>
 
@@ -481,19 +481,19 @@ export default function CampusAttendanceTab() {
                   <tr
                     key={st.id}
                     style={{
-                      borderBottom: '1px solid #f1f5f9',
+                      borderBottom: "1px solid var(--portal-strong-border,#f1f5f9)",
                       background:
                         st.morning.status === 'absent' && st.evening.status === 'absent'
-                          ? '#fffbfb'
-                          : '#ffffff',
+                          ? "var(--portal-danger-bg,#fffbfb)"
+                          : "var(--portal-surface,#ffffff)",
                     }}
                   >
-                    <td style={{ padding: '10px 14px', color: '#94a3b8' }}>{idx + 1}</td>
-                    <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a' }}>
+                    <td style={{ padding: '10px 14px', color: "var(--portal-info-text,#94a3b8)" }}>{idx + 1}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: "var(--portal-brand-text,#0f172a)" }}>
                       {st.full_name}
                     </td>
 
-                    <td style={{ padding: '10px 14px', color: '#64748b' }}>Sem {st.current_semester}</td>
+                    <td style={{ padding: '10px 14px', color: "var(--portal-muted,#64748b)" }}>Sem {st.current_semester}</td>
                     <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.morning)}</td>
                     <td style={{ padding: '10px 14px' }}>{renderStatusBadge(st.evening)}</td>
                   </tr>

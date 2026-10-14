@@ -649,9 +649,9 @@ export default function RegisterPage() {
             href="/dashboard/student"
             className={styles.logoutBtn}
             style={{
-              background: '#f1f5f9',
-              color: '#002147',
-              border: '1px solid #cbd5e1',
+              background: "var(--portal-info-bg,#f1f5f9)",
+              color: "var(--portal-brand-text,#002147)",
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -694,7 +694,7 @@ export default function RegisterPage() {
               </NavigationLink>
               <button
                 className={styles.closedBackBtn}
-                style={{ background: '#0284c7', color: '#ffffff', borderColor: '#0284c7' }}
+                style={{ background: '#0284c7', color: '#ffffff', borderColor: "var(--portal-info-border,#0284c7)" }}
                 onClick={() => {
                   setError('')
                   setPageState('loading_blueprint')
@@ -809,8 +809,8 @@ export default function RegisterPage() {
                     className={styles.windowBanner}
                     style={{
                       background: 'rgba(2, 132, 199, 0.08)',
-                      borderColor: '#0284c7',
-                      color: '#0369a1',
+                      borderColor: "var(--portal-info-border,#0284c7)",
+                      color: "var(--portal-info-text,#0369a1)",
                       margin: 0,
                     }}
                   >
@@ -828,9 +828,9 @@ export default function RegisterPage() {
                       gap: '0.75rem',
                       padding: '0.8rem 1.1rem',
                       borderRadius: '0.5rem',
-                      background: slotChangesRemaining > 0 ? '#f0fdf4' : '#fef2f2',
-                      border: `1px solid ${slotChangesRemaining > 0 ? '#bbf7d0' : '#fecaca'}`,
-                      color: slotChangesRemaining > 0 ? '#166534' : '#991b1b',
+                      background: slotChangesRemaining > 0 ? "var(--portal-success-bg,#f0fdf4)" : "var(--portal-danger-bg,#fef2f2)",
+                      border: `1px solid ${slotChangesRemaining > 0 ? "var(--portal-success-border,#bbf7d0)" : "var(--portal-danger-border,#fecaca)"}`,
+                      color: slotChangesRemaining > 0 ? "var(--portal-success-text,#166534)" : "var(--portal-danger-text,#991b1b)",
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -855,8 +855,8 @@ export default function RegisterPage() {
                           fontWeight: 600,
                           padding: '0.3rem 0.65rem',
                           borderRadius: '4px',
-                          background: slotChangesRemaining > 0 ? '#dcfce7' : '#fee2e2',
-                          border: `1px solid ${slotChangesRemaining > 0 ? '#86efac' : '#fca5a5'}`,
+                          background: slotChangesRemaining > 0 ? "var(--portal-success-bg,#dcfce7)" : "var(--portal-danger-bg,#fee2e2)",
+                          border: `1px solid ${slotChangesRemaining > 0 ? "var(--portal-success-border,#86efac)" : "var(--portal-danger-border,#fca5a5)"}`,
                         }}
                       >
                         {slotChangesRemaining === 0 ? 'Next change unlocks:' : 'Quota resets earliest:'}{' '}
@@ -930,13 +930,13 @@ export default function RegisterPage() {
                     type="button"
                     onClick={handleChangeTrack}
                     style={{
-                      background: '#f8fafc',
-                      border: '1.5px solid #dde1e7',
+                      background: "var(--portal-info-bg,#f8fafc)",
+                      border: "1.5px solid var(--portal-border,#dde1e7)",
                       borderRadius: '0.4rem',
                       padding: '0.5rem 1rem',
                       fontSize: '0.78rem',
                       fontWeight: 600,
-                      color: '#002147',
+                      color: "var(--portal-brand-text,#002147)",
                       cursor: 'pointer',
                       marginBottom: '1rem',
                       width: '100%',
@@ -969,18 +969,18 @@ export default function RegisterPage() {
                       </span>
                     </span>
                     {isValidCredits && (
-                      <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.72rem', background: "var(--portal-success-bg,#dcfce7)", color: "var(--portal-success-text,#15803d)", padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
                         ✓ Valid Load
                       </span>
                     )}
                     {!isValidCredits && baseCredits > 0 && (
-                      <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#b91c1c', padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.72rem', background: "var(--portal-danger-bg,#fee2e2)", color: "var(--portal-danger-text,#b91c1c)", padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
                         ⚠️ {baseCredits < minCredits ? `Need ${minCredits - baseCredits} more cr` : `Exceeds max by ${baseCredits - maxCredits} cr`}
                       </span>
                     )}
                   </div>
                   {extraCredits > 0 && (
-                    <span style={{ fontSize: '0.8rem', color: '#0284c7', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#0284c7)", fontWeight: 600 }}>
                       + {extraCredits} optional minor credits ({extraSlotsCount} paper{extraSlotsCount > 1 ? 's' : ''} added)
                     </span>
                   )}
@@ -1030,7 +1030,7 @@ export default function RegisterPage() {
                         <span className={styles.slotLabel}>
                           {slot.name}
                           {slot.slot > 6 && (
-                            <span style={{ marginLeft: '0.6rem', fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: '#e0f2fe', color: '#0369a1', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <span style={{ marginLeft: '0.6rem', fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: "var(--portal-info-bg,#e0f2fe)", color: "var(--portal-info-text,#0369a1)", fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               Minor Elective
                             </span>
                           )}
@@ -1040,9 +1040,9 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => handleRemovePaper(slot.slot)}
                             style={{
-                              background: '#fef2f2',
-                              color: '#dc2626',
-                              border: '1px solid #fecaca',
+                              background: "var(--portal-danger-bg,#fef2f2)",
+                              color: "var(--portal-danger-text,#dc2626)",
+                              border: "1px solid var(--portal-danger-border,#fecaca)",
                               borderRadius: '0.375rem',
                               padding: '0.25rem 0.65rem',
                               fontSize: '0.72rem',
@@ -1067,10 +1067,10 @@ export default function RegisterPage() {
                           /* Interactive Slot Editor Mode */
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                              <label style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>
+                              <label style={{ fontSize: '0.75rem', color: "var(--portal-info-text,#0284c7)", fontWeight: 700, textTransform: 'uppercase' }}>
                                 Select Open Course ({slot.name})
                               </label>
-                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              <span style={{ fontSize: '0.72rem', color: "var(--portal-muted,#64748b)" }}>
                                 Showing papers with available seats
                               </span>
                             </div>
@@ -1127,9 +1127,9 @@ export default function RegisterPage() {
                                       }}
                                       disabled={updatingSlot}
                                       style={{
-                                        background: '#f1f5f9',
-                                        color: '#475569',
-                                        border: '1px solid #cbd5e1',
+                                        background: "var(--portal-info-bg,#f1f5f9)",
+                                        color: "var(--portal-info-text,#475569)",
+                                        border: "1px solid var(--portal-strong-border,#cbd5e1)",
                                         borderRadius: '6px',
                                         padding: '0.5rem 0.9rem',
                                         fontSize: '0.8rem',
@@ -1152,9 +1152,9 @@ export default function RegisterPage() {
                                 <span
                                   className={styles.confirmedBadge}
                                   style={{
-                                    background: isFixedSlot ? '#f1f5f9' : '#ecfdf5',
-                                    color: isFixedSlot ? '#475569' : '#059669',
-                                    border: `1px solid ${isFixedSlot ? '#cbd5e1' : '#a7f3d0'}`,
+                                    background: isFixedSlot ? "var(--portal-info-bg,#f1f5f9)" : "var(--portal-success-bg,#ecfdf5)",
+                                    color: isFixedSlot ? "var(--portal-info-text,#475569)" : "var(--portal-success-text,#059669)",
+                                    border: `1px solid ${isFixedSlot ? "var(--portal-strong-border,#cbd5e1)" : "var(--portal-success-border,#a7f3d0)"}`,
                                   }}
                                 >
                                   {isFixedSlot ? '🔒 Fixed Core Course' : '✓ Confirmed Allocation'}
@@ -1169,9 +1169,9 @@ export default function RegisterPage() {
                                         setError('')
                                       }}
                                       style={{
-                                        background: '#f0f9ff',
-                                        color: '#0284c7',
-                                        border: '1px solid #bae6fd',
+                                        background: "var(--portal-info-bg,#f0f9ff)",
+                                        color: "var(--portal-info-text,#0284c7)",
+                                        border: "1px solid var(--portal-info-border,#bae6fd)",
                                         borderRadius: '6px',
                                         padding: '0.3rem 0.75rem',
                                         fontSize: '0.76rem',
@@ -1191,9 +1191,9 @@ export default function RegisterPage() {
                                         fontSize: '0.72rem',
                                         padding: '0.25rem 0.55rem',
                                         borderRadius: '4px',
-                                        background: '#f1f5f9',
-                                        color: '#64748b',
-                                        border: '1px solid #cbd5e1',
+                                        background: "var(--portal-info-bg,#f1f5f9)",
+                                        color: "var(--portal-muted,#64748b)",
+                                        border: "1px solid var(--portal-strong-border,#cbd5e1)",
                                         fontWeight: 600,
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -1249,7 +1249,7 @@ export default function RegisterPage() {
                               }}
                               disabled={slotChangesRemaining === 0}
                               style={{
-                                background: slotChangesRemaining > 0 ? '#0284c7' : '#94a3b8',
+                                background: slotChangesRemaining > 0 ? '#0284c7' : "var(--portal-info-bg,#94a3b8)",
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '6px',
@@ -1311,7 +1311,7 @@ export default function RegisterPage() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
+                            <p style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", margin: 0 }}>
                               {slot.slot > 6
                                 ? 'Select an elective course offered by any department outside your own for this Minor Paper.'
                                 : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and prerequisites.'}
@@ -1322,7 +1322,7 @@ export default function RegisterPage() {
                                 <label
                                   style={{
                                     fontSize: '0.72rem',
-                                    color: '#0284c7',
+                                    color: "var(--portal-info-text,#0284c7)",
                                     fontWeight: 700,
                                     textTransform: 'uppercase',
                                     display: 'block',
@@ -1346,7 +1346,7 @@ export default function RegisterPage() {
                                 <label
                                   style={{
                                     fontSize: '0.72rem',
-                                    color: '#64748b',
+                                    color: "var(--portal-muted,#64748b)",
                                     fontWeight: 600,
                                     textTransform: 'uppercase',
                                     display: 'block',
@@ -1372,7 +1372,7 @@ export default function RegisterPage() {
                                 <label
                                   style={{
                                     fontSize: '0.72rem',
-                                    color: '#64748b',
+                                    color: "var(--portal-muted,#64748b)",
                                     fontWeight: 600,
                                     textTransform: 'uppercase',
                                     display: 'block',
@@ -1409,13 +1409,13 @@ export default function RegisterPage() {
                     type="button"
                     onClick={handleAddPaper}
                     style={{
-                      background: '#f8fafc',
-                      border: '1.5px dashed #0284c7',
+                      background: "var(--portal-info-bg,#f8fafc)",
+                      border: "1.5px dashed var(--portal-info-border,#0284c7)",
                       borderRadius: '0.625rem',
                       padding: '0.75rem 1.75rem',
                       fontSize: '0.875rem',
                       fontWeight: 600,
-                      color: '#0284c7',
+                      color: "var(--portal-info-text,#0284c7)",
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -1429,14 +1429,14 @@ export default function RegisterPage() {
                     <span style={{ fontSize: '1.2rem', fontWeight: 700, lineHeight: 1 }}>+</span>
                     Add Paper {extraSlotsCount === 0 ? '7' : '8'} (Minor Elective)
                   </button>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.4rem', marginBottom: 0 }}>
+                  <p style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", marginTop: '0.4rem', marginBottom: 0 }}>
                     Optional Minor Paper ({extraSlotsCount}/2 added) — Select an elective from outside your department
                   </p>
                 </div>
               )}
               {extraSlotsCount === 2 && windowIsOpen && (
                 <div style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#0369a1', background: '#f0f9ff', padding: '0.35rem 0.85rem', borderRadius: '9999px', border: '1px solid #bae6fd', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.75rem', color: "var(--portal-info-text,#0369a1)", background: "var(--portal-info-bg,#f0f9ff)", padding: '0.35rem 0.85rem', borderRadius: '9999px', border: "1px solid var(--portal-info-border,#bae6fd)", fontWeight: 600 }}>
                     ✓ Maximum 8 papers reached (6 blueprint + 2 minor electives)
                   </span>
                 </div>

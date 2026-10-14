@@ -22,11 +22,11 @@ export const CourseAttendanceItemSchema = z.object({
   course_title: z.string(),
   attended_classes: z.number(),
   total_classes: z.number(),
-  percentage: z.number(),
+  percentage: z.number().nullable(),
 });
 
 export const StudentAttendanceListSchema = z.object({
-  overall_percentage: z.number(),
+  overall_percentage: z.number().nullable(),
   courses: z.array(CourseAttendanceItemSchema),
 });
 

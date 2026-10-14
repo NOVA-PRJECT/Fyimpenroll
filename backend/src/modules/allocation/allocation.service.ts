@@ -1344,7 +1344,7 @@ export class AllocationService {
     // Fetch target course
     const { data: course, error: courseErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, department_id, seat_limit, semester, credits, category, tag')
+      .select('id, course_code, title, department_id, seat_limit, semester, credits, category, tag, prerequisite_course_ids')
       .eq('id', course_id)
       .single()
 

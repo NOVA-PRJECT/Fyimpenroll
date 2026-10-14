@@ -1,5 +1,8 @@
 import './globals.css'
+import './theme.css'
 import { ApiRefreshInit } from '../components/ApiRefreshInit'
+import ThemeToggle from '@/components/ThemeToggle'
+import ThemeBootstrap from '@/components/ThemeBootstrap'
 
 export const metadata = {
   title: 'FYIMP COURSE REGISTRATION KUC',
@@ -21,15 +24,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap"
           rel="stylesheet"
         />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font -- Shared font in the App Router root layout. */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body className="antialiased">
+        <ThemeBootstrap />
         <ApiRefreshInit />
         {children}
+        <ThemeToggle />
       </body>
     </html>
   );

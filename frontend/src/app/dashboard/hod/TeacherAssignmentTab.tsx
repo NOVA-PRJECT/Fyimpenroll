@@ -76,8 +76,8 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
   return (
     <div
       style={{
-        background: '#ffffff',
-        border: '1.5px solid #002147',
+        background: "var(--portal-surface,#ffffff)",
+        border: "1.5px solid var(--portal-info-border,#002147)",
         borderRadius: '10px',
         padding: '10px 14px',
         minWidth: '220px',
@@ -91,8 +91,8 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            background: '#e6f0fa',
-            color: '#002147',
+            background: "var(--portal-info-bg,#e6f0fa)",
+            color: "var(--portal-brand-text,#002147)",
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -103,19 +103,19 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
           {data.teacher.full_name.charAt(0)}
         </div>
         <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontWeight: 600, fontSize: '13px', color: '#002147', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <div style={{ fontWeight: 600, fontSize: '13px', color: "var(--portal-brand-text,#002147)", whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {data.teacher.full_name}
           </div>
-          <div style={{ fontSize: '11px', color: '#666', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '11px', color: "var(--portal-muted,#666)", whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {data.teacher.email}
           </div>
         </div>
       </div>
       <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '10px', background: '#f0f4f8', padding: '2px 6px', borderRadius: '4px', color: '#444' }}>
+        <span style={{ fontSize: '10px', background: "var(--portal-info-bg,#f0f4f8)", padding: '2px 6px', borderRadius: '4px', color: "var(--portal-muted,#444)" }}>
           {data.teacher.role}
         </span>
-        <span style={{ fontSize: '10px', fontWeight: 600, color: data.assignmentCount > 0 ? '#16a34a' : '#9ca3af' }}>
+        <span style={{ fontSize: '10px', fontWeight: 600, color: data.assignmentCount > 0 ? "var(--portal-success-text,#16a34a)" : "var(--portal-subtle,#9ca3af)" }}>
           {data.assignmentCount} {data.assignmentCount === 1 ? 'Course' : 'Courses'}
         </span>
       </div>
@@ -125,10 +125,10 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
         position={Position.Right}
         id="teacher-source"
         style={{
-          background: '#002147',
+          background: "var(--portal-primary,#002147)",
           width: '10px',
           height: '10px',
-          border: '2px solid #fff',
+          border: "2px solid var(--portal-border,#fff)",
         }}
       />
     </div>
@@ -152,12 +152,12 @@ function CourseNode({
   return (
     <div
       style={{
-        background: '#ffffff',
+        background: "var(--portal-surface,#ffffff)",
         border: hasStaged
-          ? '2px solid #E0A92C'
+          ? "2px solid var(--portal-warning-border,#E0A92C)"
           : isAssigned
-          ? '1.5px solid #0284c7'
-          : '2px dashed #f59e0b',
+          ? "1.5px solid var(--portal-info-border,#0284c7)"
+          : "2px dashed var(--portal-warning-border,#f59e0b)",
         borderRadius: '10px',
         padding: '10px 14px',
         minWidth: '240px',
@@ -177,7 +177,7 @@ function CourseNode({
           background: hasStaged ? '#E0A92C' : isAssigned ? '#0284c7' : '#f59e0b',
           width: '10px',
           height: '10px',
-          border: '2px solid #fff',
+          border: "2px solid var(--portal-border,#fff)",
         }}
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -185,20 +185,20 @@ function CourseNode({
           style={{
             fontSize: '11px',
             fontWeight: 700,
-            background: hasStaged ? '#fef3c7' : isAssigned ? '#e0f2fe' : '#fef3c7',
-            color: hasStaged ? '#92400e' : isAssigned ? '#0369a1' : '#b45309',
+            background: hasStaged ? "var(--portal-warning-bg,#fef3c7)" : isAssigned ? "var(--portal-info-bg,#e0f2fe)" : "var(--portal-warning-bg,#fef3c7)",
+            color: hasStaged ? "var(--portal-warning-text,#92400e)" : isAssigned ? "var(--portal-info-text,#0369a1)" : "var(--portal-warning-text,#b45309)",
             padding: '2px 6px',
             borderRadius: '4px',
           }}
         >
           {data.course.course_code}
         </span>
-        <span style={{ fontSize: '10px', color: '#64748b' }}>
+        <span style={{ fontSize: '10px', color: "var(--portal-muted,#64748b)" }}>
           Sem {data.course.semester} • {data.course.credits} Cr
         </span>
       </div>
 
-      <div style={{ fontWeight: 600, fontSize: '12px', color: '#1e293b', marginTop: '4px', lineHeight: '1.3' }}>
+      <div style={{ fontWeight: 600, fontSize: '12px', color: "var(--portal-brand-text,#1e293b)", marginTop: '4px', lineHeight: '1.3' }}>
         {data.course.title}
       </div>
 
@@ -211,14 +211,14 @@ function CourseNode({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              background: "var(--portal-info-bg,#f8fafc)",
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               borderRadius: '6px',
               padding: '3px 6px',
               fontSize: '11px',
             }}
           >
-            <span style={{ fontWeight: 500, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>
+            <span style={{ fontWeight: 500, color: "var(--portal-brand-text,#0f172a)", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>
               {a.teacher_name}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -232,7 +232,7 @@ function CourseNode({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#0284c7',
+                  color: "var(--portal-info-text,#0284c7)",
                   padding: '2px',
                 }}
               >
@@ -248,7 +248,7 @@ function CourseNode({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#ef4444',
+                  color: "var(--portal-danger-text,#ef4444)",
                   padding: '2px',
                 }}
               >
@@ -265,8 +265,8 @@ function CourseNode({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: '#fffbeb',
-              border: '1.5px solid #E0A92C',
+              background: "var(--portal-warning-bg,#fffbeb)",
+              border: "1.5px solid var(--portal-warning-border,#E0A92C)",
               borderRadius: '6px',
               padding: '3px 6px',
               fontSize: '11px',
@@ -274,10 +274,10 @@ function CourseNode({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E0A92C', flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+              <span style={{ fontWeight: 600, color: "var(--portal-warning-text,#92400e)", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
                 {data.stagedAssignment.teacherName}
               </span>
-              <span style={{ fontSize: '9px', background: '#fde68a', color: '#78350f', padding: '1px 4px', borderRadius: '3px', fontWeight: 700 }}>
+              <span style={{ fontSize: '9px', background: "var(--portal-warning-bg,#fde68a)", color: "var(--portal-warning-text,#78350f)", padding: '1px 4px', borderRadius: '3px', fontWeight: 700 }}>
                 PENDING
               </span>
             </div>
@@ -287,7 +287,7 @@ function CourseNode({
                 data.onCancelStaged?.(data.course.id)
               }}
               title="Discard staged assignment"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', padding: '2px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: "var(--portal-warning-text,#b45309)", padding: '2px' }}
             >
               <X size={12} />
             </button>
@@ -302,7 +302,7 @@ function CourseNode({
               alignItems: 'center',
               gap: '4px',
               fontSize: '11px',
-              color: '#d97706',
+              color: "var(--portal-warning-text,#d97706)",
               fontWeight: 500,
             }}
           >
@@ -586,7 +586,7 @@ export default function TeacherAssignmentTab({
           sourceHandle: 'teacher-source',
           targetHandle: 'course-target',
           animated: true,
-          style: { stroke: '#0284c7', strokeWidth: 2 },
+          style: { stroke: "var(--portal-info-text,#0284c7)", strokeWidth: 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: '#0284c7',
@@ -808,10 +808,10 @@ export default function TeacherAssignmentTab({
       {/* ── Top Bar with Stats & Filter ── */}
       <div
         style={{
-          background: '#ffffff',
+          background: "var(--portal-surface,#ffffff)",
           borderRadius: '12px',
           padding: '1.25rem',
-          border: '1px solid #e2e8f0',
+          border: "1px solid var(--portal-strong-border,#e2e8f0)",
           display: 'flex',
           flexWrap: 'wrap',
           gap: '1rem',
@@ -820,10 +820,10 @@ export default function TeacherAssignmentTab({
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#002147', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={20} color="#c9a227" /> Faculty Course Assignment
           </h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0' }}>
+          <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#64748b)", margin: '4px 0 0' }}>
             Assign faculty to department courses. Connect teachers to courses on canvas or list view.
           </p>
         </div>
@@ -834,37 +834,37 @@ export default function TeacherAssignmentTab({
             style={{
               padding: '6px 14px',
               borderRadius: '8px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              background: "var(--portal-info-bg,#f8fafc)",
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               fontSize: '12px',
             }}
           >
-            <span style={{ color: '#64748b' }}>Total Courses: </span>
-            <strong style={{ color: '#0f172a' }}>{totalCourses}</strong>
+            <span style={{ color: "var(--portal-muted,#64748b)" }}>Total Courses: </span>
+            <strong style={{ color: "var(--portal-brand-text,#0f172a)" }}>{totalCourses}</strong>
           </div>
           <div
             style={{
               padding: '6px 14px',
               borderRadius: '8px',
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              background: "var(--portal-success-bg,#f0fdf4)",
+              border: "1px solid var(--portal-success-border,#bbf7d0)",
               fontSize: '12px',
             }}
           >
-            <span style={{ color: '#15803d' }}>Assigned: </span>
-            <strong style={{ color: '#166534' }}>{assignedCourses}</strong>
+            <span style={{ color: "var(--portal-success-text,#15803d)" }}>Assigned: </span>
+            <strong style={{ color: "var(--portal-success-text,#166534)" }}>{assignedCourses}</strong>
           </div>
           <div
             style={{
               padding: '6px 14px',
               borderRadius: '8px',
-              background: unassignedCourses > 0 ? '#fffbeb' : '#f8fafc',
-              border: unassignedCourses > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
+              background: unassignedCourses > 0 ? "var(--portal-warning-bg,#fffbeb)" : "var(--portal-info-bg,#f8fafc)",
+              border: unassignedCourses > 0 ? "1px solid var(--portal-warning-border,#fde68a)" : "1px solid var(--portal-strong-border,#e2e8f0)",
               fontSize: '12px',
             }}
           >
-            <span style={{ color: unassignedCourses > 0 ? '#b45309' : '#64748b' }}>Unassigned: </span>
-            <strong style={{ color: unassignedCourses > 0 ? '#b45309' : '#0f172a' }}>{unassignedCourses}</strong>
+            <span style={{ color: unassignedCourses > 0 ? "var(--portal-warning-text,#b45309)" : "var(--portal-muted,#64748b)" }}>Unassigned: </span>
+            <strong style={{ color: unassignedCourses > 0 ? "var(--portal-warning-text,#b45309)" : "var(--portal-brand-text,#0f172a)" }}>{unassignedCourses}</strong>
           </div>
         </div>
       </div>
@@ -890,7 +890,7 @@ export default function TeacherAssignmentTab({
               style={{
                 padding: '8px 12px 8px 34px',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                border: "1px solid var(--portal-strong-border,#cbd5e1)",
                 fontSize: '13px',
                 minWidth: '240px',
                 outline: 'none',
@@ -904,9 +904,9 @@ export default function TeacherAssignmentTab({
             style={{
               padding: '8px 12px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
               fontSize: '13px',
-              background: '#fff',
+              background: "var(--portal-surface,#fff)",
               outline: 'none',
             }}
           >
@@ -924,14 +924,14 @@ export default function TeacherAssignmentTab({
             style={{
               padding: '8px 12px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#fff',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
+              background: "var(--portal-surface,#fff)",
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '13px',
-              color: '#475569',
+              color: "var(--portal-info-text,#475569)",
             }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -947,7 +947,7 @@ export default function TeacherAssignmentTab({
               padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
-              background: '#002147',
+              background: "var(--portal-primary,#002147)",
               color: '#ffffff',
               fontWeight: 600,
               cursor: 'pointer',
@@ -966,9 +966,9 @@ export default function TeacherAssignmentTab({
             style={{
               padding: '8px 12px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#002147',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
+              background: "var(--portal-surface,#ffffff)",
+              color: "var(--portal-brand-text,#002147)",
               fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
@@ -982,7 +982,7 @@ export default function TeacherAssignmentTab({
         </div>
 
         {/* Canvas / List view toggle hint on desktop */}
-        <div style={{ fontSize: '12px', color: '#64748b' }}>
+        <div style={{ fontSize: '12px', color: "var(--portal-muted,#64748b)" }}>
           {isMobileView ? (
             <span>📱 Showing Touch List View</span>
           ) : (
@@ -997,9 +997,9 @@ export default function TeacherAssignmentTab({
           style={{
             padding: '10px 14px',
             borderRadius: '8px',
-            background: '#fee2e2',
-            border: '1px solid #f87171',
-            color: '#b91c1c',
+            background: "var(--portal-danger-bg,#fee2e2)",
+            border: "1px solid var(--portal-danger-border,#f87171)",
+            color: "var(--portal-danger-text,#b91c1c)",
             fontSize: '13px',
           }}
         >
@@ -1011,9 +1011,9 @@ export default function TeacherAssignmentTab({
           style={{
             padding: '10px 14px',
             borderRadius: '8px',
-            background: '#dcfce7',
-            border: '1px solid #86efac',
-            color: '#15803d',
+            background: "var(--portal-success-bg,#dcfce7)",
+            border: "1px solid var(--portal-success-border,#86efac)",
+            color: "var(--portal-success-text,#15803d)",
             fontSize: '13px',
           }}
         >
@@ -1027,8 +1027,8 @@ export default function TeacherAssignmentTab({
           style={{
             height: '650px',
             width: '100%',
-            background: '#f8fafc',
-            border: '1.5px solid #e2e8f0',
+            background: "var(--portal-info-bg,#f8fafc)",
+            border: "1.5px solid var(--portal-strong-border,#e2e8f0)",
             borderRadius: '12px',
             overflow: 'hidden',
             position: 'relative',
@@ -1040,13 +1040,13 @@ export default function TeacherAssignmentTab({
               top: '12px',
               left: '12px',
               zIndex: 10,
-              background: 'rgba(255, 255, 255, 0.92)',
+              background: "var(--portal-glass,rgba(255, 255, 255, 0.92))",
               backdropFilter: 'blur(4px)',
               padding: '6px 12px',
               borderRadius: '8px',
-              border: '1px solid #e2e8f0',
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               fontSize: '11px',
-              color: '#475569',
+              color: "var(--portal-info-text,#475569)",
             }}
           >
             <strong>Tip:</strong> Drag from right handle of <b>Teacher</b> to left handle of <b>Course</b>.
@@ -1076,13 +1076,13 @@ export default function TeacherAssignmentTab({
               <div
                 key={course.id}
                 style={{
-                  background: '#ffffff',
+                  background: "var(--portal-surface,#ffffff)",
                   borderRadius: '12px',
                   border: hasStaged
-                    ? '2px solid #E0A92C'
+                    ? "2px solid var(--portal-warning-border,#E0A92C)"
                     : course.is_assigned
-                    ? '1.5px solid #e2e8f0'
-                    : '2px dashed #f59e0b',
+                    ? "1.5px solid var(--portal-strong-border,#e2e8f0)"
+                    : "2px dashed var(--portal-warning-border,#f59e0b)",
                   padding: '1rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1099,25 +1099,25 @@ export default function TeacherAssignmentTab({
                       fontWeight: 700,
                       padding: '3px 8px',
                       borderRadius: '6px',
-                      background: hasStaged ? '#fef3c7' : course.is_assigned ? '#e0f2fe' : '#fef3c7',
-                      color: hasStaged ? '#92400e' : course.is_assigned ? '#0369a1' : '#b45309',
+                      background: hasStaged ? "var(--portal-warning-bg,#fef3c7)" : course.is_assigned ? "var(--portal-info-bg,#e0f2fe)" : "var(--portal-warning-bg,#fef3c7)",
+                      color: hasStaged ? "var(--portal-warning-text,#92400e)" : course.is_assigned ? "var(--portal-info-text,#0369a1)" : "var(--portal-warning-text,#b45309)",
                     }}
                   >
                     {course.course_code}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>
                     Sem {course.semester} • {course.credits} Credits
                   </span>
                 </div>
 
                 <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', margin: 0 }}>{course.title}</h4>
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0' }}>Category: {course.category}</p>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: "var(--portal-brand-text,#0f172a)", margin: 0 }}>{course.title}</h4>
+                  <p style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)", margin: '2px 0 0' }}>Category: {course.category}</p>
                 </div>
 
                 {/* Assigned Teachers List */}
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                <div style={{ borderTop: "1px solid var(--portal-strong-border,#f1f5f9)", paddingTop: '0.5rem' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: "var(--portal-info-text,#475569)", marginBottom: '4px' }}>
                     Assigned Faculty:
                   </div>
                   {course.assignments.length === 0 && !hasStaged ? (
@@ -1127,7 +1127,7 @@ export default function TeacherAssignmentTab({
                         alignItems: 'center',
                         gap: '6px',
                         fontSize: '12px',
-                        color: '#d97706',
+                        color: "var(--portal-warning-text,#d97706)",
                         padding: '4px 0',
                       }}
                     >
@@ -1143,15 +1143,15 @@ export default function TeacherAssignmentTab({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            background: "var(--portal-info-bg,#f8fafc)",
+                            border: "1px solid var(--portal-strong-border,#e2e8f0)",
                             borderRadius: '8px',
                             padding: '6px 10px',
                           }}
                         >
                           <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>{a.teacher_name}</div>
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>{a.teacher_email}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: "var(--portal-brand-text,#0f172a)" }}>{a.teacher_name}</div>
+                            <div style={{ fontSize: '10px', color: "var(--portal-muted,#64748b)" }}>{a.teacher_email}</div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <button
@@ -1161,12 +1161,12 @@ export default function TeacherAssignmentTab({
                               }}
                               title="Reassign"
                               style={{
-                                background: '#e0f2fe',
+                                background: "var(--portal-info-bg,#e0f2fe)",
                                 border: 'none',
                                 borderRadius: '6px',
                                 padding: '4px 8px',
                                 cursor: 'pointer',
-                                color: '#0284c7',
+                                color: "var(--portal-info-text,#0284c7)",
                                 fontSize: '11px',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1187,12 +1187,12 @@ export default function TeacherAssignmentTab({
                               }}
                               title="Remove"
                               style={{
-                                background: '#fee2e2',
+                                background: "var(--portal-danger-bg,#fee2e2)",
                                 border: 'none',
                                 borderRadius: '6px',
                                 padding: '4px 8px',
                                 cursor: 'pointer',
-                                color: '#dc2626',
+                                color: "var(--portal-danger-text,#dc2626)",
                                 fontSize: '11px',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1212,8 +1212,8 @@ export default function TeacherAssignmentTab({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            background: '#fffbeb',
-                            border: '1.5px solid #E0A92C',
+                            background: "var(--portal-warning-bg,#fffbeb)",
+                            border: "1.5px solid var(--portal-warning-border,#E0A92C)",
                             borderRadius: '8px',
                             padding: '6px 10px',
                           }}
@@ -1221,10 +1221,10 @@ export default function TeacherAssignmentTab({
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E0A92C', flexShrink: 0 }} />
                             <div>
-                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: "var(--portal-warning-text,#92400e)" }}>
                                 {staged.teacherName}
                               </div>
-                              <div style={{ fontSize: '10px', color: '#b45309', fontWeight: 700 }}>
+                              <div style={{ fontSize: '10px', color: "var(--portal-warning-text,#b45309)", fontWeight: 700 }}>
                                 PENDING SAVE
                               </div>
                             </div>
@@ -1233,12 +1233,12 @@ export default function TeacherAssignmentTab({
                             onClick={() => handleCancelStaged(course.id)}
                             title="Discard staged assignment"
                             style={{
-                              background: '#fef3c7',
-                              border: '1px solid #fde68a',
+                              background: "var(--portal-warning-bg,#fef3c7)",
+                              border: "1px solid var(--portal-warning-border,#fde68a)",
                               borderRadius: '6px',
                               padding: '4px 8px',
                               cursor: 'pointer',
-                              color: '#b45309',
+                              color: "var(--portal-warning-text,#b45309)",
                               fontSize: '11px',
                               display: 'flex',
                               alignItems: 'center',
@@ -1261,11 +1261,11 @@ export default function TeacherAssignmentTab({
                 }}
                 style={{
                   marginTop: 'auto',
-                  background: '#f0f4f8',
-                  border: '1px dashed #002147',
+                  background: "var(--portal-info-bg,#f0f4f8)",
+                  border: "1px dashed var(--portal-info-border,#002147)",
                   borderRadius: '8px',
                   padding: '8px',
-                  color: '#002147',
+                  color: "var(--portal-brand-text,#002147)",
                   fontWeight: 600,
                   fontSize: '12px',
                   cursor: 'pointer',
@@ -1292,10 +1292,10 @@ export default function TeacherAssignmentTab({
               Reassigning an existing assignment row updates the teacher for subsequent period attendance marking.
             </p>
 
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>Currently Assigned To:</div>
-              <strong style={{ fontSize: '13px', color: '#0f172a' }}>{reassignTarget.teacher_name}</strong>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>{reassignTarget.teacher_email}</div>
+            <div style={{ background: "var(--portal-info-bg,#f8fafc)", padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: "1px solid var(--portal-strong-border,#e2e8f0)" }}>
+              <div style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>Currently Assigned To:</div>
+              <strong style={{ fontSize: '13px', color: "var(--portal-brand-text,#0f172a)" }}>{reassignTarget.teacher_name}</strong>
+              <div style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>{reassignTarget.teacher_email}</div>
             </div>
 
             <div className={styles.field}>
@@ -1340,7 +1340,7 @@ export default function TeacherAssignmentTab({
       {removeTarget && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal} style={{ maxWidth: '26rem' }}>
-            <h3 className={styles.modalTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c0392b' }}>
+            <h3 className={styles.modalTitle} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: "var(--portal-danger-text,#c0392b)" }}>
               <Trash2 size={20} /> Remove Faculty from Course
             </h3>
             <p className={styles.modalSubtitle} style={{ margin: '0.5rem 0 1rem' }}>
@@ -1348,12 +1348,12 @@ export default function TeacherAssignmentTab({
               <strong>{removeTarget.course_code} ({removeTarget.course_title})</strong>?
             </p>
 
-            <div style={{ background: '#fef2f2', padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #fecaca', fontSize: '12px', color: '#991b1b' }}>
+            <div style={{ background: "var(--portal-danger-bg,#fef2f2)", padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: "1px solid var(--portal-danger-border,#fecaca)", fontSize: '12px', color: "var(--portal-danger-text,#991b1b)" }}>
               ⚠️ The course will become unassigned until another faculty member is assigned.
             </div>
 
             {removeModalError && (
-              <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #f87171', borderRadius: '6px', color: '#b91c1c', fontSize: '12px', marginBottom: '1rem' }}>
+              <div style={{ padding: '8px 12px', background: "var(--portal-danger-bg,#fee2e2)", border: "1px solid var(--portal-danger-border,#f87171)", borderRadius: '6px', color: "var(--portal-danger-text,#b91c1c)", fontSize: '12px', marginBottom: '1rem' }}>
                 {removeModalError}
               </div>
             )}
@@ -1524,7 +1524,7 @@ export default function TeacherAssignmentTab({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#0284c7',
+                        color: "var(--portal-info-text,#0284c7)",
                         fontSize: '0.72rem',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -1600,7 +1600,7 @@ export default function TeacherAssignmentTab({
                   setShowAddTeacherModal(true)
                 }}
                 style={{
-                  background: '#002147',
+                  background: "var(--portal-primary,#002147)",
                   color: '#fff',
                   border: 'none',
                   borderRadius: '6px',
@@ -1621,19 +1621,19 @@ export default function TeacherAssignmentTab({
             </p>
 
             {error && (
-              <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #f87171', borderRadius: '6px', color: '#b91c1c', fontSize: '12px', margin: '0.5rem 0' }}>
+              <div style={{ padding: '8px 12px', background: "var(--portal-danger-bg,#fee2e2)", border: "1px solid var(--portal-danger-border,#f87171)", borderRadius: '6px', color: "var(--portal-danger-text,#b91c1c)", fontSize: '12px', margin: '0.5rem 0' }}>
                 {error}
               </div>
             )}
             {success && (
-              <div style={{ padding: '8px 12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '6px', color: '#166534', fontSize: '12px', margin: '0.5rem 0' }}>
+              <div style={{ padding: '8px 12px', background: "var(--portal-success-bg,#dcfce7)", border: "1px solid var(--portal-success-border,#86efac)", borderRadius: '6px', color: "var(--portal-success-text,#166534)", fontSize: '12px', margin: '0.5rem 0' }}>
                 {success}
               </div>
             )}
 
             <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', margin: '1rem 0' }}>
               {eligibleFaculty.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '13px' }}>
+                <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-muted,#64748b)", fontSize: '13px' }}>
                   No teachers found in your department. Click &quot;+ Add Teacher&quot; to add your first faculty member.
                 </div>
               ) : (
@@ -1650,28 +1650,28 @@ export default function TeacherAssignmentTab({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '10px 14px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
+                        background: "var(--portal-info-bg,#f8fafc)",
+                        border: "1px solid var(--portal-strong-border,#e2e8f0)",
                         borderRadius: '8px',
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{t.full_name}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{t.email}</div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', color: "var(--portal-brand-text,#0f172a)" }}>{t.full_name}</div>
+                        <div style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>{t.email}</div>
                         <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                           <span
                             style={{
                               fontSize: '10px',
                               padding: '2px 6px',
                               borderRadius: '4px',
-                              background: t.role === 'teacher' ? '#e0f2fe' : '#f1f5f9',
-                              color: t.role === 'teacher' ? '#0369a1' : '#475569',
+                              background: t.role === 'teacher' ? "var(--portal-info-bg,#e0f2fe)" : "var(--portal-info-bg,#f1f5f9)",
+                              color: t.role === 'teacher' ? "var(--portal-info-text,#0369a1)" : "var(--portal-info-text,#475569)",
                               fontWeight: 600,
                             }}
                           >
                             {t.role === 'teacher' ? 'Course Teacher' : 'Teaching Staff'}
                           </span>
-                          <span style={{ fontSize: '10px', color: assignedCount > 0 ? '#16a34a' : '#94a3b8' }}>
+                          <span style={{ fontSize: '10px', color: assignedCount > 0 ? "var(--portal-success-text,#16a34a)" : "var(--portal-info-text,#94a3b8)" }}>
                             {assignedCount} {assignedCount === 1 ? 'course' : 'courses'} assigned
                           </span>
                         </div>
@@ -1682,9 +1682,9 @@ export default function TeacherAssignmentTab({
                         disabled={deletingTeacherId === t.id}
                         title="Remove teacher from department"
                         style={{
-                          background: '#fef2f2',
-                          border: '1px solid #fecaca',
-                          color: '#dc2626',
+                          background: "var(--portal-danger-bg,#fef2f2)",
+                          border: "1px solid var(--portal-danger-border,#fecaca)",
+                          color: "var(--portal-danger-text,#dc2626)",
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: '12px',
@@ -1724,7 +1724,7 @@ export default function TeacherAssignmentTab({
             bottom: '24px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: '#0f172a',
+            background: "var(--portal-primary,#0f172a)",
             color: '#ffffff',
             padding: '12px 24px',
             borderRadius: '14px',
@@ -1733,7 +1733,7 @@ export default function TeacherAssignmentTab({
             alignItems: 'center',
             gap: '20px',
             zIndex: 1000,
-            border: '1.5px solid #334155',
+            border: "1.5px solid var(--portal-info-border,#334155)",
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1757,8 +1757,8 @@ export default function TeacherAssignmentTab({
               disabled={savingBatch}
               style={{
                 background: 'transparent',
-                border: '1px solid #475569',
-                color: '#cbd5e1',
+                border: "1px solid var(--portal-info-border,#475569)",
+                color: "var(--portal-info-text,#cbd5e1)",
                 padding: '7px 14px',
                 borderRadius: '8px',
                 fontSize: '12px',
@@ -1774,7 +1774,7 @@ export default function TeacherAssignmentTab({
               style={{
                 background: '#E0A92C',
                 border: 'none',
-                color: '#002147',
+                color: "var(--portal-brand-text,#002147)",
                 padding: '7px 18px',
                 borderRadius: '8px',
                 fontSize: '12px',

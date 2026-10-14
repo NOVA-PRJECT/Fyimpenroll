@@ -129,31 +129,31 @@ export default function ManualAllocationTab() {
           flexWrap: 'wrap',
           gap: '1rem',
           padding: '1.25rem',
-          background: '#ffffff',
+          background: "var(--portal-surface,#ffffff)",
           borderRadius: '12px',
-          border: '1px solid #e2e8f0',
+          border: "1px solid var(--portal-strong-border,#e2e8f0)",
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#002147', margin: 0 }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0 }}>
             Reactive Manual Allocation
           </h2>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
+          <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#64748b)", margin: '0.25rem 0 0 0' }}>
             Resolve unplaced elective slots upon student contact with remaining departmental seats.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <label style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>Semester:</label>
+          <label style={{ fontSize: '0.82rem', color: "var(--portal-info-text,#475569)", fontWeight: 500 }}>Semester:</label>
           <select
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(Number(e.target.value))}
             style={{
               padding: '0.5rem 0.85rem',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#0f172a',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
+              background: "var(--portal-surface,#ffffff)",
+              color: "var(--portal-brand-text,#0f172a)",
               fontSize: '0.85rem',
               fontWeight: 500,
             }}
@@ -174,9 +174,9 @@ export default function ManualAllocationTab() {
               gap: '0.4rem',
               padding: '0.5rem 0.85rem',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#475569',
+              border: "1px solid var(--portal-strong-border,#cbd5e1)",
+              background: "var(--portal-surface,#ffffff)",
+              color: "var(--portal-info-text,#475569)",
               fontSize: '0.82rem',
               cursor: 'pointer',
             }}
@@ -192,9 +192,9 @@ export default function ManualAllocationTab() {
           style={{
             padding: '0.85rem 1.25rem',
             borderRadius: '8px',
-            background: '#fee2e2',
-            border: '1px solid #f87171',
-            color: '#b91c1c',
+            background: "var(--portal-danger-bg,#fee2e2)",
+            border: "1px solid var(--portal-danger-border,#f87171)",
+            color: "var(--portal-danger-text,#b91c1c)",
             fontSize: '0.85rem',
           }}
         >
@@ -207,9 +207,9 @@ export default function ManualAllocationTab() {
           style={{
             padding: '0.85rem 1.25rem',
             borderRadius: '8px',
-            background: '#dcfce7',
-            border: '1px solid #86efac',
-            color: '#15803d',
+            background: "var(--portal-success-bg,#dcfce7)",
+            border: "1px solid var(--portal-success-border,#86efac)",
+            color: "var(--portal-success-text,#15803d)",
             fontSize: '0.85rem',
             display: 'flex',
             alignItems: 'center',
@@ -232,9 +232,9 @@ export default function ManualAllocationTab() {
         {/* Section 1: Unresolved Students */}
         <div
           style={{
-            background: '#ffffff',
+            background: "var(--portal-surface,#ffffff)",
             borderRadius: '12px',
-            border: '1px solid #e2e8f0',
+            border: "1px solid var(--portal-strong-border,#e2e8f0)",
             padding: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
@@ -242,17 +242,17 @@ export default function ManualAllocationTab() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#002147', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <AlertTriangle size={18} color="#d97706" />
               Unresolved Students ({unresolvedStudents.length})
             </h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+            <span style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)" }}>
               Contacted students requiring placement
             </span>
           </div>
 
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)", fontSize: '0.85rem' }}>
               Loading unresolved students...
             </div>
           ) : unresolvedStudents.length === 0 ? (
@@ -260,7 +260,7 @@ export default function ManualAllocationTab() {
               style={{
                 padding: '3rem 1rem',
                 textAlign: 'center',
-                color: '#64748b',
+                color: "var(--portal-muted,#64748b)",
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -268,7 +268,7 @@ export default function ManualAllocationTab() {
               }}
             >
               <CheckCircle size={32} color="#22c55e" />
-              <p style={{ margin: 0, fontWeight: 600, color: '#0f172a' }}>
+              <p style={{ margin: 0, fontWeight: 600, color: "var(--portal-brand-text,#0f172a)" }}>
                 All student elective slots are fully resolved!
               </p>
               <span style={{ fontSize: '0.78rem' }}>
@@ -281,9 +281,9 @@ export default function ManualAllocationTab() {
                 <div
                   key={st.student_id}
                   style={{
-                    background: '#f8fafc',
+                    background: "var(--portal-info-bg,#f8fafc)",
                     borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
+                    border: "1px solid var(--portal-strong-border,#e2e8f0)",
                     padding: '1rem',
                     display: 'flex',
                     flexDirection: 'column',
@@ -292,10 +292,10 @@ export default function ManualAllocationTab() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: '0.92rem', color: '#0f172a' }}>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: '0.92rem', color: "var(--portal-brand-text,#0f172a)" }}>
                         {st.full_name}
                       </p>
-                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", fontFamily: 'monospace' }}>
                         CAP: {st.cap_application_number}
                       </p>
                     </div>
@@ -305,9 +305,9 @@ export default function ManualAllocationTab() {
                         borderRadius: '4px',
                         fontSize: '0.7rem',
                         fontWeight: 600,
-                        background: '#fef3c7',
-                        color: '#b45309',
-                        border: '1px solid #fde68a',
+                        background: "var(--portal-warning-bg,#fef3c7)",
+                        color: "var(--portal-warning-text,#b45309)",
+                        border: "1px solid var(--portal-warning-border,#fde68a)",
                       }}
                     >
                       {st.unresolved_slots.length} Unresolved Slot(s)
@@ -320,10 +320,10 @@ export default function ManualAllocationTab() {
                       <div
                         key={slot.slot_key}
                         style={{
-                          background: '#ffffff',
+                          background: "var(--portal-surface,#ffffff)",
                           borderRadius: '6px',
                           padding: '0.65rem 0.85rem',
-                          border: '1px solid #e2e8f0',
+                          border: "1px solid var(--portal-strong-border,#e2e8f0)",
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
@@ -331,24 +331,24 @@ export default function ManualAllocationTab() {
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e40af' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: "var(--portal-info-text,#1e40af)" }}>
                             Paper {slot.slot_number} ({slot.slot_key})
                           </span>
                           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Submitted choices:</span>
+                            <span style={{ fontSize: '0.7rem', color: "var(--portal-muted,#64748b)" }}>Submitted choices:</span>
                             {slot.submitted_preferences.length === 0 ? (
-                              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>None</span>
+                              <span style={{ fontSize: '0.7rem', color: "var(--portal-info-text,#94a3b8)" }}>None</span>
                             ) : (
                               slot.submitted_preferences.map((p) => (
                                 <span
                                   key={p.course_id}
                                   style={{
                                     fontSize: '0.7rem',
-                                    background: '#f1f5f9',
-                                    border: '1px solid #e2e8f0',
+                                    background: "var(--portal-info-bg,#f1f5f9)",
+                                    border: "1px solid var(--portal-strong-border,#e2e8f0)",
                                     padding: '0.1rem 0.35rem',
                                     borderRadius: '4px',
-                                    color: '#475569',
+                                    color: "var(--portal-info-text,#475569)",
                                   }}
                                 >
                                   <strong>#{p.rank}</strong> {p.course_code}
@@ -393,9 +393,9 @@ export default function ManualAllocationTab() {
         {/* Section 2: Remaining Department Capacity */}
         <div
           style={{
-            background: '#ffffff',
+            background: "var(--portal-surface,#ffffff)",
             borderRadius: '12px',
-            border: '1px solid #e2e8f0',
+            border: "1px solid var(--portal-strong-border,#e2e8f0)",
             padding: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
@@ -403,18 +403,18 @@ export default function ManualAllocationTab() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#002147', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <BookOpen size={18} color="#1e40af" />
               Department Course Capacity
             </h3>
           </div>
 
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)", fontSize: '0.85rem' }}>
               Loading capacities...
             </div>
           ) : remainingCourses.length === 0 ? (
-            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+            <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#64748b)", margin: 0 }}>
               No departmental courses configured for Semester {selectedSemester}.
             </p>
           ) : (
@@ -425,9 +425,9 @@ export default function ManualAllocationTab() {
                   <div
                     key={c.id}
                     style={{
-                      background: '#f8fafc',
+                      background: "var(--portal-info-bg,#f8fafc)",
                       borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
+                      border: "1px solid var(--portal-strong-border,#e2e8f0)",
                       padding: '0.85rem',
                       display: 'flex',
                       flexDirection: 'column',
@@ -436,10 +436,10 @@ export default function ManualAllocationTab() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#1e40af' }}>
+                        <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: "var(--portal-info-text,#1e40af)" }}>
                           {c.course_code}
                         </span>
-                        <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
+                        <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.82rem', fontWeight: 600, color: "var(--portal-brand-text,#0f172a)" }}>
                           {c.title}
                         </p>
                       </div>
@@ -449,16 +449,16 @@ export default function ManualAllocationTab() {
                           borderRadius: '4px',
                           fontSize: '0.72rem',
                           fontWeight: 700,
-                          background: isFull ? '#fee2e2' : '#dcfce7',
-                          color: isFull ? '#dc2626' : '#15803d',
-                          border: `1px solid ${isFull ? '#fecaca' : '#bbf7d0'}`,
+                          background: isFull ? "var(--portal-danger-bg,#fee2e2)" : "var(--portal-success-bg,#dcfce7)",
+                          color: isFull ? "var(--portal-danger-text,#dc2626)" : "var(--portal-success-text,#15803d)",
+                          border: `1px solid ${isFull ? "var(--portal-danger-border,#fecaca)" : "var(--portal-success-border,#bbf7d0)"}`,
                         }}
                       >
                         {c.remaining_seats} seat{c.remaining_seats === 1 ? '' : 's'} left
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: "var(--portal-muted,#64748b)" }}>
                       <span>
                         Allocated: {c.total_allocated} / {c.seat_limit}
                       </span>
@@ -473,7 +473,7 @@ export default function ManualAllocationTab() {
                         width: '100%',
                         height: '5px',
                         borderRadius: '999px',
-                        background: '#e2e8f0',
+                        background: "var(--portal-info-bg,#e2e8f0)",
                         overflow: 'hidden',
                       }}
                     >
@@ -509,8 +509,8 @@ export default function ManualAllocationTab() {
         >
           <div
             style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
+              background: "var(--portal-surface,#ffffff)",
+              border: "1px solid var(--portal-strong-border,#e2e8f0)",
               borderRadius: '12px',
               padding: '1.5rem',
               maxWidth: '520px',
@@ -522,20 +522,20 @@ export default function ManualAllocationTab() {
             }}
           >
             <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#002147', margin: 0 }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0 }}>
                 Manual Course Placement
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
+              <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#64748b)", margin: '0.25rem 0 0 0' }}>
                 Assign an available departmental course to resolve this student&apos;s paper slot.
               </p>
             </div>
 
             <div
               style={{
-                background: '#f8fafc',
+                background: "var(--portal-info-bg,#f8fafc)",
                 padding: '0.85rem',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
+                border: "1px solid var(--portal-strong-border,#e2e8f0)",
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.35rem',
@@ -543,18 +543,18 @@ export default function ManualAllocationTab() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Student:</span>
-                <strong style={{ color: '#0f172a' }}>{allocatingTarget.student.full_name}</strong>
+                <span style={{ color: "var(--portal-muted,#64748b)" }}>Student:</span>
+                <strong style={{ color: "var(--portal-brand-text,#0f172a)" }}>{allocatingTarget.student.full_name}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>CAP Register:</span>
-                <span style={{ fontFamily: 'monospace', color: '#0f172a' }}>
+                <span style={{ color: "var(--portal-muted,#64748b)" }}>CAP Register:</span>
+                <span style={{ fontFamily: 'monospace', color: "var(--portal-brand-text,#0f172a)" }}>
                   {allocatingTarget.student.cap_application_number}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Target Paper:</span>
-                <strong style={{ color: '#1e40af' }}>
+                <span style={{ color: "var(--portal-muted,#64748b)" }}>Target Paper:</span>
+                <strong style={{ color: "var(--portal-info-text,#1e40af)" }}>
                   Paper {allocatingTarget.slot.slot_number} ({allocatingTarget.slot.slot_key})
                 </strong>
               </div>
@@ -562,7 +562,7 @@ export default function ManualAllocationTab() {
 
             {/* Course Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: "var(--portal-info-text,#475569)" }}>
                 Select Course with Remaining Seats:
               </label>
               <select
@@ -571,9 +571,9 @@ export default function ManualAllocationTab() {
                 style={{
                   padding: '0.65rem 0.85rem',
                   borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
+                  border: "1px solid var(--portal-strong-border,#cbd5e1)",
+                  background: "var(--portal-surface,#ffffff)",
+                  color: "var(--portal-brand-text,#0f172a)",
                   fontSize: '0.85rem',
                 }}
               >
@@ -593,9 +593,9 @@ export default function ManualAllocationTab() {
                 style={{
                   padding: '0.65rem 0.85rem',
                   borderRadius: '6px',
-                  background: '#fee2e2',
-                  border: '1px solid #f87171',
-                  color: '#b91c1c',
+                  background: "var(--portal-danger-bg,#fee2e2)",
+                  border: "1px solid var(--portal-danger-border,#f87171)",
+                  color: "var(--portal-danger-text,#b91c1c)",
                   fontSize: '0.8rem',
                 }}
               >
@@ -612,9 +612,9 @@ export default function ManualAllocationTab() {
                 style={{
                   padding: '0.5rem 1rem',
                   borderRadius: '8px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: '#475569',
+                  background: "var(--portal-surface,#ffffff)",
+                  border: "1px solid var(--portal-strong-border,#cbd5e1)",
+                  color: "var(--portal-info-text,#475569)",
                   fontSize: '0.82rem',
                   cursor: 'pointer',
                 }}

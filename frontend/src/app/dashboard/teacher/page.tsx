@@ -727,9 +727,9 @@ export default function TeacherDashboard() {
         {globalSuccess && (
           <div
             style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              color: '#15803d',
+              background: "var(--portal-success-bg,#f0fdf4)",
+              border: "1px solid var(--portal-success-border,#bbf7d0)",
+              color: "var(--portal-success-text,#15803d)",
               padding: '0.75rem 1rem',
               borderRadius: '0.5rem',
               fontSize: '0.84rem',
@@ -785,12 +785,12 @@ export default function TeacherDashboard() {
                 <span>• Scheduled Lectures: <strong>{schedulePeriods.length}</strong></span>
                 <span>
                   • Marked:{' '}
-                  <strong style={{ color: '#16a34a' }}>
+                  <strong style={{ color: "var(--portal-success-text,#16a34a)" }}>
                     {schedulePeriods.filter(p => p.is_marked).length}
                   </strong>{' '}
                   /{' '}
                   Pending:{' '}
-                  <strong style={{ color: '#b45309' }}>
+                  <strong style={{ color: "var(--portal-warning-text,#b45309)" }}>
                     {schedulePeriods.filter(p => !p.is_marked).length}
                   </strong>
                 </span>
@@ -805,7 +805,7 @@ export default function TeacherDashboard() {
             ) : schedulePeriods.length === 0 ? (
               <div className={styles.emptyPeriodBanner}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>☕</div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#002147', margin: '0 0 0.35rem' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.35rem' }}>
                   No Lectures Scheduled For This Day
                 </h4>
                 <p style={{ fontSize: '0.82rem', margin: 0 }}>
@@ -873,9 +873,9 @@ export default function TeacherDashboard() {
                             type="button"
                             className={styles.markAttendanceBtn}
                             style={{
-                              background: '#f0fdf4',
-                              color: '#166534',
-                              border: '1px solid #86efac',
+                              background: "var(--portal-success-bg,#f0fdf4)",
+                              color: "var(--portal-success-text,#166534)",
+                              border: "1px solid var(--portal-success-border,#86efac)",
                             }}
                             onClick={() => handleCopyPractical(period)}
                             disabled={copyingPractical === period.timetable_slot_id}
@@ -951,19 +951,19 @@ export default function TeacherDashboard() {
             {weeklySchedule.length === 0 && !loadingSchedule ? (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: '1.5px dashed #cbd5e1',
+                  background: "var(--portal-surface,#ffffff)",
+                  border: "1.5px dashed var(--portal-strong-border,#cbd5e1)",
                   borderRadius: '12px',
                   padding: '2.5rem 1.5rem',
                   textAlign: 'center',
-                  color: '#475569',
+                  color: "var(--portal-info-text,#475569)",
                 }}
               >
                 <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}>🗓️</div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#002147', margin: '0 0 0.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.5rem' }}>
                   No Timetable Entries Published Yet
                 </h3>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '480px', margin: '0 auto', lineHeight: 1.5 }}>
+                <p style={{ fontSize: '0.85rem', color: "var(--portal-muted,#64748b)", maxWidth: '480px', margin: '0 auto', lineHeight: 1.5 }}>
                   Timetable entries for your assigned courses have not been scheduled or published yet by your department. Once published, your weekly class grid will appear here.
                 </p>
               </div>
@@ -978,7 +978,7 @@ export default function TeacherDashboard() {
                         {PERIODS.map(p => (
                           <th key={p.num} className={styles.timetableTh}>
                             <div>{p.label}</div>
-                            <div style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>{p.time}</div>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 500, color: "var(--portal-muted,#64748b)" }}>{p.time}</div>
                           </th>
                         ))}
                       </tr>
@@ -1056,7 +1056,7 @@ export default function TeacherDashboard() {
                           <span>{activeDayObj.name}</span>
                           {isToday && <span className={styles.todayBadge}>Today</span>}
                         </div>
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.78rem', color: "var(--portal-muted,#64748b)", fontWeight: 600 }}>
                           6 Scheduled Periods
                         </span>
                       </div>
@@ -1118,20 +1118,20 @@ export default function TeacherDashboard() {
             {assignedCourses.length === 0 && !loadingProfile && (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: '1.5px dashed #cbd5e1',
+                  background: "var(--portal-surface,#ffffff)",
+                  border: "1.5px dashed var(--portal-strong-border,#cbd5e1)",
                   borderRadius: '12px',
                   padding: '2.5rem 1.5rem',
                   textAlign: 'center',
-                  color: '#475569',
+                  color: "var(--portal-info-text,#475569)",
                   marginBottom: '1rem',
                 }}
               >
                 <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}>📚</div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#002147', margin: '0 0 0.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.5rem' }}>
                   No Courses Currently Assigned
                 </h3>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '480px', margin: '0 auto', lineHeight: 1.5 }}>
+                <p style={{ fontSize: '0.85rem', color: "var(--portal-muted,#64748b)", maxWidth: '480px', margin: '0 auto', lineHeight: 1.5 }}>
                   Your Head of Department (HOD) has not assigned you to any courses yet. Once assigned, your papers, enrolled student lists, and downloadable attendance sheets will appear here.
                 </p>
               </div>
@@ -1315,7 +1315,7 @@ export default function TeacherDashboard() {
 
             {markingError && <div className={styles.errorBanner} style={{ margin: '0.75rem 1.25rem 0' }}>{markingError}</div>}
             {conflictRevision !== null && (
-              <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.75rem', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '0.375rem', color: '#92400e', fontSize: '0.875rem' }}>
+              <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.75rem', background: "var(--portal-warning-bg,#fef3c7)", border: "1px solid var(--portal-warning-border,#f59e0b)", borderRadius: '0.375rem', color: "var(--portal-warning-text,#92400e)", fontSize: '0.875rem' }}>
                 <strong>⚠️ Concurrent edit detected:</strong> Another teacher modified this record (now at revision {conflictRevision}). Your entered selections above are preserved. Click <strong>Overwrite with My Marks</strong> to submit your selections, or <strong>Cancel</strong> to discard.
               </div>
             )}
@@ -1355,7 +1355,7 @@ export default function TeacherDashboard() {
                   <p className={styles.loadingText}>Loading enrolled student roster...</p>
                 </div>
               ) : markingRoster.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-muted,#64748b)" }}>
                   No students registered for this course.
                 </div>
               ) : (

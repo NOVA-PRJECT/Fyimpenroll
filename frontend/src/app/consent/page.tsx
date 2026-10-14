@@ -124,7 +124,7 @@ export default function ConsentPage() {
             type="button"
             onClick={handleSignOut}
             disabled={loading}
-            className="text-xs font-medium px-3.5 py-1.5 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-600 rounded-lg transition-colors flex items-center gap-1.5"
+            className="text-xs font-medium px-3.5 py-1.5 border border-[color:var(--portal-strong-border,#e2e8f0)] hover:bg-[color:var(--portal-info-bg,#f1f5f9)] hover:text-[color:var(--portal-brand-text,#0f172a)] text-[color:var(--portal-info-text,#475569)] rounded-lg transition-colors flex items-center gap-1.5"
           >
             <LogOut size={13} />
             <span>Sign Out</span>

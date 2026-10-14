@@ -9,7 +9,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Eye, EyeOff } from 'lucide-react'
+import { CircleCheck, Eye, EyeOff, X } from 'lucide-react'
 import styles from './login.module.css'
 import PortalHeader from '@/components/portal/PortalHeader'
 import PortalFooter from '@/components/portal/PortalFooter'
@@ -87,7 +87,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-[#f8f9ff] font-sans text-[#0b1c30] antialiased selection:bg-[#d3e4fe] selection:text-[#0b1c30] flex flex-col min-h-screen">
+    <div className="bg-[color:var(--portal-canvas,#f8f9ff)] font-sans text-[color:var(--portal-brand-text,#0b1c30)] antialiased selection:bg-[color:var(--portal-info-bg,#d3e4fe)] selection:text-[color:var(--portal-brand-text,#0b1c30)] flex flex-col min-h-screen">
       {/* Top Institutional Header */}
       <PortalHeader variant="login" />
 
@@ -95,8 +95,8 @@ function LoginForm() {
       <main className="w-full flex-grow flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8 relative overflow-hidden">
         {/* Ambient background glow orbs */}
         <div className="absolute inset-0 pointer-events-none -z-10 flex items-center justify-center">
-          <div className="w-[680px] h-[680px] rounded-full bg-[#dce9ff]/45 blur-3xl transform -translate-y-12" />
-          <div className="absolute top-1/4 right-1/4 w-[340px] h-[340px] rounded-full bg-[#d5e3fc]/60 blur-2xl" />
+          <div className="w-[680px] h-[680px] rounded-full bg-[color:var(--portal-info-bg,#dce9ff)]/45 blur-3xl transform -translate-y-12" />
+          <div className="absolute top-1/4 right-1/4 w-[340px] h-[340px] rounded-full bg-[color:var(--portal-info-bg,#d5e3fc)]/60 blur-2xl" />
         </div>
 
         {/* Central Card Reverted to Original */}
@@ -124,18 +124,16 @@ function LoginForm() {
 
             {/* Success Message Banner */}
             {successMsg && (
-              <div className="mb-4 rounded-lg p-3.5 flex items-start gap-2.5 text-xs bg-[#f0fdf4] border border-[#bbf7d0] text-[#166534]">
-                <span className="material-symbols-outlined text-[#16a34a] text-[18px] shrink-0 mt-0.5">
-                  check_circle
-                </span>
+              <div className="mb-4 rounded-lg p-3.5 flex items-start gap-2.5 text-xs bg-[color:var(--portal-success-bg,#f0fdf4)] border border-[color:var(--portal-success-border,#bbf7d0)] text-[color:var(--portal-success-text,#166534)]">
+                <CircleCheck size={18} className="text-[color:var(--portal-success-text,#16a34a)] shrink-0 mt-0.5" aria-hidden="true" />
                 <span className="flex-1 font-medium leading-relaxed">{successMsg}</span>
                 <button
                   type="button"
                   onClick={() => setSuccessMsg('')}
-                  className="text-[#166534] hover:opacity-75 transition-opacity"
+                  className="text-[color:var(--portal-success-text,#166534)] hover:opacity-75 transition-opacity"
                   aria-label="Dismiss message"
                 >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
+                  <X size={16} className="shrink-0" aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -177,7 +175,7 @@ function LoginForm() {
                     </label>
                     <Link
                       href="/reset-password"
-                      className="text-[11px] text-slate-500 hover:text-[#002147] transition-colors"
+                      className="text-[11px] text-[color:var(--portal-muted,#64748b)] hover:text-[color:var(--portal-brand-text,#002147)] transition-colors"
                       style={{ textDecoration: 'none', marginBottom: '0.2rem' }}
                     >
                       Forgot Password?
@@ -264,11 +262,11 @@ function LoginForm() {
         </div>
 
         {/* Statutory IT Helpdesk Footnote */}
-        <div className="mt-6 text-center text-xs text-slate-500">
+        <div className="mt-6 text-center text-xs text-[color:var(--portal-muted,#64748b)]">
           Need help?{' '}
           <a
             href="mailto:itcentre@kannuruniversity.ac.in"
-            className="font-medium text-slate-700 underline underline-offset-2 hover:text-[#082042] transition-colors"
+            className="font-medium text-[color:var(--portal-info-text,#334155)] underline underline-offset-2 hover:text-[color:var(--portal-brand-text,#082042)] transition-colors"
           >
             Contact support
           </a>
@@ -285,8 +283,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#082042] flex items-center justify-center">
-          <div className="w-12 h-12 border-3 border-[#E0A92C]/20 border-t-[#E0A92C] rounded-full animate-spin" />
+        <div className="min-h-screen bg-[color:var(--portal-primary,#082042)] flex items-center justify-center">
+          <div className="w-12 h-12 border-3 border-[color:var(--portal-warning-border,#E0A92C)]/20 border-t-[#E0A92C] rounded-full animate-spin" />
         </div>
       }
     >

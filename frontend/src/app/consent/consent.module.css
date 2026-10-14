@@ -7,11 +7,11 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f8fafc;
+  background-color: var(--portal-info-bg,#f8fafc);
   background-image: radial-gradient(at 0% 0%, rgba(8, 32, 66, 0.04) 0px, transparent 50%),
                     radial-gradient(at 100% 100%, rgba(196, 162, 39, 0.05) 0px, transparent 50%);
   font-family: 'Hanken Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 .mainContent {
@@ -25,9 +25,9 @@
 .card {
   width: 100%;
   max-width: 44rem;
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   border-radius: 1.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   box-shadow: 0 12px 40px -10px rgba(8, 32, 66, 0.12),
               0 2px 10px -2px rgba(8, 32, 66, 0.06);
   overflow: hidden;
@@ -47,7 +47,7 @@
 
 /* ── Card Header (Executive Navy) ── */
 .cardHeader {
-  background-color: #0B192C;
+  background-color: var(--portal-primary,#0B192C);
   padding: 2.25rem 2rem 1.75rem;
   text-align: center;
   display: flex;
@@ -65,19 +65,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c4a227;
+  color: var(--portal-warning-text,#c4a227);
   margin-bottom: 0.85rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 .shieldIcon {
-  color: #c4a227;
+  color: var(--portal-warning-text,#c4a227);
 }
 
 .versionBadge {
   display: inline-block;
   background: rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
+  color: var(--portal-info-text,#cbd5e1);
   border: 1px solid rgba(255, 255, 255, 0.15);
   font-size: 0.72rem;
   font-weight: 600;
@@ -97,7 +97,7 @@
 
 .subtitle {
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   line-height: 1.45;
   margin: 0;
   max-width: 30rem;
@@ -118,7 +118,7 @@
 
 .introNotice {
   font-size: 0.88rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   line-height: 1.5;
   margin: 0 0 1.5rem;
   text-align: center;
@@ -135,15 +135,15 @@
 .dataCard {
   display: flex;
   gap: 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.85rem;
   padding: 1rem 1.15rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .dataCard:hover {
-  border-color: #cbd5e1;
+  border-color: var(--portal-strong-border,#cbd5e1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
@@ -154,8 +154,8 @@
 .iconCircle {
   width: 2.25rem;
   height: 2.25rem;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-brand-text,#0f172a);
   border-radius: 0.5rem;
   display: flex;
   align-items: center;
@@ -172,30 +172,30 @@
 .itemTitle {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   margin: 0;
 }
 
 .itemDesc {
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   line-height: 1.45;
   margin: 0;
 }
 
 /* ── Zero GPS Highlight Card ── */
 .highlightCard {
-  background: #fefce8;
-  border-color: #fef08a;
+  background: var(--portal-warning-bg,#fefce8);
+  border-color: var(--portal-warning-border,#fef08a);
 }
 
 .highlightCard:hover {
-  border-color: #fde047;
+  border-color: var(--portal-warning-border,#fde047);
 }
 
 .highlightIconCircle {
-  background: #fef08a;
-  color: #854d0e;
+  background: var(--portal-warning-bg,#fef08a);
+  color: var(--portal-warning-text,#854d0e);
 }
 
 .highlightHeader {
@@ -209,16 +209,16 @@
 .highlightTitle {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #854d0e;
+  color: var(--portal-warning-text,#854d0e);
   margin: 0;
 }
 
 .privacyGuaranteeTag {
   font-size: 0.68rem;
   font-weight: 700;
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+  background: var(--portal-success-bg,#ecfdf5);
+  color: var(--portal-success-text,#047857);
+  border: 1px solid var(--portal-success-border,#a7f3d0);
   border-radius: 999px;
   padding: 0.15rem 0.5rem;
   text-transform: uppercase;
@@ -228,7 +228,7 @@
 .privacyNote {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #854d0e;
+  color: var(--portal-warning-text,#854d0e);
   margin: 0.35rem 0 0;
   display: flex;
   align-items: center;
@@ -237,13 +237,13 @@
 
 .privacyShieldIcon {
   flex-shrink: 0;
-  color: #16a34a;
+  color: var(--portal-success-text,#16a34a);
 }
 
 /* ── Statutory Documentation Section ── */
 .legalSection {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f1f5f9);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.85rem;
   padding: 1rem 1.15rem;
   margin-bottom: 1.5rem;
@@ -252,7 +252,7 @@
 .legalLabel {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: block;
@@ -261,7 +261,7 @@
 
 .legalDesc {
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   margin: 0 0 0.75rem;
 }
 
@@ -277,11 +277,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
   padding: 0.55rem 0.75rem;
-  color: #1e40af;
+  color: var(--portal-info-text,#1e40af);
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
@@ -289,13 +289,13 @@
 }
 
 .legalCardLink:hover {
-  border-color: #3b82f6;
-  background: #f8fafc;
-  color: #1d4ed8;
+  border-color: var(--portal-info-border,#3b82f6);
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-info-text,#1d4ed8);
 }
 
 .legalIcon {
-  color: #3b82f6;
+  color: var(--portal-info-text,#3b82f6);
   flex-shrink: 0;
 }
 
@@ -304,20 +304,20 @@
 }
 
 .extIcon {
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   flex-shrink: 0;
 }
 
 /* ── Error Banner ── */
 .errorAlert {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--portal-danger-bg,#fef2f2);
+  border: 1px solid var(--portal-danger-border,#fecaca);
   border-radius: 0.75rem;
   padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  color: #991b1b;
+  color: var(--portal-danger-text,#991b1b);
   font-size: 0.82rem;
   font-weight: 500;
   margin-bottom: 1.25rem;
@@ -332,7 +332,7 @@
 
 .agreeButton {
   width: 100%;
-  background: linear-gradient(135deg, #082042 0%, #0B192C 100%);
+  background: linear-gradient(135deg, var(--portal-primary,#082042) 0%, var(--portal-primary,#0B192C) 100%);
   color: #ffffff;
   border: 1px solid rgba(196, 162, 39, 0.35);
   border-radius: 0.75rem;
@@ -351,7 +351,7 @@
 .agreeButton:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(11, 25, 44, 0.28);
-  border-color: #c4a227;
+  border-color: var(--portal-warning-border,#c4a227);
 }
 
 .agreeButton:disabled {
@@ -361,9 +361,9 @@
 
 .declineButton {
   width: 100%;
-  background: #ffffff;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  color: var(--portal-muted,#64748b);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.75rem;
   padding: 0.75rem 1.25rem;
   font-size: 0.88rem;
@@ -377,9 +377,9 @@
 }
 
 .declineButton:hover:not(:disabled) {
-  background: #f8fafc;
-  color: #0f172a;
-  border-color: #94a3b8;
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-brand-text,#0f172a);
+  border-color: var(--portal-strong-border,#94a3b8);
 }
 
 .declineButton:disabled {
@@ -389,7 +389,7 @@
 
 .complianceNotice {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   text-align: center;
   margin: 1.25rem 0 0;
   line-height: 1.45;
@@ -408,8 +408,8 @@
 .spinner {
   width: 2.25rem;
   height: 2.25rem;
-  border: 3px solid #e2e8f0;
-  border-top-color: #0B192C;
+  border: 3px solid var(--portal-strong-border,#e2e8f0);
+  border-top-color: var(--portal-info-border,#0B192C);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
 }
@@ -417,7 +417,7 @@
 .loadingText {
   margin-top: 1rem;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 @keyframes spin {

@@ -1,0 +1,134 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.content {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.sidebar {
+  min-width: 0;
+  padding: 1rem;
+  background: var(--portal-surface,#fff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.indexHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.indexTitle {
+  margin: 0;
+  color: var(--portal-info-text,#475569);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sectionCount {
+  margin: 0.25rem 0 0;
+  color: var(--portal-muted,#64748b);
+  font-size: 0.75rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
+  border-radius: 0.5rem;
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-brand-text,#082042);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.navigation {
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: min(28rem, 60dvh);
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--portal-strong-border,#f1f5f9);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.navigation[data-open='true'] {
+  display: flex;
+}
+
+.sectionLink {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--portal-info-text,#475569);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.sectionLink:hover {
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-brand-text,#082042);
+}
+
+.sectionLink[aria-current='location'] {
+  background: var(--portal-info-bg,#eff4fa);
+  color: var(--portal-brand-text,#082042);
+  font-weight: 600;
+  box-shadow: inset 3px 0 #c9a227;
+}
+
+.toggle:focus-visible,
+.sectionLink:focus-visible {
+  outline: 2px solid var(--portal-info-border,#082042);
+  outline-offset: -2px;
+}
+
+@media (min-width: 768px) {
+  .layout {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: 2rem;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .toggle {
+    display: none;
+  }
+
+  .navigation {
+    display: flex;
+    max-height: none;
+    overflow-y: visible;
+  }
+}

@@ -530,7 +530,7 @@ export default function StudentDashboardClient({
                     <NavigationLink
                       href="/dashboard/student/register"
                       style={{
-                        background: registrationWindow.isClosingSoon ? '#e11d48' : '#002147',
+                        background: registrationWindow.isClosingSoon ? '#e11d48' : "var(--portal-primary,#002147)",
                         color: '#ffffff',
                         padding: '0.4rem 0.85rem',
                         borderRadius: '0.4rem',
@@ -559,8 +559,8 @@ export default function StudentDashboardClient({
                     fontWeight: 700,
                     padding: '0.2rem 0.6rem',
                     borderRadius: '9999px',
-                    background: registrationWindow?.isOpen ? '#dcfce7' : '#fee2e2',
-                    color: registrationWindow?.isOpen ? '#15803d' : '#b91c1c',
+                    background: registrationWindow?.isOpen ? "var(--portal-success-bg,#dcfce7)" : "var(--portal-danger-bg,#fee2e2)",
+                    color: registrationWindow?.isOpen ? "var(--portal-success-text,#15803d)" : "var(--portal-danger-text,#b91c1c)",
                   }}
                 >
                   {registrationWindow?.isOpen ? 'WINDOW OPEN' : 'WINDOW CLOSED'}
@@ -732,7 +732,7 @@ export default function StudentDashboardClient({
 
             <div className={styles.timetableContainer}>
               {loadingTimetable ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)" }}>
                   Loading your weekly class schedule...
                 </div>
               ) : (
@@ -746,7 +746,7 @@ export default function StudentDashboardClient({
                           {PERIODS.map((p) => (
                             <th key={p.num} className={styles.timetableTh}>
                               <div>{p.label}</div>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b' }}>{p.time}</div>
+                              <div style={{ fontSize: '0.62rem', fontWeight: 500, color: "var(--portal-muted,#64748b)" }}>{p.time}</div>
                             </th>
                           ))}
                         </tr>

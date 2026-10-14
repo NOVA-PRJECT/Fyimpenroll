@@ -669,7 +669,7 @@ export default function HodDashboard() {
                 <p className={styles.formatHintCode}>
                   full_name, cap_application_number, academic_year_joined, current_semester, email
                 </p>
-                <p className={styles.formatHintCode} style={{ marginTop: '0.35rem', color: '#9ba1ab' }}>
+                <p className={styles.formatHintCode} style={{ marginTop: '0.35rem', color: "var(--portal-subtle,#9ba1ab)" }}>
                   Example: Ahmed Ali, CAP2025001, 2025-26, 1, ahmed@email.com
                 </p>
               </div>
@@ -695,7 +695,7 @@ export default function HodDashboard() {
                     {showBatchPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-                <p style={{ fontSize: '0.7rem', color: '#9ba1ab', margin: '0.25rem 0 0' }}>
+                <p style={{ fontSize: '0.7rem', color: "var(--portal-subtle,#9ba1ab)", margin: '0.25rem 0 0' }}>
                   Students must change this password on first login.
                 </p>
               </div>
@@ -736,9 +736,9 @@ export default function HodDashboard() {
                     }
                   }}
                   style={{
-                    backgroundColor: '#fee2e2',
-                    color: '#dc2626',
-                    border: '1px solid #fca5a5',
+                    backgroundColor: "var(--portal-danger-bg,#fee2e2)",
+                    color: "var(--portal-danger-text,#dc2626)",
+                    border: "1px solid var(--portal-danger-border,#fca5a5)",
                     borderRadius: '0.4rem',
                     padding: '0.4rem 0.8rem',
                     fontWeight: 600,
@@ -1003,7 +1003,7 @@ export default function HodDashboard() {
                 className={styles.exportBtn}
                 onClick={() => handleFetch(defaulterSemester)}
                 disabled={loadingDefaulters}
-                style={{ background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }}
+                style={{ background: "var(--portal-info-bg,#f8fafc)", color: "var(--portal-info-text,#334155)", border: "1px solid var(--portal-strong-border,#cbd5e1)" }}
                 title="Refresh live student registration status from server"
               >
                 {loadingDefaulters ? 'Refreshing...' : '🔄 Refresh Status'}
@@ -1068,8 +1068,8 @@ export default function HodDashboard() {
                                 borderRadius: '2rem',
                                 fontSize: '0.68rem',
                                 fontWeight: 700,
-                                background: student.submitted ? '#dcfce7' : '#fee2e2',
-                                color: student.submitted ? '#16a34a' : '#dc2626',
+                                background: student.submitted ? "var(--portal-success-bg,#dcfce7)" : "var(--portal-danger-bg,#fee2e2)",
+                                color: student.submitted ? "var(--portal-success-text,#16a34a)" : "var(--portal-danger-text,#dc2626)",
                               }}>
                                 {student.submitted ? '✓ Submitted' : '⏳ Pending'}
                               </span>

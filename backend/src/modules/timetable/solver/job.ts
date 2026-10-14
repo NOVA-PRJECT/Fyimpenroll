@@ -98,7 +98,7 @@ export async function runGenerationJob(
       .eq('status', 'published');
 
     if (campusId) {
-      pubCheckQuery = pubCheckQuery.or(`campus_id.eq.${campusId},department_id.in.(${deptIds.join(',')})`);
+      pubCheckQuery = pubCheckQuery.or(`campus_id.eq.${campusId},and(campus_id.is.null,department_id.in.(${deptIds.join(',')}))`);
     } else {
       pubCheckQuery = pubCheckQuery.in('department_id', deptIds);
     }

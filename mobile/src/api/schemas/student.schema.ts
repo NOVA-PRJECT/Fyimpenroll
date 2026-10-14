@@ -7,6 +7,8 @@ export const CourseSchema = z.object({
   credits: z.number().optional().default(0),
   category: z.string().optional().default(''),
   faculty_name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  prerequisites: z.string().nullable().optional(),
 });
 
 export const TimetableSlotSchema = z.object({
@@ -22,29 +24,26 @@ export const TimetableSlotSchema = z.object({
 });
 
 export const StudentDashboardSchema = z.object({
-  todaySlots: z.array(TimetableSlotSchema).optional().default([]),
+  todaySlots: z.array(TimetableSlotSchema),
   attendanceSummary: z
     .object({
-      overallPercentage: z.number().optional().default(0),
-      totalPresent: z.number().optional().default(0),
-      totalClasses: z.number().optional().default(0),
+      overallPercentage: z.number().nullable(),
+      totalPresent: z.number(),
+      totalClasses: z.number(),
       campusSignInStatus: z
         .object({
-          morning: z.boolean().optional().default(false),
-          evening: z.boolean().optional().default(false),
-        })
-        .optional(),
-    })
-    .optional(),
+          morning: z.enum(['completed', 'pending', 'absent']),
+          evening: z.enum(['completed', 'pending', 'absent']),
+        }),
+    }),
   latestAnnouncement: z
     .object({
-      id: z.string().optional(),
-      title: z.string().optional(),
-      content: z.string().optional(),
-      created_at: z.string().optional(),
+      id: z.string(),
+      title: z.string(),
+      content: z.string(),
+      created_at: z.string(),
     })
-    .nullable()
-    .optional(),
+    .nullable(),
 });
 
 export type StudentDashboard = z.infer<typeof StudentDashboardSchema>;

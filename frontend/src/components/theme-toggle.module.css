@@ -1,0 +1,52 @@
+.control {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(44px, 5vw, 56px);
+  height: clamp(44px, 5vw, 56px);
+  padding: 0;
+  border: 1px solid var(--portal-border, #dce3ed);
+  border-radius: 999px;
+  background: var(--portal-surface, #fff);
+  color: var(--portal-brand-text, #082042);
+  box-shadow: 0 5px 24px rgb(0 0 0 / 0.18);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: grab;
+}
+
+.control[data-ready='false'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.control svg {
+  width: clamp(18px, 2vw, 24px);
+  height: clamp(18px, 2vw, 24px);
+  pointer-events: none;
+}
+
+.control[data-dragging='true'] {
+  cursor: grabbing;
+}
+
+.control[aria-checked='true'] {
+  color: #f7c975;
+}
+
+.control:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+@media print {
+  .control {
+    display: none;
+  }
+}

@@ -18,7 +18,7 @@ export default function BrowserRulesEditor({ rules, onSave, onClose, onReset }: 
     ['days', 'periods', 'allowed_days', 'allowed_periods'].some(key => Array.isArray(rule.parameters?.[key]) && (rule.parameters![key] as number[]).length === 0)
   ) ? 'Each rule needs a description, a valid weight, and at least one selected day and period.' : ''
   return <div role="dialog" aria-modal="true" aria-label="Scheduling rules" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: '#0009', display: 'grid', placeItems: 'center' }}>
-    <section style={{ background: 'white', color: '#172033', padding: 24, width: 'min(800px, 95vw)', maxHeight: '90vh', overflow: 'auto', borderRadius: 12 }}>
+    <section style={{ background: "var(--portal-surface,white)", color: "var(--portal-brand-text,#172033)", padding: 24, width: 'min(800px, 95vw)', maxHeight: '90vh', overflow: 'auto', borderRadius: 12 }}>
       <h2>Scheduling rules</h2>
       <p>Edits are saved in this browser for your campus and sent with generation requests. The shared rule file stays unchanged. Descriptions are labels; the controls below change scheduling behavior.</p>
       {draft.map((rule, index) => <fieldset key={rule.id} style={{ marginBottom: 16, padding: 12 }}>

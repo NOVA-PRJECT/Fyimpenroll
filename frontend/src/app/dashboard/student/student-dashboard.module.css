@@ -7,7 +7,7 @@
   min-height: 100dvh;
   width: 100%;
   max-width: 100vw;
-  background-color: #f0f2f5;
+  background-color: var(--portal-canvas,#f0f2f5);
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
@@ -16,7 +16,7 @@
 
 /* ── UNIFIED EXECUTIVE TOP BAR (Matched to Director & HOD) ── */
 .topBar {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   padding: 0.4rem 1.25rem;
   display: flex;
   align-items: center;
@@ -67,7 +67,7 @@
 }
 
 .topBarTitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.85rem;
   font-weight: 700;
   margin: 0;
@@ -75,7 +75,7 @@
 }
 
 .topBarSubtitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.65rem;
   font-weight: 600;
   margin: 0;
@@ -103,7 +103,7 @@
 .studentNameHeader {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   margin-bottom: 0.2rem;
   line-height: 1.2;
@@ -126,7 +126,7 @@
   padding: 0.12rem 0.55rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.08);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 0.25);
   white-space: nowrap;
   line-height: 1.3;
@@ -141,7 +141,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -155,7 +155,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   white-space: nowrap;
   overflow: hidden;
@@ -169,9 +169,9 @@
   font-weight: 600;
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
-  background: #f0f4f8;
-  color: #002147;
-  border: 1px solid #c8d5e4;
+  background: var(--portal-info-bg,#f0f4f8);
+  color: var(--portal-brand-text,#002147);
+  border: 1px solid var(--portal-strong-border,#c8d5e4);
   white-space: nowrap;
   line-height: 1.3;
 }
@@ -181,9 +181,9 @@
   font-weight: 700;
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
-  background: #e0f2fe;
-  color: #0369a1;
-  border: 1px solid #7dd3fc;
+  background: var(--portal-info-bg,#e0f2fe);
+  color: var(--portal-info-text,#0369a1);
+  border: 1px solid var(--portal-info-border,#7dd3fc);
   white-space: nowrap;
   line-height: 1.3;
 }
@@ -214,7 +214,7 @@
 }
 
 .logoutBtn:hover {
-  background: #001633;
+  background: var(--portal-primary,#001633);
   border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   transform: translateY(-1px);
@@ -237,8 +237,8 @@
 .tabBar {
   display: flex;
   width: 100%;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
   padding: 0;
   box-sizing: border-box;
   overflow-x: auto;
@@ -264,7 +264,7 @@
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   background: transparent;
   border: none;
   border-bottom: 2.5px solid transparent;
@@ -274,15 +274,15 @@
 }
 
 .tabBtn:hover {
-  color: #002147;
-  background: #f8fafc;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .tabActive {
-  color: #002147;
-  border-bottom-color: #002147;
+  color: var(--portal-brand-text,#002147);
+  border-bottom-color: var(--portal-info-border,#002147);
   font-weight: 700;
-  background: #f0f4f8;
+  background: var(--portal-info-bg,#f0f4f8);
 }
 
 .tabIconWrapper {
@@ -310,7 +310,7 @@
   height: 7px;
   border-radius: 50%;
   background: #16a34a;
-  border: 1.5px solid #ffffff;
+  border: 1.5px solid var(--portal-border,#ffffff);
 }
 
 .tabBadgeDotAlert {
@@ -334,18 +334,18 @@
 }
 
 .tabBadgeOpen {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#15803d);
 }
 
 .tabBadgeAlert {
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--portal-warning-bg,#fef3c7);
+  color: var(--portal-warning-text,#b45309);
 }
 
 .tabBadgeClosed {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--portal-danger-bg,#fee2e2);
+  color: var(--portal-danger-text,#b91c1c);
 }
 
 /* Tab Content Viewport Wrapper */
@@ -362,8 +362,8 @@
 
 /* ── STUDENT INFO CARD ── */
 .infoCard {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
   padding: 0.85rem 1.25rem;
   display: flex;
   align-items: center;
@@ -384,7 +384,7 @@
 .studentName {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -403,21 +403,21 @@
   font-weight: 600;
   padding: 0.18rem 0.5rem;
   border-radius: 2rem;
-  background: #f0f4f8;
-  color: #44474e;
-  border: 1px solid #dde1e7;
+  background: var(--portal-info-bg,#f0f4f8);
+  color: var(--portal-muted,#44474e);
+  border: 1px solid var(--portal-border,#dde1e7);
   white-space: nowrap;
 }
 
 .detailBadge.semBadge {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .registerBtn {
   flex-shrink: 0;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   border: none;
   border-radius: 0.5rem;
@@ -432,7 +432,7 @@
 }
 
 .registerBtn:hover {
-  background: #003366;
+  background: var(--portal-primary,#003366);
 }
 
 .registerBtn:active:not(:disabled) {
@@ -461,8 +461,8 @@
   align-items: center;
   text-align: center;
   padding: 2.5rem 1.25rem;
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
 }
 
@@ -474,21 +474,21 @@
 .closedTitle {
   font-size: 1rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0 0 0.5rem 0;
 }
 
 .closedSubtitle {
   font-size: 0.78rem;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   line-height: 1.5;
   margin: 0 0 1rem 0;
 }
 
 .closedDeadline {
   font-size: 0.72rem;
-  color: #9ba1ab;
-  background: #f0f2f5;
+  color: var(--portal-subtle,#9ba1ab);
+  background: var(--portal-canvas,#f0f2f5);
   border-radius: 0.4rem;
   padding: 0.5rem 0.85rem;
   margin-bottom: 1.25rem;
@@ -498,9 +498,9 @@
   font-family: inherit;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   background: transparent;
-  border: 1.5px solid #002147;
+  border: 1.5px solid var(--portal-info-border,#002147);
   border-radius: 0.5rem;
   padding: 0.55rem 1rem;
   cursor: pointer;
@@ -508,7 +508,7 @@
 }
 
 .closedBackBtn:hover {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
 }
 
@@ -525,21 +525,21 @@
 }
 
 .windowBanner.open {
-  background: #f0faf4;
-  border: 1px solid #a8d5b5;
-  color: #1a6b3c;
+  background: var(--portal-success-bg,#f0faf4);
+  border: 1px solid var(--portal-strong-border,#a8d5b5);
+  color: var(--portal-success-text,#1a6b3c);
 }
 
 .windowBanner.closed {
-  background: #fff8f0;
-  border: 1px solid #f5c6a0;
-  color: #8b4513;
+  background: var(--portal-warning-bg,#fff8f0);
+  border: 1px solid var(--portal-warning-border,#f5c6a0);
+  color: var(--portal-warning-text,#8b4513);
 }
 
 .windowBanner.closingSoon {
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  color: #be123c;
+  background: var(--portal-danger-bg,#fff1f2);
+  border: 1px solid var(--portal-danger-border,#fecdd3);
+  color: var(--portal-danger-text,#be123c);
 }
 
 .windowDot {
@@ -572,7 +572,7 @@
 .sectionTitle {
   font-size: 0.7rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0 0 0.75rem 0;
@@ -583,8 +583,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.6rem;
   padding: 0.65rem 1rem;
   margin-bottom: 1rem;
@@ -592,27 +592,27 @@
 
 .creditLabel {
   font-size: 0.75rem;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   font-weight: 500;
 }
 
 .creditValue {
   font-size: 0.88rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .creditValue.valid {
-  color: #1a6b3c;
+  color: var(--portal-success-text,#1a6b3c);
 }
 
 .creditValue.invalid {
-  color: #c0392b;
+  color: var(--portal-danger-text,#c0392b);
 }
 
 .creditRange {
   font-size: 0.65rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   margin-left: 0.35rem;
   font-weight: 400;
 }
@@ -627,8 +627,8 @@
 
 /* Slot card */
 .slotCard {
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
   padding: 0.85rem 1rem;
   transition: border-color 0.15s ease;
@@ -637,7 +637,7 @@
 }
 
 .slotCard.active {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .slotCard.greyed {
@@ -655,7 +655,7 @@
 .slotLabel {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -665,8 +665,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   padding: 0.6rem 0.85rem;
   gap: 0.5rem;
@@ -675,21 +675,21 @@
 .fixedCourseTitle {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
 .fixedCourseCode {
   font-size: 0.65rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   margin: 0.1rem 0 0 0;
 }
 
 .creditPill {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #002147;
-  background: #e8f0fe;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e8f0fe);
   border-radius: 2rem;
   padding: 0.18rem 0.5rem;
   white-space: nowrap;
@@ -702,9 +702,9 @@
   gap: 0.35rem;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #0284c7;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
+  color: var(--portal-info-text,#0284c7);
+  background: var(--portal-info-bg,#f0f9ff);
+  border: 1px solid var(--portal-info-border,#bae6fd);
   border-radius: 0.375rem;
   padding: 0.25rem 0.6rem;
   margin-top: 0.25rem;
@@ -712,8 +712,8 @@
 
 /* Confirmed Course Allocation Card (Unified Core + Elective) */
 .confirmedCard {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
-  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, var(--portal-success-bg,#f0fdf4) 0%, var(--portal-surface,#ffffff) 100%);
+  border: 1px solid var(--portal-success-border,#bbf7d0);
   border-radius: 0.65rem;
   padding: 0.95rem 1.15rem;
   display: flex;
@@ -749,9 +749,9 @@
   gap: 0.35rem;
   font-size: 0.68rem;
   font-weight: 700;
-  color: #15803d;
-  background: #dcfce7;
-  border: 1px solid #86efac;
+  color: var(--portal-success-text,#15803d);
+  background: var(--portal-success-bg,#dcfce7);
+  border: 1px solid var(--portal-success-border,#86efac);
   border-radius: 9999px;
   padding: 0.18rem 0.6rem;
   letter-spacing: 0.04em;
@@ -761,7 +761,7 @@
 .confirmedTitle {
   font-size: 0.96rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   line-height: 1.35;
   letter-spacing: -0.01em;
@@ -772,7 +772,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   flex-wrap: wrap;
 }
 
@@ -780,24 +780,24 @@
   font-family: var(--font-mono, monospace);
   font-weight: 600;
   font-size: 0.74rem;
-  color: #1e293b;
-  background: #f1f5f9;
+  color: var(--portal-brand-text,#1e293b);
+  background: var(--portal-info-bg,#f1f5f9);
   padding: 0.12rem 0.45rem;
   border-radius: 0.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .confirmedDept {
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   font-weight: 500;
 }
 
 .confirmedCreditPill {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #002147;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#eff6ff);
+  border: 1px solid var(--portal-info-border,#bfdbfe);
   border-radius: 2rem;
   padding: 0.28rem 0.75rem;
   white-space: nowrap;
@@ -807,9 +807,9 @@
 
 /* Post-allocation Unallocated Alert Card */
 .unallocatedCard {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-left: 4.5px solid #f59e0b;
+  background: var(--portal-warning-bg,#fffbeb);
+  border: 1px solid var(--portal-warning-border,#fde68a);
+  border-left: 4.5px solid var(--portal-warning-border,#f59e0b);
   border-radius: 0.65rem;
   padding: 0.95rem 1.15rem;
   box-shadow: 0 1px 3px rgba(245, 158, 11, 0.08);
@@ -818,7 +818,7 @@
 .unallocatedTitle {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #92400e;
+  color: var(--portal-warning-text,#92400e);
   margin: 0;
   display: flex;
   align-items: center;
@@ -827,13 +827,13 @@
 
 .unallocatedText {
   font-size: 0.78rem;
-  color: #78350f;
+  color: var(--portal-warning-text,#78350f);
   margin: 0.35rem 0 0 0;
   line-height: 1.45;
 }
 
 .slotCardConfirmed {
-  border-color: #cbd5e1;
+  border-color: var(--portal-strong-border,#cbd5e1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -843,9 +843,9 @@
   padding: 0.65rem 2.5rem 0.65rem 0.85rem;
   font-family: inherit;
   font-size: 0.82rem;
-  color: #191c1d;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -859,8 +859,8 @@
 }
 
 .selectInput:focus {
-  border-color: #002147;
-  background-color: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background-color: var(--portal-surface,#ffffff);
 }
 
 .selectInput:disabled {
@@ -878,7 +878,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #ffffff;
-  background-color: #002147;
+  background-color: var(--portal-primary,#002147);
   border: none;
   border-radius: 0.6rem;
   cursor: pointer;
@@ -891,7 +891,7 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-  background-color: #001633;
+  background-color: var(--portal-primary,#001633);
 }
 
 .submitBtn:active:not(:disabled) {
@@ -905,25 +905,25 @@
 
 /* Success banner */
 .successBanner {
-  background: #f0faf4;
-  border: 1px solid #a8d5b5;
+  background: var(--portal-success-bg,#f0faf4);
+  border: 1px solid var(--portal-strong-border,#a8d5b5);
   border-radius: 0.6rem;
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #1a6b3c;
+  color: var(--portal-success-text,#1a6b3c);
   text-align: center;
   margin-bottom: 1rem;
 }
 
 /* Error banner */
 .errorBanner {
-  background: #fdf2f2;
-  border: 1px solid #f5c6c6;
+  background: var(--portal-danger-bg,#fdf2f2);
+  border: 1px solid var(--portal-danger-border,#f5c6c6);
   border-radius: 0.6rem;
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
-  color: #c0392b;
+  color: var(--portal-danger-text,#c0392b);
   margin-bottom: 1rem;
 }
 
@@ -940,8 +940,8 @@
 .spinner {
   width: 2rem;
   height: 2rem;
-  border: 3px solid #e2e5ea;
-  border-top-color: #002147;
+  border: 3px solid var(--portal-border,#e2e5ea);
+  border-top-color: var(--portal-info-border,#002147);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -950,7 +950,7 @@
   width: 1rem;
   height: 1rem;
   border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #ffffff;
+  border-top-color: var(--portal-border,#ffffff);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -961,13 +961,13 @@
 
 .loadingText {
   font-size: 0.82rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
 }
 
 /* Greyed placeholder slots */
 .greyedSlot {
-  background: #f8f9fa;
-  border: 1.5px dashed #dde1e7;
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px dashed var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   padding: 0.75rem 0.85rem;
   display: flex;
@@ -978,7 +978,7 @@
 .greyedBar {
   height: 0.75rem;
   border-radius: 2rem;
-  background: #e2e5ea;
+  background: var(--portal-surface-raised,#e2e5ea);
 }
 
 /* Read only mode */
@@ -986,12 +986,12 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #f0f4ff;
-  border: 1px solid #c5d0f5;
+  background: var(--portal-info-bg,#f0f4ff);
+  border: 1px solid var(--portal-info-border,#c5d0f5);
   border-radius: 0.6rem;
   padding: 0.65rem 0.9rem;
   font-size: 0.78rem;
-  color: #2d4db5;
+  color: var(--portal-info-text,#2d4db5);
   font-weight: 600;
   margin-bottom: 1rem;
 }
@@ -1001,8 +1001,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  background: #fff8e6;
-  border: 1px solid #f5d78c;
+  background: var(--portal-warning-bg,#fff8e6);
+  border: 1px solid var(--portal-warning-border,#f5d78c);
   border-radius: 0.6rem;
   padding: 0.65rem 0.9rem;
   margin-bottom: 1rem;
@@ -1016,13 +1016,13 @@
 
 .placeholderBannerText {
   font-size: 0.78rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   margin: 0;
   font-weight: 500;
 }
 
 .placeholderBannerText strong {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-weight: 700;
 }
 
@@ -1044,8 +1044,8 @@
 ══════════════════════════════════════ */
 
 .heroProfileCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.5rem;
   display: flex;
@@ -1059,7 +1059,7 @@
   width: 3.75rem;
   height: 3.75rem;
   border-radius: 50%;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   font-size: 1.4rem;
   font-weight: 700;
@@ -1080,14 +1080,14 @@
 .heroName {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   line-height: 1.25;
 }
 
 .heroRole {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
 }
 
@@ -1099,9 +1099,9 @@
 }
 
 .heroChip {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  color: #334155;
+  background: var(--portal-info-bg,#f1f5f9);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
+  color: var(--portal-info-text,#334155);
   font-size: 0.72rem;
   font-weight: 600;
   padding: 0.2rem 0.6rem;
@@ -1109,9 +1109,9 @@
 }
 
 .heroChipSem {
-  background: #e0f2fe;
-  border: 1px solid #bae6fd;
-  color: #0369a1;
+  background: var(--portal-info-bg,#e0f2fe);
+  border: 1px solid var(--portal-info-border,#bae6fd);
+  color: var(--portal-info-text,#0369a1);
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.2rem 0.6rem;
@@ -1149,9 +1149,9 @@
 
 /* Course Registration Action Card */
 .registrationCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-left: 4px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
+  border-left: 4px solid var(--portal-info-border,#002147);
   border-radius: 0.75rem;
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -1171,7 +1171,7 @@
 .regCardTitle {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
@@ -1183,32 +1183,32 @@
 }
 
 .regStatusSubmitted {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#166534);
+  border: 1px solid var(--portal-success-border,#bbf7d0);
 }
 
 .regStatusSuccessful {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #6ee7b7;
+  background: var(--portal-success-bg,#ecfdf5);
+  color: var(--portal-success-text,#047857);
+  border: 1px solid var(--portal-success-border,#6ee7b7);
 }
 
 .regStatusClosed {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-info-text,#475569);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
 }
 
 .regStatusPending {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--portal-warning-bg,#fef3c7);
+  color: var(--portal-warning-text,#92400e);
+  border: 1px solid var(--portal-warning-border,#fde68a);
 }
 
 .regDescription {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   margin: 0;
   line-height: 1.5;
 }
@@ -1217,7 +1217,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   font-size: 0.88rem;
   font-weight: 600;
@@ -1230,19 +1230,19 @@
 }
 
 .regCtaBtn:hover {
-  background: #003366;
+  background: var(--portal-primary,#003366);
 }
 
 .regHintText {
   font-size: 0.74rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
 }
 
 /* Academic Profile Details Card */
 .academicCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.35rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -1251,9 +1251,9 @@
 .academicCardTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0 0 1rem 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
   padding-bottom: 0.5rem;
 }
 
@@ -1264,8 +1264,8 @@
 }
 
 .detailBox {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   padding: 0.75rem 0.85rem;
   display: flex;
@@ -1277,20 +1277,20 @@
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   letter-spacing: 0.04em;
 }
 
 .detailBoxValue {
   font-size: 0.88rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 /* Quick Navigation Sidebar Card */
 .quickNavCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -1302,7 +1302,7 @@
 .quickNavTitle {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
@@ -1316,13 +1316,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   padding: 0.7rem 0.85rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
@@ -1330,8 +1330,8 @@
 }
 
 .quickNavItem:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--portal-info-bg,#f1f5f9);
+  border-color: var(--portal-strong-border,#cbd5e1);
 }
 
 .quickNavPill {
@@ -1339,14 +1339,14 @@
   font-weight: 700;
   padding: 0.15rem 0.45rem;
   border-radius: 9999px;
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-info-text,#475569);
 }
 
 /* Clean Study Resources Card (Institutional styling, no gold) */
 .studyCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -1365,9 +1365,9 @@
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-info-text,#475569);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   padding: 0.15rem 0.5rem;
   border-radius: 0.25rem;
 }
@@ -1375,13 +1375,13 @@
 .studyTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
 .studyDesc {
   font-size: 0.76rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   line-height: 1.45;
   margin: 0;
 }
@@ -1390,9 +1390,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #002147;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
+  color: var(--portal-brand-text,#002147);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.55rem 0.85rem;
@@ -1403,9 +1403,9 @@
 }
 
 .studyBtn:hover {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 /* Skeletons / Fallbacks */
@@ -1420,14 +1420,14 @@
   width: 3.75rem;
   height: 3.75rem;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: var(--portal-info-bg,#e2e8f0);
   flex-shrink: 0;
   animation: shimmer 1.5s infinite;
 }
 
 .skeletonBar {
   border-radius: 0.4rem;
-  background: #e2e8f0;
+  background: var(--portal-info-bg,#e2e8f0);
   animation: shimmer 1.5s infinite;
 }
 
@@ -1437,7 +1437,7 @@
 }
 
 .profileError {
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-size: 0.85rem;
   text-align: center;
   padding: 2rem 0;
@@ -1459,8 +1459,8 @@
 }
 
 .successModalContent {
-  background: #ffffff;
-  border-left: 5px solid #16a34a;
+  background: var(--portal-surface,#ffffff);
+  border-left: 5px solid var(--portal-success-border,#16a34a);
   border-radius: 0.75rem;
   padding: 1.25rem 1.5rem;
   width: 90%;
@@ -1477,8 +1477,8 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#16a34a);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1490,7 +1490,7 @@
 .successModalText {
   flex: 1;
   font-size: 0.85rem;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-weight: 600;
   margin: 0;
   line-height: 1.4;
@@ -1500,14 +1500,14 @@
   background: transparent;
   border: none;
   font-size: 0.85rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   cursor: pointer;
   padding: 0.2rem;
   transition: color 0.15s ease;
 }
 
 .successModalClose:hover {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 @keyframes fadeIn {
@@ -1534,9 +1534,9 @@
   padding: 0.6rem 2.5rem 0.6rem 0.85rem;
   font-family: inherit;
   font-size: 0.82rem;
-  color: #191c1d;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -1548,8 +1548,8 @@
 }
 
 .customSelectTrigger:focus {
-  border-color: #002147;
-  background-color: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background-color: var(--portal-surface,#ffffff);
 }
 
 .customSelectTrigger:disabled {
@@ -1568,7 +1568,7 @@
 .triggerTitle {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1576,14 +1576,14 @@
 
 .triggerMeta {
   font-size: 0.68rem;
-  color: #5b606a;
+  color: var(--portal-muted,#5b606a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .placeholderText {
-  color: #5b606a;
+  color: var(--portal-muted,#5b606a);
   font-size: 0.82rem;
 }
 
@@ -1596,7 +1596,7 @@
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #44474e;
+  border-top: 5px solid var(--portal-border,#44474e);
   pointer-events: none;
 }
 
@@ -1605,8 +1605,8 @@
   top: calc(100% + 0.35rem);
   left: 0;
   width: 100%;
-  background: #ffffff;
-  border: 1.5px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-info-border,#002147);
   border-radius: 0.5rem;
   box-shadow: 0 4px 12px rgba(0, 33, 71, 0.15);
   z-index: 1000;
@@ -1618,12 +1618,12 @@
 .customOptionNoData {
   padding: 0.75rem;
   text-align: center;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-size: 0.82rem;
 }
 
 .placeholderOption {
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-style: italic;
   font-size: 0.82rem;
 }
@@ -1635,7 +1635,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  border-bottom: 1px solid #dde1e7;
+  border-bottom: 1px solid var(--portal-border,#dde1e7);
 }
 
 .customOption:last-child {
@@ -1643,17 +1643,17 @@
 }
 
 .customOption:hover {
-  background-color: #f0f4f8;
+  background-color: var(--portal-info-bg,#f0f4f8);
 }
 
 .customOption.selected {
-  background-color: #e8f0fe;
+  background-color: var(--portal-info-bg,#e8f0fe);
 }
 
 .optionUpper {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1665,7 +1665,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.68rem;
-  color: #5b606a;
+  color: var(--portal-muted,#5b606a);
 }
 
 .optionDept {
@@ -1677,8 +1677,8 @@
 
 .optionCredits {
   font-weight: 600;
-  color: #002147;
-  background: #e8f0fe;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e8f0fe);
   padding: 0.05rem 0.4rem;
   border-radius: 1rem;
   flex-shrink: 0;
@@ -1689,8 +1689,8 @@
    ========================================= */
 
 .trackPickerContainer {
-  background: #ffffff;
-  border: 1px solid #e1e6ed;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e1e6ed);
   border-radius: 1.25rem;
   padding: 1.75rem;
   margin-bottom: 1.5rem;
@@ -1708,9 +1708,9 @@
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: #002147;
-  background: #e8f0fe;
-  border: 1px solid #cce0ff;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e8f0fe);
+  border: 1px solid var(--portal-info-border,#cce0ff);
   padding: 0.25rem 0.65rem;
   border-radius: 2rem;
   text-transform: uppercase;
@@ -1720,14 +1720,14 @@
 .trackTitle {
   font-size: 1.45rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0 0 0.35rem 0;
   letter-spacing: -0.02em;
 }
 
 .trackSubtitle {
   font-size: 0.85rem;
-  color: #5f6368;
+  color: var(--portal-muted,#5f6368);
   margin: 0;
   line-height: 1.45;
 }
@@ -1740,8 +1740,8 @@
 }
 
 .trackCard {
-  background: #ffffff;
-  border: 2px solid #e2e7f0;
+  background: var(--portal-surface,#ffffff);
+  border: 2px solid var(--portal-strong-border,#e2e7f0);
   border-radius: 1rem;
   padding: 1.35rem;
   cursor: pointer;
@@ -1755,14 +1755,14 @@
 }
 
 .trackCard:hover {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
   transform: translateY(-4px);
   box-shadow: 0 12px 28px rgba(0, 33, 71, 0.12);
 }
 
 .trackCardSelected {
-  border-color: #002147;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border-color: var(--portal-info-border,#002147);
+  background: linear-gradient(180deg, var(--portal-info-bg,#f8fbff) 0%, var(--portal-surface,#ffffff) 100%);
   box-shadow: 0 0 0 3px rgba(0, 33, 71, 0.15), 0 10px 24px rgba(0, 33, 71, 0.08);
 }
 
@@ -1773,7 +1773,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: #002147;
+  background: var(--portal-primary,#002147);
 }
 
 .trackCardHeader {
@@ -1787,8 +1787,8 @@
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.05em;
-  color: #002147;
-  background: #f0f4f8;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#f0f4f8);
   padding: 0.2rem 0.6rem;
   border-radius: 0.35rem;
   text-transform: uppercase;
@@ -1798,7 +1798,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--portal-strong-border,#cbd5e1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1806,15 +1806,15 @@
 }
 
 .trackCardSelected .trackRadioCircle {
-  border-color: #002147;
-  background: #002147;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-primary,#002147);
 }
 
 .trackRadioDot {
   width: 0.45rem;
   height: 0.45rem;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
 }
 
 .trackIconTitleRow {
@@ -1828,7 +1828,7 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #002147, #003366);
+  background: linear-gradient(135deg, var(--portal-primary,#002147), var(--portal-primary,#003366));
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1839,20 +1839,20 @@
 }
 
 .trackCardSelected .trackIconBox {
-  background: #002147;
+  background: var(--portal-primary,#002147);
 }
 
 .trackName {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   line-height: 1.3;
 }
 
 .trackDescription {
   font-size: 0.8rem;
-  color: #5f6368;
+  color: var(--portal-muted,#5f6368);
   line-height: 1.45;
   margin: 0 0 1rem 0;
 }
@@ -1867,22 +1867,22 @@
 .trackMetaTag {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #475569;
-  background: #f1f5f9;
+  color: var(--portal-info-text,#475569);
+  background: var(--portal-info-bg,#f1f5f9);
   padding: 0.2rem 0.55rem;
   border-radius: 0.35rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .trackCardSelected .trackMetaTag {
-  background: #e6f0fa;
-  color: #002147;
-  border-color: #cce0ff;
+  background: var(--portal-info-bg,#e6f0fa);
+  color: var(--portal-brand-text,#002147);
+  border-color: var(--portal-info-border,#cce0ff);
 }
 
 .trackActionButton {
   width: 100%;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   border: none;
   border-radius: 0.6rem;
@@ -1899,21 +1899,21 @@
 }
 
 .trackActionButton:hover {
-  background: #001530;
+  background: var(--portal-primary,#001530);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(0, 33, 71, 0.25);
 }
 
 .trackNoticeBox {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 0.85rem 1.1rem;
   display: flex;
   align-items: center;
   gap: 0.65rem;
   font-size: 0.78rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
 }
 
 .trackNoticeIcon {
@@ -1923,9 +1923,9 @@
 
 /* ── ENROLLED COURSES SECTION ON STUDENT DASHBOARD ── */
 .enrolledSection {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   border-radius: 0.85rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   box-shadow: 0 4px 16px rgba(0, 33, 71, 0.06);
   padding: 1.5rem;
   margin: 1.25rem 1.25rem 0;
@@ -1940,7 +1940,7 @@
   gap: 0.75rem;
   margin-bottom: 1.25rem;
   padding-bottom: 0.85rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
 }
 
 .enrolledTitleGroup {
@@ -1952,7 +1952,7 @@
 .enrolledTitle {
   font-size: 1.15rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   display: flex;
   align-items: center;
@@ -1961,12 +1961,12 @@
 
 .enrolledSubtitle {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
 }
 
 .creditsTotalBadge {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   padding: 0.4rem 0.85rem;
   border-radius: 9999px;
@@ -1983,8 +1983,8 @@
 }
 
 .courseCard {
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.1rem;
   display: flex;
@@ -1997,7 +1997,7 @@
 }
 
 .courseCard:hover {
-  border-color: #38bdf8;
+  border-color: var(--portal-info-border,#38bdf8);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 33, 71, 0.08);
 }
@@ -2013,8 +2013,8 @@
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
-  color: #475569;
-  background: #f1f5f9;
+  color: var(--portal-info-text,#475569);
+  background: var(--portal-info-bg,#f1f5f9);
   padding: 0.2rem 0.5rem;
   border-radius: 0.35rem;
   letter-spacing: 0.05em;
@@ -2030,39 +2030,39 @@
 }
 
 .catDsc {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--portal-info-bg,#eff6ff);
+  color: var(--portal-info-text,#1d4ed8);
+  border: 1px solid var(--portal-info-border,#bfdbfe);
 }
 
 .catAec {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+  background: var(--portal-success-bg,#ecfdf5);
+  color: var(--portal-success-text,#047857);
+  border: 1px solid var(--portal-success-border,#a7f3d0);
 }
 
 .catSec {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: var(--portal-warning-bg,#fffbeb);
+  color: var(--portal-warning-text,#b45309);
+  border: 1px solid var(--portal-warning-border,#fde68a);
 }
 
 .catVac {
-  background: #faf5ff;
-  color: #7e22ce;
-  border: 1px solid #e9d5ff;
+  background: var(--portal-purple-bg,#faf5ff);
+  color: var(--portal-purple-text,#7e22ce);
+  border: 1px solid var(--portal-purple-border,#e9d5ff);
 }
 
 .catMdc {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fecdd3;
+  background: var(--portal-danger-bg,#fff1f2);
+  color: var(--portal-danger-text,#be123c);
+  border: 1px solid var(--portal-danger-border,#fecdd3);
 }
 
 .catGeneral {
-  background: #f8fafc;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-info-text,#475569);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .cardMainBody {
@@ -2075,14 +2075,14 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #0284c7;
+  color: var(--portal-info-text,#0284c7);
   letter-spacing: 0.04em;
 }
 
 .cardCourseTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   line-height: 1.35;
   margin: 0;
 }
@@ -2092,12 +2092,12 @@
   align-items: center;
   justify-content: space-between;
   padding-top: 0.65rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--portal-strong-border,#f1f5f9);
   font-size: 0.75rem;
 }
 
 .cardDeptName {
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-weight: 500;
   max-width: 60%;
   overflow: hidden;
@@ -2107,9 +2107,9 @@
 
 .cardCreditPill {
   font-weight: 700;
-  color: #002147;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   padding: 0.15rem 0.5rem;
   border-radius: 0.35rem;
 }
@@ -2120,8 +2120,8 @@
   gap: 0.3rem;
   font-size: 0.68rem;
   font-weight: 700;
-  color: #166534;
-  background: #dcfce7;
+  color: var(--portal-success-text,#166534);
+  background: var(--portal-success-bg,#dcfce7);
   padding: 0.2rem 0.55rem;
   border-radius: 9999px;
 }
@@ -2132,15 +2132,15 @@
   gap: 0.3rem;
   font-size: 0.68rem;
   font-weight: 700;
-  color: #92400e;
-  background: #fef3c7;
+  color: var(--portal-warning-text,#92400e);
+  background: var(--portal-warning-bg,#fef3c7);
   padding: 0.2rem 0.55rem;
   border-radius: 9999px;
 }
 
 .emptyCoursesCard {
-  background: #f8fafc;
-  border: 1.5px dashed #cbd5e1;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1.5px dashed var(--portal-strong-border,#cbd5e1);
   border-radius: 0.75rem;
   padding: 2rem 1.5rem;
   text-align: center;
@@ -2157,13 +2157,13 @@
 .emptyCoursesTitle {
   font-size: 1rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--portal-brand-text,#1e293b);
   margin: 0;
 }
 
 .emptyCoursesText {
   font-size: 0.82rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0;
   max-width: 420px;
   line-height: 1.45;
@@ -2194,9 +2194,9 @@
 .skeletonLightPulse {
   background: linear-gradient(
     90deg,
-    #f1f5f9 25%,
-    #e2e8f0 37%,
-    #f1f5f9 63%
+    var(--portal-info-bg,#f1f5f9) 25%,
+    var(--portal-info-bg,#e2e8f0) 37%,
+    var(--portal-info-bg,#f1f5f9) 63%
   );
   background-size: 200% 100%;
   animation: shimmerAnim 1.6s ease-in-out infinite;
@@ -2258,7 +2258,7 @@
   padding: 0.4rem 0.85rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   background: transparent;
   border: none;
   border-radius: 0.35rem;
@@ -2270,7 +2270,7 @@
 }
 
 .viewModeBtn:hover {
-  color: #f1f5f9;
+  color: var(--portal-info-text,#f1f5f9);
 }
 
 .viewModeBtnActive {
@@ -2284,7 +2284,7 @@
   width: 100%;
   overflow-x: auto;
   margin-top: 1rem;
-  background: #0f172a;
+  background: var(--portal-primary,#0f172a);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.85rem;
   padding: 1rem;
@@ -2298,8 +2298,8 @@
 }
 
 .timetableTh {
-  background: #1e293b;
-  color: #94a3b8;
+  background: var(--portal-primary,#1e293b);
+  color: var(--portal-info-text,#94a3b8);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -2316,8 +2316,8 @@
 }
 
 .timetableDayCell {
-  background: #1e293b;
-  color: #f8fafc;
+  background: var(--portal-primary,#1e293b);
+  color: var(--portal-info-text,#f8fafc);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.75rem 0.85rem;
@@ -2339,7 +2339,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   font-size: 0.75rem;
   font-style: italic;
 }
@@ -2366,17 +2366,17 @@
   font-family: monospace;
   font-size: 0.68rem;
   font-weight: 700;
-  color: #38bdf8;
+  color: var(--portal-info-text,#38bdf8);
 }
 
 .timetableSlotLab .timetableCourseCode {
-  color: #c084fc;
+  color: var(--portal-purple-text,#c084fc);
 }
 
 .timetableCourseTitle {
   font-size: 0.72rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--portal-info-text,#f1f5f9);
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2389,7 +2389,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 0.65rem;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   margin-top: 0.15rem;
 }
 
@@ -2398,7 +2398,7 @@
   font-weight: 700;
   text-transform: uppercase;
   background: rgba(192, 132, 252, 0.2);
-  color: #d8b4fe;
+  color: var(--portal-purple-text,#d8b4fe);
   padding: 0.1rem 0.35rem;
   border-radius: 0.25rem;
 }
@@ -2426,7 +2426,7 @@
   gap: 0.5rem;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #f8fafc;
+  color: var(--portal-info-text,#f8fafc);
 }
 
 .todayBadge {
@@ -2442,7 +2442,7 @@
 
 .mobileDaySub {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   font-weight: 500;
 }
 
@@ -2457,7 +2457,7 @@
   display: flex;
   align-items: stretch;
   gap: 0.75rem;
-  background: #1e293b;
+  background: var(--portal-primary,#1e293b);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.65rem;
   padding: 0.65rem 0.75rem;
@@ -2478,13 +2478,13 @@
 .verticalPeriodNum {
   font-size: 0.9rem;
   font-weight: 800;
-  color: #38bdf8;
+  color: var(--portal-info-text,#38bdf8);
   line-height: 1;
 }
 
 .verticalPeriodTime {
   font-size: 0.62rem;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   margin-top: 0.25rem;
   font-weight: 500;
   line-height: 1.2;
@@ -2525,11 +2525,11 @@
   font-family: monospace;
   font-size: 0.75rem;
   font-weight: 800;
-  color: #38bdf8;
+  color: var(--portal-info-text,#38bdf8);
 }
 
 .verticalPeriodLab .verticalCourseCode {
-  color: #c084fc;
+  color: var(--portal-purple-text,#c084fc);
 }
 
 .verticalBadgeGroup {
@@ -2541,7 +2541,7 @@
 .verticalCategoryBadge {
   font-size: 0.65rem;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   background: rgba(255, 255, 255, 0.08);
   padding: 0.12rem 0.4rem;
   border-radius: 0.25rem;
@@ -2550,7 +2550,7 @@
 .verticalCourseTitle {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--portal-info-text,#f1f5f9);
   line-height: 1.35;
   word-break: break-word;
 }
@@ -2560,7 +2560,7 @@
   display: flex;
   align-items: center;
   padding: 0.5rem 0.65rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-size: 0.78rem;
   font-style: italic;
   background: rgba(15, 23, 42, 0.3);
@@ -2576,8 +2576,8 @@
 }
 
 .notificationCard {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.75rem;
   padding: 1.25rem;
   display: flex;
@@ -2592,14 +2592,14 @@
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
   padding-bottom: 0.75rem;
 }
 
 .notificationCardTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   display: flex;
   align-items: center;
@@ -2613,8 +2613,8 @@
 }
 
 .notificationItem {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   display: flex;
@@ -2627,13 +2627,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 .notificationItemValue {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .noticeList {
@@ -2648,8 +2648,8 @@
   gap: 0.75rem;
   padding: 0.85rem;
   border-radius: 0.5rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .noticeIcon {
@@ -2667,13 +2667,13 @@
 .noticeHeading {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
 .noticeBody {
   font-size: 0.75rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   margin: 0;
   line-height: 1.4;
 }
@@ -2700,8 +2700,8 @@
     right: 0 !important;
     top: auto !important;
     z-index: 1000 !important;
-    background: #ffffff !important;
-    border-top: 1px solid #e2e8f0 !important;
+    background: var(--portal-surface,#ffffff) !important;
+    border-top: 1px solid var(--portal-strong-border,#e2e8f0) !important;
     border-bottom: none !important;
     box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08) !important;
     display: flex !important;
@@ -2733,10 +2733,10 @@
   }
 
   .tabActive {
-    border-top-color: #002147 !important;
+    border-top-color: var(--portal-info-border,#002147) !important;
     border-bottom-color: transparent !important;
-    color: #002147 !important;
-    background: #f1f5f9 !important;
+    color: var(--portal-brand-text,#002147) !important;
+    background: var(--portal-info-bg,#f1f5f9) !important;
     font-weight: 700 !important;
   }
 
@@ -2764,7 +2764,7 @@
     position: absolute;
     top: -4px;
     right: -7px;
-    background: #002147;
+    background: var(--portal-primary,#002147);
     color: #ffffff;
     font-size: 0.55rem;
     font-weight: 800;
@@ -2774,7 +2774,7 @@
     align-items: center;
     justify-content: center;
     padding: 0 0.2rem;
-    border: 1px solid #ffffff;
+    border: 1px solid var(--portal-border,#ffffff);
   }
 
   /* ── 2. PAGE & VIEWPORT CONTENT ADJUSTMENTS ── */
@@ -2809,8 +2809,8 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background: var(--portal-info-bg,#f1f5f9);
+    border: 1px solid var(--portal-strong-border,#e2e8f0);
     padding: 0.2rem 0.5rem;
     border-radius: 9999px;
   }
@@ -2819,7 +2819,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #002147;
+    background: var(--portal-primary,#002147);
     color: #ffffff;
     font-size: 0.7rem;
     font-weight: 700;
@@ -2831,7 +2831,7 @@
   .mobileSemText {
     font-size: 0.65rem;
     font-weight: 700;
-    color: #002147;
+    color: var(--portal-brand-text,#002147);
   }
 
   .logoutText {
@@ -2942,18 +2942,18 @@
     border-radius: 9999px;
     font-size: 0.72rem;
     font-weight: 700;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #475569;
+    border: 1px solid var(--portal-strong-border,#cbd5e1);
+    background: var(--portal-surface,#ffffff);
+    color: var(--portal-info-text,#475569);
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.15s ease;
   }
 
   .daySelectBtnActive {
-    background: #002147;
+    background: var(--portal-primary,#002147);
     color: #ffffff;
-    border-color: #002147;
+    border-color: var(--portal-info-border,#002147);
   }
 
   .fullWeekBtn {

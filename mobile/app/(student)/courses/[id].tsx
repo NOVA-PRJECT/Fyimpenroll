@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../src/hooks/useAuth';
+import { useSemester } from '../../../src/hooks/useSemester';
+import { CourseSchema } from '../../../src/api/schemas/student.schema';
 import { useTheme } from '../../../src/hooks/useTheme';
 import { apiClient } from '../../../src/api/client';
 import { API_ENDPOINTS } from '../../../src/api/endpoints';
@@ -16,13 +18,14 @@ import { ErrorView } from '../../../src/components/common/ErrorView';
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const { activeSemester } = useSemester();
   const { colors, typography, spacing } = useTheme();
 
   const userId = user?.id || '';
 
   const { data: course, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: queryKeys.student.courseDetail(userId, id || ''),
-    queryFn: () => apiClient.get(`${API_ENDPOINTS.STUDENT_COURSES}/${id}`),
+    queryKey: queryKeys.student.courseDetail(userId, id || '', activeSemester),
+    queryFn: () => apiClient.get(`${API_ENDPOINTS.STUDENT_COURSES}/${id}?semester=${activeSemester}`, { schema: CourseSchema }),
     enabled: !!userId && !!id,
   });
 
@@ -66,7 +69,7 @@ export default function CourseDetailScreen() {
             </Text>
             <Text style={[typography.body, { color: colors.textSecondary, lineHeight: 22 }]}>
               {course.description ||
-                'This course covers foundational principles and multidisciplinary applications under the FYIMP academic framework.'}
+                'No course description has been published.'}
             </Text>
           </Card>
 

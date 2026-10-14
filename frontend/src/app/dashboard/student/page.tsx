@@ -152,7 +152,7 @@ export default function StudentDashboardPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 p-4" role={summaryError ? 'alert' : 'status'}>
           <p>{summaryError || 'Loading your dashboard data…'}</p>
-          {summaryError && <button onClick={retrySummary} className="rounded-lg bg-[#002147] px-4 py-2 text-white">Try again</button>}
+          {summaryError && <button onClick={retrySummary} className="rounded-lg bg-[color:var(--portal-primary,#002147)] px-4 py-2 text-white">Try again</button>}
           <NavigationLink href="/dashboard/student/register" className={styles.regCtaBtn}>Open course registration →</NavigationLink>
         </div>
         {/* Tab Bar Skeleton */}
@@ -197,7 +197,7 @@ export default function StudentDashboardPage() {
 
   return (
     <>
-      {summaryError && <div role="alert" className="flex items-center gap-3 bg-amber-50 p-4">
+      {summaryError && <div role="alert" className="flex items-center gap-3 bg-[color:var(--portal-warning-bg,#fffbeb)] p-4">
         <p>{summaryError}</p><button onClick={retrySummary}>Try again</button>
       </div>}
     <StudentDashboardClient

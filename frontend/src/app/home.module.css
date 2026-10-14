@@ -22,7 +22,7 @@
   font-family: var(--font-family);
   min-height: 100dvh;
   width: 100%;
-  background: radial-gradient(circle at 50% 50%, #061830 0%, #020710 100%);
+  background: radial-gradient(circle at 50% 50%, var(--portal-primary,#061830) 0%, var(--portal-primary,#020710) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -153,7 +153,7 @@
 /* Portal Title */
 .portalTitle {
   font-family: var(--font-display);
-  background: linear-gradient(135deg, #ffffff 40%, var(--gold-light) 100%);
+  background: linear-gradient(135deg, var(--portal-surface,#ffffff) 40%, var(--gold-light) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-size: 1.5rem;
@@ -182,7 +182,7 @@
   padding: 1.05rem;
   background: linear-gradient(90deg, var(--gold-accent) 0%, var(--gold-light) 50%, var(--gold-accent) 100%);
   background-size: 200% auto;
-  color: #020710;
+  color: var(--portal-brand-text,#020710);
   font-family: var(--font-display);
   font-size: 0.92rem;
   font-weight: 800;

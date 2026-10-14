@@ -1300,28 +1300,26 @@ export class RegistrationsService {
       candidateCourses = targetSlot.options ?? []
     }
 
-    const { data: allRegs } = await this.supabase.admin
-      .from('student_registrations')
-      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-      .eq('campus_id', campusId)
-      .eq('academic_year', settings.academic_year)
-      .eq('semester', sem)
-
     const seatCounts: Record<string, number> = {}
-    if (allRegs) {
-      for (const reg of allRegs) {
-        for (let s = 1; s <= 8; s++) {
-          const cid = (reg as any)[`slot_${s}_course_id`]
-          if (cid) {
-            seatCounts[cid] = (seatCounts[cid] || 0) + 1
-          }
-        }
+    // Keep RPC result sets below the API row limit even for large catalogues.
+    const candidateIds = [...new Set(candidateCourses.map((course) => course.id))]
+    for (let offset = 0; offset < candidateIds.length; offset += 200) {
+      const { data: counts, error } = await this.supabase.admin.rpc('course_enrollment_counts', {
+        p_course_ids: candidateIds.slice(offset, offset + 200),
+        p_academic_year: settings.academic_year,
+        p_semester: sem,
+      })
+      if (error || !counts) {
+        throw new InternalServerErrorException('Unable to load course seat availability')
+      }
+      for (const row of counts) {
+        seatCounts[row.course_id] = Number(row.enrolled)
       }
     }
 
     const availableCourses = candidateCourses
       .map((c) => {
-        const seatLimit = c.seat_limit ? Number(c.seat_limit) : 60
+        const seatLimit = c.seat_limit == null ? 60 : Number(c.seat_limit)
         const enrolled = seatCounts[c.id] || 0
         const remainingSeats = Math.max(0, seatLimit - enrolled)
         return {

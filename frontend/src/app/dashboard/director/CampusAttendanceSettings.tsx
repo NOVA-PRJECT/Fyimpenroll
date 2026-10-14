@@ -54,12 +54,12 @@ export default function CampusAttendanceSettings() {
     finally { setSaving(false) }
   }
 
-  return <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+  return <section style={{ background: "var(--portal-surface,#fff)", border: "1px solid var(--portal-strong-border,#e2e8f0)", borderRadius: 12, padding: 24, marginBottom: 24 }}>
     <h2 style={{ marginTop: 0 }}>Campus sign-in settings</h2>
     <p>Use a verified campus centre and a radius that covers the campus. All attendance times are in IST.</p>
-    {error && <p role="alert" style={{ color: '#991b1b' }}>{error} {!ready && <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
+    {error && <p role="alert" style={{ color: "var(--portal-danger-text,#991b1b)" }}>{error} {!ready && <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
     {!ready && !error && <p role="status">Loading attendance settings…</p>}
-    {success && <p role="status" style={{ color: '#065f46' }}>{success}</p>}
+    {success && <p role="status" style={{ color: "var(--portal-success-text,#065f46)" }}>{success}</p>}
     <form onSubmit={save}>
       <fieldset disabled={!ready || saving} style={{ border: 0, padding: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
@@ -70,7 +70,7 @@ export default function CampusAttendanceSettings() {
               min={key === 'center_latitude' ? -90 : key === 'center_longitude' ? -180 : key === 'radius_meters' ? 1 : undefined}
               max={key === 'center_latitude' ? 90 : key === 'center_longitude' ? 180 : undefined}
               onChange={event => { setSuccess(''); setValues(previous => ({ ...previous, [key]: event.target.value })) }}
-              style={{ padding: 10, border: '1px solid #94a3b8', borderRadius: 6 }} />
+              style={{ padding: 10, border: "1px solid var(--portal-strong-border,#94a3b8)", borderRadius: 6 }} />
           </label>)}
         </div>
         <button type="submit" style={{ marginTop: 16, padding: '10px 16px' }}>{saving ? 'Saving…' : 'Save campus sign-in settings'}</button>

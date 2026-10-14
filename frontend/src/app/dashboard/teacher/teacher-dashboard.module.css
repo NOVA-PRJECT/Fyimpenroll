@@ -6,14 +6,14 @@
   font-family: system-ui, -apple-system, sans-serif;
   min-height: 100dvh;
   width: 100%;
-  background-color: #f0f2f5;
+  background-color: var(--portal-canvas,#f0f2f5);
   display: flex;
   flex-direction: column;
 }
 
 /* ── UNIFIED EXECUTIVE TOP BAR ── */
 .topBar {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   padding: 0.4rem 1.25rem;
   display: flex;
   align-items: center;
@@ -64,7 +64,7 @@
 }
 
 .topBarTitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.85rem;
   font-weight: 700;
   margin: 0;
@@ -72,7 +72,7 @@
 }
 
 .topBarSubtitle {
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.65rem;
   font-weight: 600;
   margin: 0;
@@ -100,7 +100,7 @@
 .teacherNameHeader {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   margin-bottom: 0.2rem;
   line-height: 1.2;
@@ -123,7 +123,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.1);
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   border: 1px solid rgba(0, 33, 71, 1.0);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -137,7 +137,7 @@
   padding: 0.08rem 0.45rem;
   border-radius: 2rem;
   background: rgba(0, 33, 71, 0.06);
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   border: 1px solid rgba(0, 33, 71, 0.2);
   white-space: nowrap;
   overflow: hidden;
@@ -185,7 +185,7 @@
 }
 
 .logoutBtn:hover {
-  background: #001633;
+  background: var(--portal-primary,#001633);
   border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   transform: translateY(-1px);
@@ -224,9 +224,9 @@
   padding: 0.65rem 0.85rem;
   font-family: inherit;
   font-size: 0.85rem;
-  color: #191c1d;
-  background: #ffffff;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   transition: border-color 0.15s ease;
@@ -236,7 +236,7 @@
 }
 
 .searchInput:focus {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .searchResults {
@@ -244,8 +244,8 @@
   top: calc(100% + 0.35rem);
   left: 0;
   right: 0;
-  background: #ffffff;
-  border: 1.5px solid #dde1e7;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   box-shadow: 0 4px 16px rgba(0, 33, 71, 0.12);
   z-index: 50;
@@ -262,7 +262,7 @@
   padding: 0.65rem 0.85rem;
   background: transparent;
   border: none;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--portal-strong-border,#f0f2f5);
   cursor: pointer;
   text-align: left;
   transition: background 0.1s ease;
@@ -274,32 +274,32 @@
 }
 
 .searchResultItem:hover {
-  background: #f0f4f8;
+  background: var(--portal-info-bg,#f0f4f8);
 }
 
 .searchResultTitle {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .searchResultCode {
   font-size: 0.68rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-family: monospace;
 }
 
 .searchNoResult {
   padding: 0.85rem;
   font-size: 0.78rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-align: center;
 }
 
 .searchLabel {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0;
@@ -310,9 +310,9 @@
   padding: 0.65rem 0.85rem;
   font-family: inherit;
   font-size: 0.85rem;
-  color: #191c1d;
-  background: #ffffff;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -322,7 +322,7 @@
 }
 
 .courseSelect:focus {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .fetchBtn {
@@ -332,7 +332,7 @@
   font-size: 0.82rem;
   font-weight: 700;
   color: #ffffff;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
@@ -342,7 +342,7 @@
 }
 
 .fetchBtn:hover:not(:disabled) {
-  background: #001633;
+  background: var(--portal-primary,#001633);
 }
 
 .fetchBtn:disabled {
@@ -359,8 +359,8 @@
 }
 
 .statCard {
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
   padding: 0.85rem;
   text-align: center;
@@ -369,14 +369,14 @@
 .statValue {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   line-height: 1;
 }
 
 .statLabel {
   font-size: 0.65rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin: 0.3rem 0 0 0;
@@ -385,8 +385,8 @@
 
 /* Department breakdown */
 .breakdownCard {
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
   padding: 0.9rem 1rem;
   margin-bottom: 1rem;
@@ -395,7 +395,7 @@
 .breakdownTitle {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0 0 0.75rem 0;
@@ -406,7 +406,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.35rem 0;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--portal-strong-border,#f0f2f5);
 }
 
 .breakdownRow:last-child {
@@ -415,14 +415,14 @@
 
 .breakdownDept {
   font-size: 0.8rem;
-  color: #191c1d;
+  color: var(--portal-text,#191c1d);
   font-weight: 500;
 }
 
 .breakdownCount {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 /* Section header */
@@ -436,7 +436,7 @@
 .sectionTitle {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0;
@@ -466,8 +466,8 @@
 
 /* Table */
 .tableWrapper {
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.75rem;
   overflow: hidden;
 }
@@ -478,22 +478,22 @@
 }
 
 .tableHead {
-  background: #f8f9fa;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--portal-canvas,#f8f9fa);
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
 }
 
 .tableHead th {
   padding: 0.65rem 1rem;
   font-size: 0.65rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-align: left;
 }
 
 .tableRow {
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--portal-strong-border,#f0f2f5);
   transition: background 0.1s ease;
 }
 
@@ -502,18 +502,18 @@
 }
 
 .tableRow:hover {
-  background: #f8f9fa;
+  background: var(--portal-canvas,#f8f9fa);
 }
 
 .tableRow td {
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
-  color: #191c1d;
+  color: var(--portal-text,#191c1d);
 }
 
 .rollNumber {
   font-size: 0.72rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-family: monospace;
 }
 
@@ -522,9 +522,9 @@
   font-weight: 600;
   padding: 0.15rem 0.5rem;
   border-radius: 2rem;
-  background: #f0f4f8;
-  color: #44474e;
-  border: 1px solid #dde1e7;
+  background: var(--portal-info-bg,#f0f4f8);
+  color: var(--portal-muted,#44474e);
+  border: 1px solid var(--portal-border,#dde1e7);
 }
 
 /* Empty state */
@@ -541,13 +541,13 @@
 .emptyTitle {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   margin: 0 0 0.25rem 0;
 }
 
 .emptySubtitle {
   font-size: 0.78rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   margin: 0;
 }
 
@@ -564,8 +564,8 @@
 .spinner {
   width: 2rem;
   height: 2rem;
-  border: 3px solid #e2e5ea;
-  border-top-color: #002147;
+  border: 3px solid var(--portal-border,#e2e5ea);
+  border-top-color: var(--portal-info-border,#002147);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -576,24 +576,24 @@
 
 .loadingText {
   font-size: 0.82rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
 }
 
 /* Error banner */
 .errorBanner {
-  background: #fdf2f2;
-  border: 1px solid #f5c6c6;
+  background: var(--portal-danger-bg,#fdf2f2);
+  border: 1px solid var(--portal-danger-border,#f5c6c6);
   border-radius: 0.6rem;
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
-  color: #c0392b;
+  color: var(--portal-danger-text,#c0392b);
   margin-bottom: 1rem;
 }
 
 /* Course info banner */
 .courseInfoBanner {
-  background: #f0f4ff;
-  border: 1px solid #c5d0f5;
+  background: var(--portal-info-bg,#f0f4ff);
+  border: 1px solid var(--portal-info-border,#c5d0f5);
   border-radius: 0.6rem;
   padding: 0.65rem 1rem;
   margin-bottom: 1rem;
@@ -605,13 +605,13 @@
 .courseInfoName {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #2d4db5;
+  color: var(--portal-info-text,#2d4db5);
   margin: 0;
 }
 
 .courseInfoCode {
   font-size: 0.7rem;
-  color: #6b7db5;
+  color: var(--portal-info-text,#6b7db5);
   margin: 0;
   font-family: monospace;
 }
@@ -653,7 +653,7 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  border-bottom: 1px solid #e2e5ea;
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
   padding-bottom: 0.75rem;
 }
 
@@ -663,19 +663,19 @@
   font-weight: 600;
   padding: 0.45rem 0.9rem;
   border-radius: 0.45rem;
-  border: 1px solid #dde1e7;
-  background: #f8f9fa;
-  color: #44474e;
+  border: 1px solid var(--portal-border,#dde1e7);
+  background: var(--portal-canvas,#f8f9fa);
+  color: var(--portal-muted,#44474e);
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.attTab:hover { background: #e8eaed; }
+.attTab:hover { background: var(--portal-surface-raised,#e8eaed); }
 
 .attTabActive {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .attControls {
@@ -690,22 +690,22 @@
   font-family: inherit;
   font-size: 0.82rem;
   padding: 0.5rem 0.75rem;
-  border: 1.5px solid #dde1e7;
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
-  background: #f8f9fa;
-  color: #191c1d;
+  background: var(--portal-canvas,#f8f9fa);
+  color: var(--portal-text,#191c1d);
   cursor: pointer;
 }
 
 .attHint {
   font-size: 0.72rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   margin: 0 0 0.75rem;
 }
 
 .attGridWrapper {
   overflow-x: auto;
-  border: 1px solid #e2e5ea;
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.65rem;
   margin-bottom: 1rem;
   max-height: 28rem;
@@ -719,7 +719,7 @@
 }
 
 .attGrid thead {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   position: sticky;
   top: 0;
@@ -734,7 +734,7 @@
   white-space: nowrap;
   position: sticky;
   left: 0;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   z-index: 3;
 }
 
@@ -748,8 +748,8 @@
 .attStudentName {
   padding: 0.4rem 0.75rem;
   white-space: nowrap;
-  background: #f8f9fa;
-  border-right: 1px solid #e2e5ea;
+  background: var(--portal-canvas,#f8f9fa);
+  border-right: 1px solid var(--portal-border,#e2e5ea);
   position: sticky;
   left: 0;
   z-index: 1;
@@ -760,13 +760,13 @@
 
 .attStudentName span:first-child {
   font-weight: 600;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.75rem;
 }
 
 .attRoll {
   font-size: 0.65rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-family: monospace;
 }
 
@@ -774,29 +774,29 @@
   text-align: center;
   cursor: pointer;
   padding: 0.45rem 0.35rem;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--portal-border,#f0f0f0);
   font-size: 0.7rem;
   transition: background 0.1s;
   user-select: none;
   min-width: 2rem;
 }
 
-.attCell:hover { background: #e8f0fe; }
+.attCell:hover { background: var(--portal-info-bg,#e8f0fe); }
 
 .attPresent {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#16a34a);
   font-weight: 700;
 }
 
 .attAbsent {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--portal-danger-bg,#fee2e2);
+  color: var(--portal-danger-text,#dc2626);
   font-weight: 700;
 }
 
 .attPending {
-  outline: 2px solid #c4a227;
+  outline: 2px solid var(--portal-warning-border,#c4a227);
   outline-offset: -2px;
 }
 
@@ -810,7 +810,7 @@
 
 .attPendingHint {
   font-size: 0.75rem;
-  color: #c4a227;
+  color: var(--portal-warning-text,#c4a227);
   font-weight: 600;
   margin: 0;
 }
@@ -820,7 +820,7 @@
   font-size: 0.82rem;
   font-weight: 700;
   padding: 0.6rem 1.2rem;
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   border: none;
   border-radius: 0.5rem;
@@ -828,17 +828,17 @@
   transition: background 0.15s;
 }
 
-.attSaveBtn:hover:not(:disabled) { background: #001633; }
+.attSaveBtn:hover:not(:disabled) { background: var(--portal-primary,#001633); }
 .attSaveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .successBanner {
-  background: #f0faf4;
-  border: 1px solid #a8d5b5;
+  background: var(--portal-success-bg,#f0faf4);
+  border: 1px solid var(--portal-strong-border,#a8d5b5);
   border-radius: 0.6rem;
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #1a6b3c;
+  color: var(--portal-success-text,#1a6b3c);
   margin-bottom: 1rem;
 }
 
@@ -858,16 +858,16 @@
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.25rem 0.6rem;
-  border: 1px solid #dde1e7;
+  border: 1px solid var(--portal-border,#dde1e7);
   border-radius: 0.4rem;
-  background: #ffffff;
-  color: #002147;
+  background: var(--portal-surface,#ffffff);
+  color: var(--portal-brand-text,#002147);
   cursor: pointer;
   outline: none;
 }
 
 .tableFilterSelect:focus {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .modalOverlay {
@@ -883,7 +883,7 @@
 }
 
 .modal {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   border-radius: 1rem;
   padding: 1.5rem;
   width: 100%;
@@ -911,7 +911,7 @@
 .modalTitle {
   font-size: 1rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
 }
 
@@ -919,7 +919,7 @@
   background: transparent;
   border: none;
   font-size: 1.1rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   cursor: pointer;
   padding: 0.2rem 0.5rem;
   border-radius: 0.3rem;
@@ -927,13 +927,13 @@
 }
 
 .modalCloseBtn:hover {
-  background: #f0f2f5;
-  color: #002147;
+  background: var(--portal-canvas,#f0f2f5);
+  color: var(--portal-brand-text,#002147);
 }
 
 .modalSubtitle {
   font-size: 0.78rem;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   margin: 0 0 1.25rem 0;
   line-height: 1.45;
 }
@@ -951,21 +951,21 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
-  border: 1.5px solid #dde1e7;
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.6rem;
-  background: #f8f9fa;
+  background: var(--portal-canvas,#f8f9fa);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .radioOption:hover {
-  border-color: #002147;
-  background: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-surface,#ffffff);
 }
 
 .radioOptionActive {
-  border-color: #002147;
-  background: #f0f4ff;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-info-bg,#f0f4ff);
 }
 
 .radioInput {
@@ -983,18 +983,18 @@
 .radioOptionTitle {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .radioOptionDesc {
   font-size: 0.72rem;
-  color: #6b7280;
+  color: var(--portal-muted,#6b7280);
 }
 
 /* Custom Department Checklist */
 .customDeptContainer {
-  background: #f8f9fa;
-  border: 1px solid #dde1e7;
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1px solid var(--portal-border,#dde1e7);
   border-radius: 0.6rem;
   padding: 0.85rem;
   margin-bottom: 1rem;
@@ -1010,7 +1010,7 @@
 .deptQuickTitle {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1021,10 +1021,10 @@
 }
 
 .quickActionBtn {
-  background: #ffffff;
-  border: 1px solid #dde1e7;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#dde1e7);
   border-radius: 0.35rem;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   font-size: 0.68rem;
   font-weight: 600;
   padding: 0.2rem 0.5rem;
@@ -1033,9 +1033,9 @@
 }
 
 .quickActionBtn:hover {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .deptChecklist {
@@ -1051,20 +1051,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.65rem;
-  background: #ffffff;
-  border: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border: 1px solid var(--portal-border,#e2e5ea);
   border-radius: 0.45rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .deptCheckItem:hover {
-  border-color: #002147;
+  border-color: var(--portal-info-border,#002147);
 }
 
 .deptCheckItemActive {
-  background: #ffffff;
-  border-color: #002147;
+  background: var(--portal-surface,#ffffff);
+  border-color: var(--portal-info-border,#002147);
   box-shadow: 0 1px 4px rgba(0, 33, 71, 0.08);
 }
 
@@ -1084,14 +1084,14 @@
 .deptCheckName {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #191c1d;
+  color: var(--portal-text,#191c1d);
 }
 
 .deptCheckCodeBadge {
   font-size: 0.65rem;
   font-weight: 700;
-  background: #f0f4f8;
-  color: #002147;
+  background: var(--portal-info-bg,#f0f4f8);
+  color: var(--portal-brand-text,#002147);
   padding: 0.1rem 0.4rem;
   border-radius: 0.3rem;
   font-family: monospace;
@@ -1100,17 +1100,17 @@
 .deptCheckCount {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 /* Warnings and summary */
 .pdfWarningBanner {
-  background: #fdf2f2;
-  border: 1px solid #f5c6c6;
+  background: var(--portal-danger-bg,#fdf2f2);
+  border: 1px solid var(--portal-danger-border,#f5c6c6);
   border-radius: 0.5rem;
   padding: 0.55rem 0.75rem;
   font-size: 0.75rem;
-  color: #c0392b;
+  color: var(--portal-danger-text,#c0392b);
   font-weight: 600;
   margin-bottom: 1rem;
 }
@@ -1119,19 +1119,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f0f4ff;
-  border: 1px solid #c5d0f5;
+  background: var(--portal-info-bg,#f0f4ff);
+  border: 1px solid var(--portal-info-border,#c5d0f5);
   border-radius: 0.5rem;
   padding: 0.65rem 0.85rem;
   font-size: 0.78rem;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin-bottom: 1.25rem;
 }
 
 .pdfSummaryCount {
   font-size: 0.88rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 /* Modal Actions */
@@ -1148,16 +1148,16 @@
   font-weight: 600;
   padding: 0.55rem 1rem;
   border-radius: 0.45rem;
-  border: 1px solid #dde1e7;
-  background: #ffffff;
-  color: #44474e;
+  border: 1px solid var(--portal-border,#dde1e7);
+  background: var(--portal-surface,#ffffff);
+  color: var(--portal-muted,#44474e);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .modalCancelBtn:hover:not(:disabled) {
-  background: #f0f2f5;
-  color: #191c1d;
+  background: var(--portal-canvas,#f0f2f5);
+  color: var(--portal-text,#191c1d);
 }
 
 .modalConfirmBtn {
@@ -1187,9 +1187,9 @@
 ══════════════════════════════════════ */
 
 .filterCard {
-  background: #ffffff;
-  border: 1.5px solid #dde1e7;
-  border-top: 4px solid #c9a227;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-border,#dde1e7);
+  border-top: 4px solid var(--portal-warning-border,#c9a227);
   border-radius: 0.75rem;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
@@ -1206,7 +1206,7 @@
 .filterCardTitle {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0;
@@ -1234,7 +1234,7 @@
 .filterLabel {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #44474e;
+  color: var(--portal-muted,#44474e);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
@@ -1246,9 +1246,9 @@
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #002147;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -1262,8 +1262,8 @@
 }
 
 .filterSelect:focus {
-  border-color: #002147;
-  background-color: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background-color: var(--portal-surface,#ffffff);
 }
 
 .paperSelectRow {
@@ -1300,9 +1300,9 @@
   padding: 0.55rem 2.25rem 0.55rem 0.85rem;
   font-family: inherit;
   font-size: 0.82rem;
-  color: #191c1d;
-  background: #f8f9fa;
-  border: 1.5px solid #dde1e7;
+  color: var(--portal-text,#191c1d);
+  background: var(--portal-canvas,#f8f9fa);
+  border: 1.5px solid var(--portal-border,#dde1e7);
   border-radius: 0.5rem;
   outline: none;
   cursor: pointer;
@@ -1314,8 +1314,8 @@
 }
 
 .customSelectTrigger:focus {
-  border-color: #002147;
-  background-color: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background-color: var(--portal-surface,#ffffff);
 }
 
 .customSelectTrigger:disabled {
@@ -1334,7 +1334,7 @@
 .triggerTitle {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1342,7 +1342,7 @@
 
 .triggerMeta {
   font-size: 0.68rem;
-  color: #5b606a;
+  color: var(--portal-muted,#5b606a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1350,7 +1350,7 @@
 }
 
 .placeholderText {
-  color: #727782;
+  color: var(--portal-muted,#727782);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -1364,7 +1364,7 @@
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #002147;
+  border-top: 5px solid var(--portal-info-border,#002147);
   pointer-events: none;
   transition: transform 0.2s ease;
 }
@@ -1378,8 +1378,8 @@
   top: calc(100% + 0.35rem);
   left: 0;
   width: 100%;
-  background: #ffffff;
-  border: 1.5px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-info-border,#002147);
   border-radius: 0.5rem;
   box-shadow: 0 6px 20px rgba(0, 33, 71, 0.18);
   z-index: 1000;
@@ -1392,12 +1392,12 @@
   padding: 0.85rem;
   text-align: center;
   font-size: 0.78rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
 }
 
 .customOption {
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--portal-strong-border,#f0f2f5);
   cursor: pointer;
   transition: background 0.12s ease;
   display: flex;
@@ -1410,17 +1410,17 @@
 }
 
 .customOption:hover {
-  background: #f0f4ff;
+  background: var(--portal-info-bg,#f0f4ff);
 }
 
 .customOption.selected {
-  background: #e8f0fe;
-  border-left: 3px solid #002147;
+  background: var(--portal-info-bg,#e8f0fe);
+  border-left: 3px solid var(--portal-info-border,#002147);
 }
 
 .placeholderOption {
   font-size: 0.8rem;
-  color: #9ba1ab;
+  color: var(--portal-subtle,#9ba1ab);
   font-style: italic;
 }
 
@@ -1434,12 +1434,12 @@
 .optionTitle {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .optionCode {
   font-size: 0.72rem;
-  color: #5b606a;
+  color: var(--portal-muted,#5b606a);
   font-family: monospace;
 }
 
@@ -1453,18 +1453,18 @@
 .optionSemTag {
   font-size: 0.65rem;
   font-weight: 600;
-  background: #f0f4f8;
-  color: #44474e;
+  background: var(--portal-info-bg,#f0f4f8);
+  color: var(--portal-muted,#44474e);
   padding: 0.1rem 0.45rem;
   border-radius: 0.3rem;
-  border: 1px solid #dde1e7;
+  border: 1px solid var(--portal-border,#dde1e7);
 }
 
 .optionCountBadge {
   font-size: 0.7rem;
   font-weight: 700;
-  color: #16a34a;
-  background: #dcfce7;
+  color: var(--portal-success-text,#16a34a);
+  background: var(--portal-success-bg,#dcfce7);
   padding: 0.12rem 0.5rem;
   border-radius: 2rem;
 }
@@ -1484,15 +1484,15 @@
 .sectionDividerLine {
   flex: 1;
   height: 1.5px;
-  background: #cbd5e1;
+  background: var(--portal-info-bg,#cbd5e1);
 }
 
 .sectionDividerBadge {
   font-size: 0.68rem;
   font-weight: 800;
-  color: #002147;
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e2e8f0);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   padding: 0.35rem 0.85rem;
   border-radius: 2rem;
   text-transform: uppercase;
@@ -1502,9 +1502,9 @@
 }
 
 .detailsContainer {
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  border-top: 4px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
+  border-top: 4px solid var(--portal-info-border,#002147);
   border-radius: 0.85rem;
   padding: 1.25rem;
   box-shadow: 0 6px 20px rgba(0, 33, 71, 0.07);
@@ -1523,8 +1523,8 @@
 .tabBar {
   display: flex;
   width: 100%;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--portal-surface,#ffffff);
+  border-bottom: 1px solid var(--portal-border,#e2e5ea);
   padding: 0;
   box-sizing: border-box;
   overflow-x: auto;
@@ -1550,7 +1550,7 @@
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   background: transparent;
   border: none;
   border-bottom: 2.5px solid transparent;
@@ -1560,31 +1560,31 @@
 }
 
 .tabBtn:hover {
-  color: #002147;
-  background: #f8fafc;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#f8fafc);
 }
 
 .tabActive,
 .tabBtn.tabActive {
-  color: #002147;
-  border-bottom-color: #002147;
+  color: var(--portal-brand-text,#002147);
+  border-bottom-color: var(--portal-info-border,#002147);
   font-weight: 700;
-  background: #f0f4f8;
+  background: var(--portal-info-bg,#f0f4f8);
 }
 
 .tabCountBadge {
   font-size: 0.7rem;
   padding: 0.1rem 0.45rem;
   border-radius: 1rem;
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-info-text,#475569);
   font-weight: 700;
   transition: all 0.15s ease;
 }
 
 .tabActive .tabCountBadge,
 .tabBtn.tabActive .tabCountBadge {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
 }
 
@@ -1593,9 +1593,9 @@
 ══════════════════════════════════════ */
 
 .scheduleHeaderCard {
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  border-top: 4px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
+  border-top: 4px solid var(--portal-info-border,#002147);
   border-radius: 0.75rem;
   padding: 1.15rem 1.25rem;
   margin-bottom: 1.25rem;
@@ -1614,7 +1614,7 @@
 .scheduleTitle {
   font-size: 1rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   display: flex;
   align-items: center;
@@ -1632,25 +1632,25 @@
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #0f172a;
-  background: #f8fafc;
-  border: 1.5px solid #cbd5e1;
+  color: var(--portal-brand-text,#0f172a);
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.4rem;
   outline: none;
 }
 
 .scheduleDateInput:focus {
-  border-color: #002147;
-  background: #ffffff;
+  border-color: var(--portal-info-border,#002147);
+  background: var(--portal-surface,#ffffff);
 }
 
 .todayQuickBtn {
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #002147;
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e2e8f0);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   padding: 0.45rem 0.75rem;
   border-radius: 0.4rem;
   cursor: pointer;
@@ -1658,16 +1658,16 @@
 }
 
 .todayQuickBtn:hover {
-  background: #cbd5e1;
+  background: var(--portal-info-bg,#cbd5e1);
 }
 
 .refreshScheduleBtn {
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+  color: var(--portal-info-text,#475569);
+  background: var(--portal-info-bg,#f8fafc);
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   padding: 0.45rem 0.65rem;
   border-radius: 0.4rem;
   cursor: pointer;
@@ -1675,8 +1675,8 @@
 }
 
 .refreshScheduleBtn:hover {
-  background: #f1f5f9;
-  color: #002147;
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-brand-text,#002147);
 }
 
 .scheduleMetaSummary {
@@ -1684,7 +1684,7 @@
   align-items: center;
   gap: 1rem;
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   flex-wrap: wrap;
 }
 
@@ -1696,8 +1696,8 @@
 }
 
 .periodCard {
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.75rem;
   padding: 1.15rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
@@ -1709,17 +1709,17 @@
 }
 
 .periodCard:hover {
-  border-color: #94a3b8;
+  border-color: var(--portal-strong-border,#94a3b8);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 33, 71, 0.08);
 }
 
 .periodCardMarked {
-  border-left: 5px solid #16a34a;
+  border-left: 5px solid var(--portal-success-border,#16a34a);
 }
 
 .periodCardPending {
-  border-left: 5px solid #eab308;
+  border-left: 5px solid var(--portal-warning-border,#eab308);
 }
 
 .periodCardHeader {
@@ -1732,8 +1732,8 @@
 .periodTag {
   font-size: 0.78rem;
   font-weight: 800;
-  color: #002147;
-  background: #e2e8f0;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e2e8f0);
   padding: 0.2rem 0.6rem;
   border-radius: 0.35rem;
   letter-spacing: 0.02em;
@@ -1742,7 +1742,7 @@
 .periodTimeBadge {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -1751,7 +1751,7 @@
 .periodCourseTitle {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   margin: 0 0 0.25rem 0;
   line-height: 1.35;
 }
@@ -1759,7 +1759,7 @@
 .periodCourseCode {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin: 0 0 0.85rem 0;
 }
 
@@ -1769,15 +1769,15 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.55rem 0.75rem;
-  background: #f8fafc;
+  background: var(--portal-info-bg,#f8fafc);
   border-radius: 0.5rem;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--portal-strong-border,#f1f5f9);
   margin-bottom: 0.85rem;
   font-size: 0.78rem;
 }
 
 .statusMarkedText {
-  color: #16a34a;
+  color: var(--portal-success-text,#16a34a);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1785,7 +1785,7 @@
 }
 
 .statusPendingText {
-  color: #b45309;
+  color: var(--portal-warning-text,#b45309);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1794,7 +1794,7 @@
 
 .statusStatsText {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   font-weight: 500;
 }
 
@@ -1815,7 +1815,7 @@
 }
 
 .markAttendanceBtnPending {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
 }
 
@@ -1825,23 +1825,23 @@
 }
 
 .markAttendanceBtnMarked {
-  background: #f0fdf4;
-  color: #166534;
-  border: 1.5px solid #bbf7d0;
+  background: var(--portal-success-bg,#f0fdf4);
+  color: var(--portal-success-text,#166534);
+  border: 1.5px solid var(--portal-success-border,#bbf7d0);
 }
 
 .markAttendanceBtnMarked:hover {
-  background: #dcfce7;
+  background: var(--portal-success-bg,#dcfce7);
 }
 
 /* Empty period state */
 .emptyPeriodBanner {
-  background: #ffffff;
-  border: 1.5px dashed #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px dashed var(--portal-strong-border,#cbd5e1);
   border-radius: 0.75rem;
   padding: 2.5rem 1.5rem;
   text-align: center;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   grid-column: 1 / -1;
 }
 
@@ -1850,7 +1850,7 @@
 ══════════════════════════════════════ */
 
 .attendanceModal {
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   border-radius: 0.85rem;
   width: 94%;
   max-width: 580px;
@@ -1868,7 +1868,7 @@
 }
 
 .attendanceModalHeader {
-  background: linear-gradient(135deg, #002147 0%, #1e3a8a 100%);
+  background: linear-gradient(135deg, var(--portal-primary,#002147) 0%, #1e3a8a 100%);
   color: #ffffff;
   padding: 1.15rem 1.25rem;
   display: flex;
@@ -1909,8 +1909,8 @@
 
 .attendanceModalControls {
   padding: 0.85rem 1.25rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--portal-info-bg,#f8fafc);
+  border-bottom: 1px solid var(--portal-strong-border,#e2e8f0);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1927,11 +1927,11 @@
 }
 
 .statLivePresent {
-  color: #16a34a;
+  color: var(--portal-success-text,#16a34a);
 }
 
 .statLiveAbsent {
-  color: #dc2626;
+  color: var(--portal-danger-text,#dc2626);
 }
 
 .quickActionGroup {
@@ -1945,16 +1945,16 @@
   font-weight: 700;
   padding: 0.35rem 0.65rem;
   border-radius: 0.35rem;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
+  background: var(--portal-surface,#ffffff);
+  color: var(--portal-info-text,#334155);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .quickBtn:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
+  background: var(--portal-info-bg,#f1f5f9);
+  border-color: var(--portal-strong-border,#94a3b8);
 }
 
 .attendanceStudentList {
@@ -1971,21 +1971,21 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.7rem 0.85rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--portal-strong-border,#e2e8f0);
   border-radius: 0.5rem;
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
   transition: all 0.12s ease;
 }
 
 .studentAttendanceRowPresent {
-  border-left: 4px solid #16a34a;
-  background: #ffffff;
+  border-left: 4px solid var(--portal-success-border,#16a34a);
+  background: var(--portal-surface,#ffffff);
 }
 
 .studentAttendanceRowAbsent {
-  border-left: 4px solid #dc2626;
-  background: #fef2f2;
-  border-color: #fecaca;
+  border-left: 4px solid var(--portal-danger-border,#dc2626);
+  background: var(--portal-danger-bg,#fef2f2);
+  border-color: var(--portal-danger-border,#fecaca);
 }
 
 .studentInfoBlock {
@@ -1997,12 +1997,12 @@
 .studentRowName {
   font-size: 0.86rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 .studentRowMeta {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
 }
 
 .toggleStatusBtn {
@@ -2019,36 +2019,36 @@
 }
 
 .toggleStatusPresent {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #86efac;
+  background: var(--portal-success-bg,#dcfce7);
+  color: var(--portal-success-text,#166534);
+  border: 1px solid var(--portal-success-border,#86efac);
 }
 
 .toggleStatusPresent:hover {
-  background: #bbf7d0;
+  background: var(--portal-success-bg,#bbf7d0);
 }
 
 .toggleStatusAbsent {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
+  background: var(--portal-danger-bg,#fee2e2);
+  color: var(--portal-danger-text,#991b1b);
+  border: 1px solid var(--portal-danger-border,#fca5a5);
 }
 
 .toggleStatusAbsent:hover {
-  background: #fecaca;
+  background: var(--portal-danger-bg,#fecaca);
 }
 
 .attendanceModalFooter {
   padding: 1rem 1.25rem;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
+  border-top: 1px solid var(--portal-strong-border,#e2e8f0);
+  background: var(--portal-surface,#ffffff);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
 }
 
 .submitAttendanceBtn {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   font-family: inherit;
   font-size: 0.84rem;
@@ -2075,9 +2075,9 @@
 ══════════════════════════════════════ */
 
 .timetableContainer {
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  border-top: 4px solid #002147;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
+  border-top: 4px solid var(--portal-info-border,#002147);
   border-radius: 0.75rem;
   padding: 1.25rem;
   box-shadow: 0 2px 8px rgba(0, 33, 71, 0.04);
@@ -2092,13 +2092,13 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--portal-strong-border,#e2e8f0);
 }
 
 .timetableTitle {
   font-size: 1rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
   margin: 0;
   display: flex;
   align-items: center;
@@ -2114,10 +2114,10 @@
 
 .dayFilterGroup {
   display: flex;
-  background: #f1f5f9;
+  background: var(--portal-info-bg,#f1f5f9);
   padding: 0.2rem;
   border-radius: 0.45rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   gap: 0.2rem;
 }
 
@@ -2129,18 +2129,18 @@
   border-radius: 0.35rem;
   border: none;
   background: transparent;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .dayFilterBtn:hover:not(.dayFilterBtnActive) {
-  background: #e2e8f0;
-  color: #002147;
+  background: var(--portal-info-bg,#e2e8f0);
+  color: var(--portal-brand-text,#002147);
 }
 
 .dayFilterBtnActive {
-  background: #002147;
+  background: var(--portal-primary,#002147);
   color: #ffffff;
   font-weight: 700;
 }
@@ -2148,18 +2148,18 @@
 .timetableMetaPill {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #002147;
-  background: #e2e8f0;
+  color: var(--portal-brand-text,#002147);
+  background: var(--portal-info-bg,#e2e8f0);
   padding: 0.35rem 0.75rem;
   border-radius: 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
 }
 
 /* Desktop Grid View */
 .timetableDesktop {
   display: block;
   overflow-x: auto;
-  border: 1.5px solid #cbd5e1;
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
 }
 
@@ -2170,15 +2170,15 @@
 }
 
 .timetableTh {
-  background: #f8fafc;
-  color: #002147;
+  background: var(--portal-info-bg,#f8fafc);
+  color: var(--portal-brand-text,#002147);
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.65rem 0.6rem;
   text-align: center;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
 }
 
 .timetableThDay {
@@ -2188,22 +2188,22 @@
 }
 
 .timetableDayCell {
-  background: #f1f5f9;
-  color: #002147;
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-brand-text,#002147);
   font-size: 0.82rem;
   font-weight: 700;
   padding: 0.75rem 0.85rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   white-space: nowrap;
 }
 
 .timetableTd {
   padding: 0.4rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--portal-strong-border,#cbd5e1);
   vertical-align: top;
   height: 85px;
   width: 14.5%;
-  background: #ffffff;
+  background: var(--portal-surface,#ffffff);
 }
 
 .timetableSlotEmpty {
@@ -2211,15 +2211,15 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   font-size: 0.75rem;
   font-style: italic;
 }
 
 .timetableSlotFilled {
-  background: #f0fdf4;
-  border: 1.5px solid #86efac;
-  border-left: 4px solid #16a34a;
+  background: var(--portal-success-bg,#f0fdf4);
+  border: 1.5px solid var(--portal-success-border,#86efac);
+  border-left: 4px solid var(--portal-success-border,#16a34a);
   border-radius: 0.45rem;
   padding: 0.5rem;
   height: 100%;
@@ -2237,26 +2237,26 @@
 }
 
 .timetableSlotLab {
-  background: #f5f3ff;
-  border-color: #c4b5fd;
-  border-left-color: #7c3aed;
+  background: var(--portal-info-bg,#f5f3ff);
+  border-color: var(--portal-info-border,#c4b5fd);
+  border-left-color: var(--portal-info-border,#7c3aed);
 }
 
 .timetableCourseCode {
   font-family: monospace;
   font-size: 0.75rem;
   font-weight: 800;
-  color: #166534;
+  color: var(--portal-success-text,#166534);
 }
 
 .timetableSlotLab .timetableCourseCode {
-  color: #6d28d9;
+  color: var(--portal-info-text,#6d28d9);
 }
 
 .timetableCourseTitle {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2269,7 +2269,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 0.68rem;
-  color: #475569;
+  color: var(--portal-info-text,#475569);
   margin-top: 0.15rem;
   gap: 0.25rem;
 }
@@ -2277,8 +2277,8 @@
 .timetableCategoryBadge {
   font-size: 0.62rem;
   font-weight: 700;
-  color: #1e3a8a;
-  background: #dbeafe;
+  color: var(--portal-info-text,#1e3a8a);
+  background: var(--portal-info-bg,#dbeafe);
   padding: 0.08rem 0.35rem;
   border-radius: 0.25rem;
   white-space: nowrap;
@@ -2288,8 +2288,8 @@
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
-  background: #ede9fe;
-  color: #6d28d9;
+  background: var(--portal-info-bg,#ede9fe);
+  color: var(--portal-info-text,#6d28d9);
   padding: 0.08rem 0.35rem;
   border-radius: 0.25rem;
   white-space: nowrap;
@@ -2313,7 +2313,7 @@
   gap: 0.45rem;
   font-size: 1rem;
   font-weight: 700;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .todayBadge {
@@ -2334,16 +2334,16 @@
 .verticalPeriodCard {
   display: flex;
   align-items: stretch;
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
+  background: var(--portal-surface,#ffffff);
+  border: 1.5px solid var(--portal-strong-border,#cbd5e1);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .verticalPeriodTimeCol {
   width: 90px;
-  background: #f8fafc;
-  border-right: 1.5px solid #cbd5e1;
+  background: var(--portal-info-bg,#f8fafc);
+  border-right: 1.5px solid var(--portal-strong-border,#cbd5e1);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2355,12 +2355,12 @@
 .verticalPeriodNum {
   font-size: 0.74rem;
   font-weight: 800;
-  color: #002147;
+  color: var(--portal-brand-text,#002147);
 }
 
 .verticalPeriodTime {
   font-size: 0.65rem;
-  color: #64748b;
+  color: var(--portal-muted,#64748b);
   margin-top: 0.15rem;
 }
 
@@ -2388,17 +2388,17 @@
   font-family: monospace;
   font-size: 0.78rem;
   font-weight: 800;
-  color: #166534;
+  color: var(--portal-success-text,#166534);
 }
 
 .verticalCourseTitle {
   font-size: 0.84rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--portal-brand-text,#0f172a);
 }
 
 .verticalPeriodEmpty {
-  color: #94a3b8;
+  color: var(--portal-info-text,#94a3b8);
   font-size: 0.78rem;
   font-style: italic;
 }

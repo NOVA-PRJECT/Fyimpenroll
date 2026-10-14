@@ -29,7 +29,9 @@ export const queryKeys = {
     profile: (userId: string) => ['auth', 'profile', userId] as const,
   },
   student: {
-    dashboard: (userId: string) => ['student', 'dashboard', userId] as const,
+    dashboard: (userId: string, semester?: number, date?: string) => semester === undefined
+      ? ['student', 'dashboard', userId] as const
+      : ['student', 'dashboard', userId, semester, date] as const,
     timetable: (userId: string, semester?: number) =>
       ['student', 'timetable', userId, semester ?? 'current'] as const,
     attendanceList: (userId: string, semester?: number) =>
@@ -40,8 +42,8 @@ export const queryKeys = {
       ['student', 'campus-status', userId, dateStr] as const,
     courses: (userId: string, semester?: number) =>
       ['student', 'courses', userId, semester ?? 'current'] as const,
-    courseDetail: (userId: string, courseId: string) =>
-      ['student', 'course-detail', userId, courseId] as const,
+    courseDetail: (userId: string, courseId: string, semester?: number) =>
+      ['student', 'course-detail', userId, courseId, semester ?? 'current'] as const,
     credits: (userId: string) => ['student', 'credits', userId] as const,
   },
   teacher: {

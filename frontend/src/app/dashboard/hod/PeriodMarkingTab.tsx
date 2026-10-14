@@ -228,10 +228,10 @@ export default function PeriodMarkingTab() {
       {/* ── Top Header & Stats ── */}
       <div
         style={{
-          background: '#ffffff',
+          background: "var(--portal-surface,#ffffff)",
           borderRadius: '12px',
           padding: '1.25rem',
-          border: '1px solid #e2e8f0',
+          border: "1px solid var(--portal-strong-border,#e2e8f0)",
           display: 'flex',
           flexWrap: 'wrap',
           gap: '1rem',
@@ -240,10 +240,10 @@ export default function PeriodMarkingTab() {
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#002147', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clock size={20} color="#c9a227" /> Period Attendance Monitoring
           </h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0' }}>
+          <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#64748b)", margin: '4px 0 0' }}>
             Monitor real-time lecture period attendance and track dated student rosters for your department.
           </p>
         </div>
@@ -273,29 +273,29 @@ export default function PeriodMarkingTab() {
             {exporting ? 'Generating Statement...' : `Export Sem ${semesterFilter === 'all' ? 1 : semesterFilter} Statement (XLSX)`}
           </button>
 
-          <div style={{ padding: '6px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px' }}>
-            <span style={{ color: '#64748b' }}>Total Slots: </span>
-            <strong style={{ color: '#0f172a' }}>{slots.length}</strong>
+          <div style={{ padding: '6px 14px', borderRadius: '8px', background: "var(--portal-info-bg,#f8fafc)", border: "1px solid var(--portal-strong-border,#e2e8f0)", fontSize: '12px' }}>
+            <span style={{ color: "var(--portal-muted,#64748b)" }}>Total Slots: </span>
+            <strong style={{ color: "var(--portal-brand-text,#0f172a)" }}>{slots.length}</strong>
           </div>
-          <div style={{ padding: '6px 14px', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '12px' }}>
-            <span style={{ color: '#15803d' }}>Marked: </span>
-            <strong style={{ color: '#166534' }}>{slots.filter((s) => s.is_marked).length}</strong>
+          <div style={{ padding: '6px 14px', borderRadius: '8px', background: "var(--portal-success-bg,#f0fdf4)", border: "1px solid var(--portal-success-border,#bbf7d0)", fontSize: '12px' }}>
+            <span style={{ color: "var(--portal-success-text,#15803d)" }}>Marked: </span>
+            <strong style={{ color: "var(--portal-success-text,#166534)" }}>{slots.filter((s) => s.is_marked).length}</strong>
           </div>
-          <div style={{ padding: '6px 14px', borderRadius: '8px', background: '#fffbeb', border: '1px solid #fde68a', fontSize: '12px' }}>
-            <span style={{ color: '#b45309' }}>Pending: </span>
-            <strong style={{ color: '#92400e' }}>{slots.filter((s) => !s.is_marked).length}</strong>
+          <div style={{ padding: '6px 14px', borderRadius: '8px', background: "var(--portal-warning-bg,#fffbeb)", border: "1px solid var(--portal-warning-border,#fde68a)", fontSize: '12px' }}>
+            <span style={{ color: "var(--portal-warning-text,#b45309)" }}>Pending: </span>
+            <strong style={{ color: "var(--portal-warning-text,#92400e)" }}>{slots.filter((s) => !s.is_marked).length}</strong>
           </div>
         </div>
       </div>
 
       {/* ── Banners ── */}
       {error && (
-        <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #f87171', color: '#b91c1c', fontSize: '13px' }}>
+        <div style={{ padding: '10px 14px', borderRadius: '8px', background: "var(--portal-danger-bg,#fee2e2)", border: "1px solid var(--portal-danger-border,#f87171)", color: "var(--portal-danger-text,#b91c1c)", fontSize: '13px' }}>
           {error}
         </div>
       )}
       {success && (
-        <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#dcfce7', border: '1px solid #86efac', color: '#15803d', fontSize: '13px' }}>
+        <div style={{ padding: '10px 14px', borderRadius: '8px', background: "var(--portal-success-bg,#dcfce7)", border: "1px solid var(--portal-success-border,#86efac)", color: "var(--portal-success-text,#15803d)", fontSize: '13px' }}>
           {success}
         </div>
       )}
@@ -303,23 +303,23 @@ export default function PeriodMarkingTab() {
       {/* ── Two-Column Layout: Slots List (Left) + Roster View (Right) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
         {/* LEFT COLUMN: Timetable Slots Filter & List */}
-        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ background: "var(--portal-surface,#ffffff)", borderRadius: '12px', border: "1px solid var(--portal-strong-border,#e2e8f0)", padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#002147', margin: 0 }}>Timetable Lecture Slots</h3>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0 }}>Timetable Lecture Slots</h3>
             <button
               onClick={fetchSlots}
               disabled={loadingSlots}
               style={{
                 padding: '4px 8px',
                 borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                background: '#fff',
+                border: "1px solid var(--portal-strong-border,#cbd5e1)",
+                background: "var(--portal-surface,#fff)",
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                color: '#475569',
+                color: "var(--portal-info-text,#475569)",
               }}
             >
               <RefreshCw size={12} className={loadingSlots ? 'animate-spin' : ''} /> Refresh
@@ -334,7 +334,7 @@ export default function PeriodMarkingTab() {
                 type="date"
                 value={attendanceDate}
                 onChange={(e) => setAttendanceDate(e.target.value)}
-                style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', width: '100%' }}
+                style={{ padding: '5px 8px', borderRadius: '6px', border: "1px solid var(--portal-strong-border,#cbd5e1)", fontSize: '12px', background: "var(--portal-surface,#fff)", width: '100%' }}
                 title="Select academic date to inspect attendance marks"
               />
             </div>
@@ -342,7 +342,7 @@ export default function PeriodMarkingTab() {
             <select
               value={semesterFilter}
               onChange={(e) => setSemesterFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', flex: 1 }}
+              style={{ padding: '6px 10px', borderRadius: '6px', border: "1px solid var(--portal-strong-border,#cbd5e1)", fontSize: '12px', background: "var(--portal-surface,#fff)", flex: 1 }}
             >
               <option value="all">All Semesters</option>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
@@ -355,7 +355,7 @@ export default function PeriodMarkingTab() {
             <select
               value={dayFilter}
               onChange={(e) => setDayFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', flex: 1 }}
+              style={{ padding: '6px 10px', borderRadius: '6px', border: "1px solid var(--portal-strong-border,#cbd5e1)", fontSize: '12px', background: "var(--portal-surface,#fff)", flex: 1 }}
             >
               <option value="all">All Days</option>
               {[1, 2, 3, 4, 5, 6].map((d) => (
@@ -378,7 +378,7 @@ export default function PeriodMarkingTab() {
                 width: '100%',
                 padding: '6px 10px 6px 30px',
                 borderRadius: '6px',
-                border: '1px solid #cbd5e1',
+                border: "1px solid var(--portal-strong-border,#cbd5e1)",
                 fontSize: '12px',
                 boxSizing: 'border-box',
               }}
@@ -388,9 +388,9 @@ export default function PeriodMarkingTab() {
           {/* Slots List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '560px', overflowY: 'auto' }}>
             {loadingSlots ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>Loading slots...</div>
+              <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>Loading slots...</div>
             ) : filteredSlots.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>No timetable slots found.</div>
+              <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>No timetable slots found.</div>
             ) : (
               filteredSlots.map((slot) => {
                 const isSelected = slot.id === selectedSlotId
@@ -401,8 +401,8 @@ export default function PeriodMarkingTab() {
                     style={{
                       padding: '10px 12px',
                       borderRadius: '8px',
-                      border: isSelected ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                      background: isSelected ? '#f0f9ff' : '#ffffff',
+                      border: isSelected ? "2px solid var(--portal-info-border,#0284c7)" : "1px solid var(--portal-strong-border,#e2e8f0)",
+                      background: isSelected ? "var(--portal-info-bg,#f0f9ff)" : "var(--portal-surface,#ffffff)",
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       display: 'flex',
@@ -411,24 +411,24 @@ export default function PeriodMarkingTab() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#002147' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
                         {slot.course_code} • P{slot.period_number}
                       </span>
-                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                      <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>
                         {DAY_NAMES[slot.day_of_week]} {slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>{slot.course_title}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: "var(--portal-brand-text,#1e293b)" }}>{slot.course_title}</div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {slot.is_marked ? (
-                          <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                          <span style={{ fontSize: '10px', background: "var(--portal-success-bg,#dcfce7)", color: "var(--portal-success-text,#15803d)", padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             ✓ Marked ({slot.present_count} Pres, {slot.absent_count} Abs)
                           </span>
                         ) : (
-                          <span style={{ fontSize: '10px', background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                          <span style={{ fontSize: '10px', background: "var(--portal-warning-bg,#fef3c7)", color: "var(--portal-warning-text,#b45309)", padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             ⏳ Pending / Unmarked
                           </span>
                         )}
@@ -442,20 +442,20 @@ export default function PeriodMarkingTab() {
         </div>
 
         {/* RIGHT COLUMN: Selected Slot Attendance Roster */}
-        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ background: "var(--portal-surface,#ffffff)", borderRadius: '12px', border: "1px solid var(--portal-strong-border,#e2e8f0)", padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {activeSlot ? (
             <>
               {/* Header Info of Selected Slot */}
-              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ borderBottom: "1px solid var(--portal-strong-border,#e2e8f0)", paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, background: "var(--portal-info-bg,#e0f2fe)", color: "var(--portal-info-text,#0369a1)", padding: '2px 8px', borderRadius: '4px' }}>
                       {activeSlot.course_code} • Period {activeSlot.period_number}
                     </span>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#002147', margin: '6px 0 2px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '6px 0 2px' }}>
                       {activeSlot.course_title}
                     </h3>
-                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                    <p style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)", margin: 0 }}>
                       {DAY_NAMES[activeSlot.day_of_week]} • {activeSlot.start_time?.slice(0, 5)} - {activeSlot.end_time?.slice(0, 5)} • Sem {activeSlot.semester} • Date: {attendanceDate}
                     </p>
                   </div>
@@ -464,21 +464,21 @@ export default function PeriodMarkingTab() {
                 {/* Status and Statistics Strip */}
                 {rosterData?.summary && (
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                    <div style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '11px' }}>
-                      <span style={{ color: '#64748b' }}>Enrolled: </span>
+                    <div style={{ background: "var(--portal-info-bg,#f8fafc)", padding: '6px 12px', borderRadius: '6px', border: "1px solid var(--portal-strong-border,#e2e8f0)", fontSize: '11px' }}>
+                      <span style={{ color: "var(--portal-muted,#64748b)" }}>Enrolled: </span>
                       <strong>{rosterData.summary.total_enrolled}</strong>
                     </div>
-                    <div style={{ background: '#f0fdf4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '11px' }}>
-                      <span style={{ color: '#15803d' }}>Present: </span>
-                      <strong style={{ color: '#166534' }}>{rosterData.summary.present_count}</strong>
+                    <div style={{ background: "var(--portal-success-bg,#f0fdf4)", padding: '6px 12px', borderRadius: '6px', border: "1px solid var(--portal-success-border,#bbf7d0)", fontSize: '11px' }}>
+                      <span style={{ color: "var(--portal-success-text,#15803d)" }}>Present: </span>
+                      <strong style={{ color: "var(--portal-success-text,#166534)" }}>{rosterData.summary.present_count}</strong>
                     </div>
-                    <div style={{ background: '#fef2f2', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fecaca', fontSize: '11px' }}>
-                      <span style={{ color: '#b91c1c' }}>Absent: </span>
-                      <strong style={{ color: '#991b1b' }}>{rosterData.summary.absent_count}</strong>
+                    <div style={{ background: "var(--portal-danger-bg,#fef2f2)", padding: '6px 12px', borderRadius: '6px', border: "1px solid var(--portal-danger-border,#fecaca)", fontSize: '11px' }}>
+                      <span style={{ color: "var(--portal-danger-text,#b91c1c)" }}>Absent: </span>
+                      <strong style={{ color: "var(--portal-danger-text,#991b1b)" }}>{rosterData.summary.absent_count}</strong>
                     </div>
-                    <div style={{ background: '#fefce8', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fef08a', fontSize: '11px' }}>
-                      <span style={{ color: '#a16207' }}>Unmarked: </span>
-                      <strong style={{ color: '#854d0e' }}>{rosterData.summary.unmarked_count}</strong>
+                    <div style={{ background: "var(--portal-warning-bg,#fefce8)", padding: '6px 12px', borderRadius: '6px', border: "1px solid var(--portal-warning-border,#fef08a)", fontSize: '11px' }}>
+                      <span style={{ color: "var(--portal-warning-text,#a16207)" }}>Unmarked: </span>
+                      <strong style={{ color: "var(--portal-warning-text,#854d0e)" }}>{rosterData.summary.unmarked_count}</strong>
                     </div>
                   </div>
                 )}
@@ -497,7 +497,7 @@ export default function PeriodMarkingTab() {
                       width: '100%',
                       padding: '6px 10px 6px 30px',
                       borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
+                      border: "1px solid var(--portal-strong-border,#cbd5e1)",
                       fontSize: '12px',
                       boxSizing: 'border-box',
                     }}
@@ -507,7 +507,7 @@ export default function PeriodMarkingTab() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as 'all' | 'present' | 'absent')}
-                  style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                  style={{ padding: '6px 10px', borderRadius: '6px', border: "1px solid var(--portal-strong-border,#cbd5e1)", fontSize: '12px', background: "var(--portal-surface,#fff)" }}
                 >
                   <option value="all">All Statuses</option>
                   <option value="present">Present Only</option>
@@ -519,36 +519,36 @@ export default function PeriodMarkingTab() {
               {/* Students Table */}
               <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
                 {loadingRoster ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>Loading student roster...</div>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>Loading student roster...</div>
                 ) : filteredStudents.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '13px' }}>No students found matching filter.</div>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>No students found matching filter.</div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                        <th style={{ padding: '8px', color: '#475569' }}>#</th>
-                        <th style={{ padding: '8px', color: '#475569' }}>Student Name</th>
-                        <th style={{ padding: '8px', color: '#475569' }}>CAP / ID</th>
-                        <th style={{ padding: '8px', color: '#475569' }}>Status</th>
+                      <tr style={{ background: "var(--portal-info-bg,#f8fafc)", borderBottom: "1px solid var(--portal-strong-border,#e2e8f0)", textAlign: 'left' }}>
+                        <th style={{ padding: '8px', color: "var(--portal-info-text,#475569)" }}>#</th>
+                        <th style={{ padding: '8px', color: "var(--portal-info-text,#475569)" }}>Student Name</th>
+                        <th style={{ padding: '8px', color: "var(--portal-info-text,#475569)" }}>CAP / ID</th>
+                        <th style={{ padding: '8px', color: "var(--portal-info-text,#475569)" }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStudents.map((st, idx) => (
-                        <tr key={st.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px', color: '#64748b' }}>{idx + 1}</td>
-                          <td style={{ padding: '8px', fontWeight: 600, color: '#1e293b' }}>{st.full_name}</td>
-                          <td style={{ padding: '8px', color: '#64748b' }}>{st.cap_application_number || '—'}</td>
+                        <tr key={st.id} style={{ borderBottom: "1px solid var(--portal-strong-border,#f1f5f9)" }}>
+                          <td style={{ padding: '8px', color: "var(--portal-muted,#64748b)" }}>{idx + 1}</td>
+                          <td style={{ padding: '8px', fontWeight: 600, color: "var(--portal-brand-text,#1e293b)" }}>{st.full_name}</td>
+                          <td style={{ padding: '8px', color: "var(--portal-muted,#64748b)" }}>{st.cap_application_number || '—'}</td>
                           <td style={{ padding: '8px' }}>
                             {st.status === 'present' ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803d', fontWeight: 600 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: "var(--portal-success-text,#15803d)", fontWeight: 600 }}>
                                 <CheckCircle2 size={13} /> Present
                               </span>
                             ) : st.status === 'absent' ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b91c1c', fontWeight: 600 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: "var(--portal-danger-text,#b91c1c)", fontWeight: 600 }}>
                                 <XCircle size={13} /> Absent
                               </span>
                             ) : (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontWeight: 500 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: "var(--portal-info-text,#94a3b8)", fontWeight: 500 }}>
                                 <HelpCircle size={13} /> Unmarked
                               </span>
                             )}
@@ -561,7 +561,7 @@ export default function PeriodMarkingTab() {
               </div>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8', fontSize: '13px' }}>
+            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>
               <Clock size={32} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
               <div>Select a timetable slot from the left to inspect student attendance for {attendanceDate}.</div>
             </div>

@@ -22,7 +22,7 @@ export default function StudentHomeScreen() {
   const userId = user?.id || '';
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: queryKeys.student.dashboard(userId),
+    queryKey: queryKeys.student.dashboard(userId, activeSemester, new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10)),
     queryFn: () =>
       apiClient.get(
         `${API_ENDPOINTS.STUDENT_DASHBOARD}?semester=${activeSemester}`,
@@ -30,6 +30,8 @@ export default function StudentHomeScreen() {
       ),
     enabled: !!userId,
   });
+
+  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
 
   return (
     <ScreenContainer
@@ -78,34 +80,34 @@ export default function StudentHomeScreen() {
                   },
                 ]}
               >
-                {data?.attendanceSummary?.overallPercentage ?? 0}%
+                {data?.attendanceSummary?.overallPercentage == null ? '—' : `${data.attendanceSummary.overallPercentage}%`}
               </Text>
               <Text style={[typography.bodySmall, { color: colors.textSecondary }]}>
-                Overall Attendance
+                {data?.attendanceSummary?.totalClasses ? 'Overall Attendance' : 'No marked classes yet'}
               </Text>
             </View>
 
             <View style={styles.badgeGroup}>
               <Badge
                 label={
-                  data?.attendanceSummary?.campusSignInStatus?.morning
+                  data?.attendanceSummary?.campusSignInStatus?.morning === 'completed'
                     ? 'Morning In'
-                    : 'Morning Pending'
+                    : data?.attendanceSummary?.campusSignInStatus?.morning === 'absent' ? 'Morning Missed' : 'Morning Pending'
                 }
                 variant={
-                  data?.attendanceSummary?.campusSignInStatus?.morning
+                  data?.attendanceSummary?.campusSignInStatus?.morning === 'completed'
                     ? 'success'
                     : 'warning'
                 }
               />
               <Badge
                 label={
-                  data?.attendanceSummary?.campusSignInStatus?.evening
+                  data?.attendanceSummary?.campusSignInStatus?.evening === 'completed'
                     ? 'Evening In'
-                    : 'Evening Pending'
+                    : data?.attendanceSummary?.campusSignInStatus?.evening === 'absent' ? 'Evening Missed' : 'Evening Pending'
                 }
                 variant={
-                  data?.attendanceSummary?.campusSignInStatus?.evening
+                  data?.attendanceSummary?.campusSignInStatus?.evening === 'completed'
                     ? 'success'
                     : 'neutral'
                 }
