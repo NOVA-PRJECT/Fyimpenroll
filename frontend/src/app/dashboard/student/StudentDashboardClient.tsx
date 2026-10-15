@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
+import { CalendarDays as UiCalendarDays, Check as UiCheck, Clock as UiClock, FileText as UiFileText, Info as UiInfo, TriangleAlert as UiTriangleAlert } from 'lucide-react'
+
 import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect } from 'react'
@@ -10,6 +14,7 @@ import {
   LayoutDashboard,
   Bell,
   Calendar,
+  RefreshCw,
   MapPin,
   BookOpen,
   Award
@@ -93,38 +98,38 @@ export default function StudentDashboardClient({
   const [loggingOut, setLoggingOut] = useState(false)
   const [timetableEntries, setTimetableEntries] = useState<{ day: number; period: number; courseId: string; courseCode: string; courseName: string; category: string; isLabBlock: boolean; id: string; course_id: string; day_of_week: number; period_number: number; start_time: string; end_time: string; course_title: string; course_code: string; teacher_name: string; time_slots?: {day_of_week: number; period_number: number}; courses?: {title: string; course_code: string} }[]>([])
   const [loadingTimetable, setLoadingTimetable] = useState(false)
+  const [timetableError, setTimetableError] = useState('')
+  const [timetableRefresh, setTimetableRefresh] = useState(0)
 
-  // Fetch timetable entries when switching to timetable tab
+  // Load on tab entry, a cohort change, or an explicit refresh.
   useEffect(() => {
-    if (activeTab === 'timetable' && timetableEntries.length === 0 && studentInfo) {
+    if (activeTab === 'timetable') {
+      const controller = new AbortController()
       async function loadTimetable() {
         setLoadingTimetable(true)
         try {
-          const ay = registrationWindow?.academicYear || '2026-27'
+          const ay = registrationWindow?.academicYear
+          if (!ay) throw new Error('The campus academic year is not available. Refresh the dashboard and try again.')
           const sem = studentInfo.current_semester || 1
-          const res = await fetch(`/api/timetable/entries?academicYear=${encodeURIComponent(ay)}&semester=${sem}`)
-          if (res.ok) {
-            const data = await res.json()
-            setTimetableEntries(data.entries || [])
-          }
+          const res = await fetch(`/api/timetable/entries?academicYear=${encodeURIComponent(ay)}&semester=${sem}`, { cache: 'no-store', signal: controller.signal })
+          const data = await res.json()
+          if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load your published timetable.')
+          if (!controller.signal.aborted) { setTimetableEntries(data.entries || []); setTimetableError('') }
         } catch (err) {
-          console.error('Failed to load timetable entries:', err)
+          if (!controller.signal.aborted) setTimetableError(err instanceof Error ? err.message : 'Unable to load your published timetable.')
         } finally {
-          setLoadingTimetable(false)
+          if (!controller.signal.aborted) setLoadingTimetable(false)
         }
       }
-      loadTimetable()
+      void loadTimetable()
+      return () => controller.abort()
     }
-  }, [activeTab, timetableEntries.length, studentInfo, registrationWindow?.academicYear])
+  }, [activeTab, studentInfo.id, studentInfo.current_semester, registrationWindow?.academicYear, timetableRefresh])
 
   async function handleLogout() {
     setLoggingOut(true)
     if (!await logoutPortal()) setLoggingOut(false)
   }
-
-  // Set of enrolled course IDs & codes for timetable filtering
-  const enrolledCourseIds = new Set(enrolledCourses.map((c) => c.id))
-  const enrolledCodes = new Set(enrolledCourses.map((c) => (c.courseCode || '').trim().toUpperCase()))
 
   const deadlineFormatted = registrationWindow?.deadline
     ? new Date(registrationWindow.deadline).toLocaleDateString('en-IN', {
@@ -145,42 +150,42 @@ export default function StudentDashboardClient({
   let regDescription =
     'Review your semester blueprint, curriculum pathway, and select your ranked elective course choices for this semester.'
   let regCtaText = 'Enter Course Registration →'
-  let regNotificationStatus = '⏳ Pending Submission'
+  let regNotificationStatus = 'Pending Submission'
   let regNotificationColor = '#ea580c'
 
   if (!isWindowOpen) {
     if (isRegistered) {
-      regStatusBadge = '✓ Registration Successful'
+      regStatusBadge = 'Registration Successful'
       regStatusClass = styles.regStatusSuccessful
       regDescription = `Your course registration for Semester ${studentInfo.current_semester} has been successfully completed and confirmed. Official papers are locked for this term.`
       regCtaText = 'View Registered Courses →'
-      regNotificationStatus = '✓ Registration Successful'
+      regNotificationStatus = 'Registration Successful'
       regNotificationColor = '#059669'
     } else {
-      regStatusBadge = '🔒 Window Closed'
+      regStatusBadge = 'Window Closed'
       regStatusClass = styles.regStatusClosed
       regDescription = `The course registration window for Semester ${studentInfo.current_semester} is currently closed. You did not submit course preferences for this term.`
       regCtaText = 'View Registration Status →'
-      regNotificationStatus = '🔒 Window Closed (Incomplete)'
+      regNotificationStatus = 'Window Closed (Incomplete)'
       regNotificationColor = '#dc2626'
     }
   } else {
     // Window is open
     if (allocationCompleted) {
-      regStatusBadge = '✓ Courses Allocated & Confirmed'
+      regStatusBadge = 'Courses Allocated & Confirmed'
       regStatusClass = styles.regStatusSubmitted
       regDescription =
         'Official course allocation is complete. Direct slot adjustment is open (subject to the maximum 3 changes per 27 hours policy).'
       regCtaText = 'Adjust Course Slots →'
-      regNotificationStatus = '✓ Courses Allocated & Confirmed'
+      regNotificationStatus = 'Courses Allocated & Confirmed'
       regNotificationColor = '#16a34a'
     } else if (hasSubmission) {
-      regStatusBadge = '✓ Preferences Submitted'
+      regStatusBadge = 'Preferences Submitted'
       regStatusClass = styles.regStatusSubmitted
       regDescription =
         'Your course preferences for this semester are recorded. You can review or modify your elective rankings anytime while the registration window remains open.'
       regCtaText = 'Review & Update Course Preferences →'
-      regNotificationStatus = '✓ Preferences Submitted'
+      regNotificationStatus = 'Preferences Submitted'
       regNotificationColor = '#16a34a'
     }
   }
@@ -249,7 +254,7 @@ export default function StudentDashboardClient({
             title="Log out of portal"
           >
             <LogOut size={16} />
-            <span className={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -435,7 +440,7 @@ export default function StudentDashboardClient({
                           className={styles.quickNavItem}
                           onClick={() => setActiveTab('courses')}
                         >
-                          <span>📚 Enrolled Courses</span>
+                          <span>Enrolled Courses</span>
                           <span className={styles.quickNavPill}>{enrolledCourses.length}</span>
                         </button>
                         <button
@@ -443,7 +448,7 @@ export default function StudentDashboardClient({
                           className={styles.quickNavItem}
                           onClick={() => setActiveTab('timetable')}
                         >
-                          <span>🗓️ Weekly Timetable</span>
+                          <span>Weekly Timetable</span>
                           <span>→</span>
                         </button>
                         <button
@@ -451,7 +456,7 @@ export default function StudentDashboardClient({
                           className={styles.quickNavItem}
                           onClick={() => setActiveTab('campus-signin')}
                         >
-                          <span>📍 Campus Sign-In</span>
+                          <span>Campus Sign-In</span>
                           <span>→</span>
                         </button>
                         <button
@@ -459,7 +464,7 @@ export default function StudentDashboardClient({
                           className={styles.quickNavItem}
                           onClick={() => setActiveTab('credits')}
                         >
-                          <span>📊 Degree Credit Ledger</span>
+                          <span>Degree Credit Ledger</span>
                           <span>→</span>
                         </button>
                         <button
@@ -467,7 +472,7 @@ export default function StudentDashboardClient({
                           className={styles.quickNavItem}
                           onClick={() => setActiveTab('notifications')}
                         >
-                          <span>🔔 Notifications & Deadlines</span>
+                          <span>Notifications & Deadlines</span>
                           <span>→</span>
                         </button>
                       </div>
@@ -519,11 +524,11 @@ export default function StudentDashboardClient({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <span>
                     {!registrationWindow.isOpen ? (
-                      <>🔒 <strong>Registration Window Closed:</strong> Course registration is currently closed for Semester {studentInfo?.current_semester ?? 1}.</>
+                      <><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <strong>Registration Window Closed:</strong> Course registration is currently closed for Semester {studentInfo?.current_semester ?? 1}.</>
                     ) : registrationWindow.isClosingSoon ? (
-                      <>⚠️ <strong>Closing Soon:</strong> Course registration closes in <strong>{registrationWindow.hoursRemaining ?? 0} hour{registrationWindow.hoursRemaining === 1 ? '' : 's'}</strong>!</>
+                      <><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <strong>Closing Soon:</strong> Course registration closes in <strong>{registrationWindow.hoursRemaining ?? 0} hour{registrationWindow.hoursRemaining === 1 ? '' : 's'}</strong>!</>
                     ) : (
-                      <>✓ <strong>Registration Open:</strong> You can submit or adjust course preferences for Semester {studentInfo?.current_semester ?? 1}.</>
+                      <><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <strong>Registration Open:</strong> You can submit or adjust course preferences for Semester {studentInfo?.current_semester ?? 1}.</>
                     )}
                   </span>
                   {registrationWindow.isOpen && (
@@ -551,7 +556,7 @@ export default function StudentDashboardClient({
             <div className={styles.notificationCard}>
               <div className={styles.notificationCardHeader}>
                 <h3 className={styles.notificationCardTitle}>
-                  <span>📅</span> Registration Window & Deadline Settings
+                  <span><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Registration Window & Deadline Settings
                 </h3>
                 <span
                   style={{
@@ -654,11 +659,11 @@ export default function StudentDashboardClient({
                       <div>
                         {c.isConfirmed ? (
                           <span className={styles.statusPillConfirmed}>
-                            ✓ {c.status}
+                            <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {c.status}
                           </span>
                         ) : (
                           <span className={styles.statusPillPending}>
-                            ⏳ {c.status}
+                            <UiClock size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {c.status}
                           </span>
                         )}
                       </div>
@@ -668,7 +673,7 @@ export default function StudentDashboardClient({
               </div>
             ) : (
               <div className={styles.emptyCoursesCard}>
-                <div className={styles.emptyCoursesIcon}>📝</div>
+                <div className={styles.emptyCoursesIcon}><UiFileText size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                 <h3 className={styles.emptyCoursesTitle}>
                   {hasSubmission
                     ? 'Preferences Submitted — Allocation in Progress'
@@ -697,15 +702,25 @@ export default function StudentDashboardClient({
             <div className={styles.enrolledHeader}>
               <div className={styles.enrolledTitleGroup}>
                 <h2 className={styles.enrolledTitle}>
-                  <span>🗓️</span> Weekly Academic Schedule — Semester {studentInfo?.current_semester ?? 1}
+                  <span><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Weekly Academic Schedule — Semester {studentInfo?.current_semester ?? 1}
                 </h2>
                 <p className={styles.enrolledSubtitle}>
                   Assigned lecture and lab blocks across Periods 1 to 6 (Monday to Saturday)
                 </p>
               </div>
+              <button
+                type="button"
+                className={styles.timetableRefreshBtn}
+                onClick={() => setTimetableRefresh(value => value + 1)}
+                disabled={loadingTimetable}
+                aria-busy={loadingTimetable}
+              >
+                {loadingTimetable ? <LoadingIndicator message="Refreshing…" /> : <><RefreshCw size={16} aria-hidden="true" /> Refresh timetable</>}
+              </button>
             </div>
 
             {/* Day Selector Bar */}
+            {timetableError && <p role="alert">{timetableError}</p>}
             <div className={styles.daySelectorBar}>
               <button
                 type="button"
@@ -732,9 +747,7 @@ export default function StudentDashboardClient({
 
             <div className={styles.timetableContainer}>
               {loadingTimetable ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)" }}>
-                  Loading your weekly class schedule...
-                </div>
+                <LoadingState layout="timetable" message="Loading your weekly class schedule…" />
               ) : (
                 <>
                   {/* Desktop Grid View */}
@@ -759,9 +772,7 @@ export default function StudentDashboardClient({
                               const matchingEntry = timetableEntries.find(
                                 (e) =>
                                   e.day === day.num &&
-                                  e.period === period.num &&
-                                  (enrolledCourseIds.has(e.courseId) ||
-                                    enrolledCodes.has((e.courseCode || '').trim().toUpperCase())),
+                                  e.period === period.num,
                               )
 
                               return (
@@ -819,9 +830,7 @@ export default function StudentDashboardClient({
                             const matchingEntry = timetableEntries.find(
                               (e) =>
                                 e.day === activeDayObj.num &&
-                                e.period === period.num &&
-                                (enrolledCourseIds.has(e.courseId) ||
-                                  enrolledCodes.has((e.courseCode || '').trim().toUpperCase())),
+                                e.period === period.num,
                             )
 
                             return (

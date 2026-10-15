@@ -1,7 +1,11 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { campusSessionLabel, formatCampusTime, type CampusAttendanceStatus } from '@fyimp/contracts'
+import { CheckCircle2, Clock3, Info, MapPin, RefreshCw } from 'lucide-react'
+import styles from '@/components/campus-attendance/campus-attendance.module.css'
 
 interface CampusSignInCardProps { studentId?: string; campusName: string }
 
@@ -97,42 +101,52 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
   }
 
   return (
-    <section aria-label="Campus sign-in" style={{ background: "var(--portal-surface,#fff)", border: "1px solid var(--portal-strong-border,#e2e8f0)", borderRadius: '1rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-        <div>
-          <h3 style={{ margin: 0 }}>Campus Physical Sign-In</h3>
-          <p style={{ color: "var(--portal-muted,#64748b)", fontSize: '.85rem' }}>{status?.campus.name || campusName} · Twice-daily GPS check</p>
+    <section aria-labelledby="campus-signin-title" className={styles.card} aria-busy={loading || locating}>
+      <div className={styles.header}>
+        <div className={styles.heading}>
+          <span className={styles.eyebrow}>Campus attendance</span>
+          <h2 id="campus-signin-title" className={styles.title}>Campus sign-in</h2>
+          <p className={styles.description}>{status?.campus.name || campusName} · Record your morning arrival and evening departure.</p>
+          <span className={styles.timeBadge}><Clock3 size={13} aria-hidden="true" /> All times shown in IST</span>
         </div>
-        <button type="button" onClick={() => void fetchStatus()} disabled={loading || locating}>Refresh status</button>
+        <button type="button" className={styles.secondaryButton} onClick={() => void fetchStatus()} disabled={!studentId || loading || locating}>
+          {loading ? <LoadingIndicator message="Refreshing…" /> : <><RefreshCw size={15} aria-hidden="true" /> Refresh status</>}
+        </button>
       </div>
-      {statusError && <p role="alert" style={{ color: "var(--portal-danger-text,#991b1b)" }}>{statusError}</p>}
-      {!studentId && <p role="alert">Your student profile is unavailable. Reload the page or contact your administrator.</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.75rem', margin: '1rem 0' }}>
+      {statusError && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{statusError}</p>}
+      {!studentId && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>Your student profile is unavailable. Reload the page or contact your administrator.</p>}
+      {studentId && !status && !statusError ? <LoadingState layout="cards" rows={2} compact message="Loading campus sign-in status…" /> : <div className={styles.sessionGrid}>
         {(['morning', 'evening'] as const).map(session => {
           const record = status?.[session]
           const completed = record?.state === 'completed'
           const onTime = record?.status === 'on_time'
-          return <div key={session} style={{ padding: '.9rem', borderRadius: '.625rem', border: "1px solid var(--portal-strong-border,#e2e8f0)", background: completed ? onTime ? "var(--portal-success-bg,#f0fdf4)" : "var(--portal-warning-bg,#fffbeb)" : "var(--portal-info-bg,#f8fafc)" }}>
-            <strong>{session === 'morning' ? 'Morning arrival' : 'Evening departure'}</strong>
-            <p aria-live="polite">{loading && !status ? 'Loading…' : campusSessionLabel(record)}</p>
-            {status && <p style={{ fontSize: '.8rem', color: "var(--portal-muted,#64748b)" }}>
-              {session === 'morning'
-                ? `On time until ${formatCampusTime(status.campus.morning_cutoff)}; closes at ${formatCampusTime(status.campus.midday_split)} IST`
-                : `On time from ${formatCampusTime(status.campus.evening_cutoff)}; closes at ${formatCampusTime(status.campus.day_end)} IST`}
-            </p>}
-            {record?.signed_in_at && <small>Recorded at {new Date(record.signed_in_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST</small>}
-          </div>
+          return <article key={session} className={`${styles.sessionCard} ${completed ? onTime ? styles.sessionComplete : styles.sessionLate : ''}`}>
+            <div className={styles.sessionHeader}>
+              <span className={styles.iconBadge}><Clock3 size={17} aria-hidden="true" /></span>
+              <h3>{session === 'morning' ? 'Morning arrival' : 'Evening departure'}</h3>
+            </div>
+            <p aria-live="polite" className={styles.sessionState}>
+              {completed && <CheckCircle2 size={15} aria-hidden="true" />}
+              {status ? campusSessionLabel(record) : 'Status unavailable'}
+            </p>
+            {status && <dl className={styles.sessionSchedule}>
+              <div><dt>{session === 'morning' ? 'On time until' : 'On time from'}</dt><dd>{formatCampusTime(session === 'morning' ? status.campus.morning_cutoff : status.campus.evening_cutoff)}</dd></div>
+              <div><dt>Checkpoint closes</dt><dd>{formatCampusTime(session === 'morning' ? status.campus.midday_split : status.campus.day_end)}</dd></div>
+            </dl>}
+            {record?.signed_in_at && <p className={styles.recordedAt}>Recorded at {new Date(record.signed_in_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST</p>}
+          </article>
         })}
+      </div>}
+      {status?.unavailable_reason && <p role="status" className={styles.notice}>{status.unavailable_reason}</p>}
+      <div className={styles.actionArea}>
+        <button type="button" id="btn-campus-gps-signin" className={styles.primaryButton} onClick={() => void handleGpsSignIn()}
+          disabled={locating || loading || !studentId || !status?.can_sign_in}>
+          {locating ? <LoadingIndicator message="Verifying your location…" /> : <><MapPin size={17} aria-hidden="true" /> Verify location and sign in</>}
+        </button>
+        {status && <p className={styles.actionHint}>Be within {status.campus.radius_meters} metres of the campus centre. Location accuracy must be 50 metres or better.</p>}
       </div>
-      {status?.unavailable_reason && <p role="status">{status.unavailable_reason}</p>}
-      <button type="button" id="btn-campus-gps-signin" onClick={() => void handleGpsSignIn()}
-        disabled={locating || loading || !studentId || !status?.can_sign_in}
-        style={{ background: !status?.can_sign_in || locating || loading ? '#64748b' : '#0369a1', color: '#fff', border: 0, borderRadius: '.5rem', padding: '.8rem 1.25rem' }}>
-        {locating ? 'Checking location and recording…' : 'Verify Campus Presence (GPS Sign-In)'}
-      </button>
-      {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} style={{ color: feedback.type === 'error' ? "var(--portal-danger-text,#991b1b)" : "var(--portal-success-text,#065f46)" }}>{feedback.message}</p>}
-      {status && <p style={{ fontSize: '.8rem', color: "var(--portal-muted,#64748b)" }}>Sign in within {status.campus.radius_meters} metres of the campus centre, with location accuracy of 50 metres or better.</p>}
-      <p style={{ fontSize: '.75rem', color: "var(--portal-muted,#64748b)" }}>Location coordinates are used for this check and are not saved. We retain the time, result, location accuracy and audit details. An internet connection is required.</p>
+      {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} className={`${styles.notice} ${feedback.type === 'error' ? styles.errorNotice : styles.successNotice}`}>{feedback.message}</p>}
+      <p className={styles.privacyNote}><Info size={14} aria-hidden="true" /><span>Your coordinates are used to verify campus presence and are not saved. The time, result, accuracy and audit details are retained. An internet connection is required.</span></p>
     </section>
   )
 }

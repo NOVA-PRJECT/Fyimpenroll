@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
+
+import { Inbox as UiInbox, Search as UiSearch, Users as UiUsers } from 'lucide-react'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
@@ -132,7 +136,7 @@ function CustomPaperSelect({
                       {course.semester ? `Semester ${course.semester}` : 'Paper'}
                     </span>
                     <span className={styles.optionCountBadge}>
-                      👥 {course.enrolled_count ?? 0} registered
+                      <UiUsers size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {course.enrolled_count ?? 0} registered
                     </span>
                   </div>
                 </div>
@@ -314,7 +318,7 @@ export default function TeachingStaffDashboard() {
 
           {/* 2. Integrated Faculty Identity Block */}
           {loadingProfile ? (
-            <div className={styles.topBarSkeleton} />
+            <ProfilePlaceholder />
           ) : (
             <div className={styles.teacherIdentity}>
               <p className={styles.teacherNameHeader}>{facultyName || 'Teaching Staff Member'}</p>
@@ -336,7 +340,7 @@ export default function TeachingStaffDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -346,9 +350,9 @@ export default function TeachingStaffDashboard() {
         {error && <div className={styles.errorBanner}>{error}</div>}
 
         {/* Paper Filter & Custom Select Card */}
-        <div className={styles.filterCard}>
+        {loadingProfile ? <LoadingState layout="form" rows={3} message="Loading courses and filters…" /> : <div className={styles.filterCard}>
           <div className={styles.filterCardHeader}>
-            <p className={styles.filterCardTitle}>🔍 Department Course Catalog & Student Inspection</p>
+            <p className={styles.filterCardTitle}>Department Course Catalog & Student Inspection</p>
           </div>
 
           <div className={styles.filterControlsGrid}>
@@ -415,12 +419,10 @@ export default function TeachingStaffDashboard() {
           </div>
         </div>
 
+        }
         {/* Loading */}
         {loading && (
-          <div className={styles.loadingState}>
-            <div className={styles.spinner} />
-            <p className={styles.loadingText}>Fetching enrolled students...</p>
-          </div>
+          <LoadingState layout="table" message="Fetching enrolled students…" />
         )}
 
         {/* Course Details & Enrolled Students Table (Read-Only) */}
@@ -481,13 +483,13 @@ export default function TeachingStaffDashboard() {
             <div className={styles.tableWrapper}>
               {rosterData.total_students === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>📭</div>
+                  <div className={styles.emptyIcon}><UiInbox size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No students enrolled</p>
                   <p className={styles.emptySubtitle}>No students have registered for this paper yet.</p>
                 </div>
               ) : displayedStudents.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>🔍</div>
+                  <div className={styles.emptyIcon}><UiSearch size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No matching students</p>
                   <p className={styles.emptySubtitle}>No students enrolled from the selected department.</p>
                 </div>

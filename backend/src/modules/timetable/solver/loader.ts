@@ -163,7 +163,7 @@ export async function loadGenerationInput(
     slotCount: number;
   };
 }> {
-  await onProgress?.(5, '🔍 Reading student course registrations from database...');
+  await onProgress?.(5, 'Reading student course registrations from database...');
 
   // Query 1: Fetch student registrations
   let regQuery = supabase
@@ -197,7 +197,7 @@ export async function loadGenerationInput(
 
   await onProgress?.(
     10,
-    `📥 Loaded ${rawRegistrations.length} student registration submissions...`,
+    `Loaded ${rawRegistrations.length} student registration submissions...`,
     { registrationCount: rawRegistrations.length }
   );
 
@@ -257,7 +257,7 @@ export async function loadGenerationInput(
 
   await onProgress?.(
     18,
-    `🏢 Mapped ${studentDeptMap.size} enrolled students across ${deptCount} campus departments...`,
+    `Mapped ${studentDeptMap.size} enrolled students across ${deptCount} campus departments...`,
     {
       registrationCount: rawRegistrations.length,
       studentCount: studentDeptMap.size,
@@ -397,7 +397,7 @@ export async function loadGenerationInput(
   const crossDeptCourseCount = courses.filter((c) => c.isCrossDept).length;
   await onProgress?.(
     25,
-    `📚 Prepared ${courses.length} active courses (${crossDeptCourseCount} cross-department)...`,
+    `Prepared ${courses.length} active courses (${crossDeptCourseCount} cross-department)...`,
     {
       registrationCount: rawRegistrations.length,
       studentCount: studentDeptMap.size,
@@ -531,7 +531,7 @@ export async function loadGenerationInput(
 
   await onProgress?.(
     30,
-    `⏰ Verified ${slotCount} weekly time slots & detected ${parallelGroups.length} parallel group(s). Ready for solver...`,
+    `Verified ${slotCount} weekly time slots & detected ${parallelGroups.length} parallel group(s). Ready for solver...`,
     stats
   );
 

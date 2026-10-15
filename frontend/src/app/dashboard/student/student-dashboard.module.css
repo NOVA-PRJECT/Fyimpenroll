@@ -2291,6 +2291,43 @@
   box-sizing: border-box;
 }
 
+.timetableRefreshBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 44px;
+  max-width: 100%;
+  padding: .6rem .9rem;
+  border: 1px solid var(--portal-strong-border, #cbd5e1);
+  border-radius: .6rem;
+  background: var(--portal-info-bg, #edf4fa);
+  color: var(--portal-brand-text, #002147);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.timetableRefreshBtn:hover:not(:disabled) {
+  border-color: var(--portal-info-border, #0369a1);
+  background: var(--portal-surface, #fff);
+}
+
+.timetableRefreshBtn:focus-visible {
+  outline: 2px solid var(--portal-info-border, #0369a1);
+  outline-offset: 3px;
+}
+
+.timetableRefreshBtn:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+@media (max-width: 540px) {
+  .timetableRefreshBtn { width: 100%; }
+}
+
 .timetableTable {
   width: 100%;
   border-collapse: collapse;

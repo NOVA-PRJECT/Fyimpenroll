@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
+
+import { BookOpen as UiBookOpen, CalendarDays as UiCalendarDays, Inbox as UiInbox, RefreshCw as UiRefreshCw, Search as UiSearch, Timer as UiTimer, Users as UiUsers, X as UiX } from 'lucide-react'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
@@ -200,7 +204,7 @@ function CustomPaperSelect({
                       {course.semester ? `Semester ${course.semester}` : 'Paper'}
                     </span>
                     <span className={styles.optionCountBadge}>
-                      👥 {course.enrolled_count ?? 0} registered
+                      <UiUsers size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {course.enrolled_count ?? 0} registered
                     </span>
                   </div>
                 </div>
@@ -315,6 +319,16 @@ export default function TeacherDashboard() {
     fetchTeacherCourses()
     fetchTeacherSchedule(scheduleDate)
   }, [fetchTeacherCourses, fetchTeacherSchedule, scheduleDate])
+
+  useEffect(() => {
+    if (activeTab !== 'timetable') return
+    void fetchTeacherSchedule(scheduleDate)
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchTeacherSchedule(scheduleDate) }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const interval = setInterval(refresh, 30000)
+    return () => { clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [activeTab, fetchTeacherSchedule, scheduleDate])
 
   // Available semesters from assigned courses
   const availableSemesters = useMemo(() => {
@@ -459,7 +473,7 @@ export default function TeacherDashboard() {
 
       const result = await res.json()
       if (res.ok) {
-        setGlobalSuccess(`✓ Period ${activeSlotForMarking.period_number} attendance for ${scheduleDate} saved successfully!`)
+        setGlobalSuccess(`Period ${activeSlotForMarking.period_number} attendance for ${scheduleDate} saved successfully!`)
         setActiveSlotForMarking(null)
         setSessionRevision(null)
         setConflictRevision(null)
@@ -541,7 +555,7 @@ export default function TeacherDashboard() {
 
       const data = await res.json()
       if (res.ok) {
-        setGlobalSuccess(`✓ Practical attendance copied to Period ${period.period_number + 1} for ${scheduleDate}!`)
+        setGlobalSuccess(`Practical attendance copied to Period ${period.period_number + 1} for ${scheduleDate}!`)
         await fetchTeacherSchedule(scheduleDate)
         setTimeout(() => setGlobalSuccess(''), 4000)
       } else {
@@ -654,7 +668,7 @@ export default function TeacherDashboard() {
 
           {/* 2. Integrated Teacher Identity Block */}
           {loadingProfile ? (
-            <div className={styles.topBarSkeleton} />
+            <ProfilePlaceholder />
           ) : (
             <div className={styles.teacherIdentity}>
               <p className={styles.teacherNameHeader}>{teacherName || 'Course Teacher'}</p>
@@ -688,7 +702,7 @@ export default function TeacherDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -700,7 +714,7 @@ export default function TeacherDashboard() {
           className={`${styles.tabBtn} ${activeTab === 'schedule' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('schedule')}
         >
-          <span>📅 Today&apos;s Schedule & Attendance</span>
+          <span>Today&apos;s Schedule & Attendance</span>
           <span className={styles.tabCountBadge}>{schedulePeriods.length}</span>
         </button>
         <button
@@ -708,7 +722,7 @@ export default function TeacherDashboard() {
           className={`${styles.tabBtn} ${activeTab === 'timetable' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('timetable')}
         >
-          <span>🗓️ Weekly Timetable</span>
+          <span>Weekly Timetable</span>
           <span className={styles.tabCountBadge}>{weeklySchedule.length}</span>
         </button>
         <button
@@ -716,7 +730,7 @@ export default function TeacherDashboard() {
           className={`${styles.tabBtn} ${activeTab === 'rosters' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('rosters')}
         >
-          <span>📚 My Assigned Papers & Class Rosters</span>
+          <span>My Assigned Papers & Class Rosters</span>
           <span className={styles.tabCountBadge}>{assignedCourses.length}</span>
         </button>
       </nav>
@@ -747,7 +761,7 @@ export default function TeacherDashboard() {
             <div className={styles.scheduleHeaderCard}>
               <div className={styles.scheduleHeaderTop}>
                 <h3 className={styles.scheduleTitle}>
-                  <span>🕒 Lecture Timetable & Marking</span>
+                  <span>Lecture Timetable & Marking</span>
                 </h3>
                 <div className={styles.scheduleDateControls}>
                   <input
@@ -775,7 +789,7 @@ export default function TeacherDashboard() {
                     disabled={loadingSchedule}
                     title="Refresh schedule"
                   >
-                    🔄
+                    <UiRefreshCw size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
                   </button>
                 </div>
               </div>
@@ -797,14 +811,11 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {loadingSchedule ? (
-              <div className={styles.loadingState}>
-                <div className={styles.spinner} />
-                <p className={styles.loadingText}>Loading scheduled periods...</p>
-              </div>
+            {loadingSchedule || loadingProfile ? (
+              <LoadingState layout="cards" message="Loading scheduled periods…" />
             ) : schedulePeriods.length === 0 ? (
               <div className={styles.emptyPeriodBanner}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>☕</div>
+                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.35rem' }}>
                   No Lectures Scheduled For This Day
                 </h4>
@@ -826,7 +837,7 @@ export default function TeacherDashboard() {
                         <div className={styles.periodCardHeader}>
                           <span className={styles.periodTag}>PERIOD {period.period_number}</span>
                           <span className={styles.periodTimeBadge}>
-                            ⏱️ {period.start_time.slice(0, 5)} - {period.end_time.slice(0, 5)}
+                            <UiTimer size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {period.start_time.slice(0, 5)} - {period.end_time.slice(0, 5)}
                           </span>
                         </div>
 
@@ -839,14 +850,14 @@ export default function TeacherDashboard() {
                         <div className={styles.periodStatusRow}>
                           {period.is_marked ? (
                             <>
-                              <span className={styles.statusMarkedText}>✓ Attendance Marked</span>
+                              <span className={styles.statusMarkedText}>Attendance Marked</span>
                               <span className={styles.statusStatsText}>
                                 Present: {period.present_count} | Absent: {period.absent_count}
                               </span>
                             </>
                           ) : (
                             <>
-                              <span className={styles.statusPendingText}>⏳ Attendance Pending</span>
+                              <span className={styles.statusPendingText}>Attendance Pending</span>
                               <span className={styles.statusStatsText}>
                                 {period.total_enrolled} Enrolled
                               </span>
@@ -865,7 +876,7 @@ export default function TeacherDashboard() {
                           }`}
                           onClick={() => handleOpenMarkingModal(period)}
                         >
-                          {period.is_marked ? '✏️ Update Attendance' : '📝 Mark Attendance Now'}
+                          {period.is_marked ? 'Update Attendance' : 'Mark Attendance Now'}
                         </button>
 
                         {period.is_marked && period.adjacent_practical_slot_id && (
@@ -881,8 +892,8 @@ export default function TeacherDashboard() {
                             disabled={copyingPractical === period.timetable_slot_id}
                           >
                             {copyingPractical === period.timetable_slot_id
-                              ? 'Copying...'
-                              : `📋 Copy to P${period.period_number + 1}`}
+                              ? <LoadingIndicator message="Copying…" />
+                              : `Copy to P${period.period_number + 1}`}
                           </button>
                         )}
                       </div>
@@ -900,7 +911,7 @@ export default function TeacherDashboard() {
             {/* Header & Controls */}
             <div className={styles.timetableHeaderRow}>
               <h2 className={styles.timetableTitle}>
-                <span>🗓️</span> Weekly Teaching Schedule (Periods 1 to 6)
+                <span><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Weekly Teaching Schedule (Periods 1 to 6)
               </h2>
 
               <div className={styles.timetableControlsGroup}>
@@ -948,7 +959,9 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {weeklySchedule.length === 0 && !loadingSchedule ? (
+            {loadingSchedule || loadingProfile ? (
+              <LoadingState layout="timetable" message="Loading your weekly teaching schedule…" />
+            ) : weeklySchedule.length === 0 ? (
               <div
                 style={{
                   background: "var(--portal-surface,#ffffff)",
@@ -959,7 +972,7 @@ export default function TeacherDashboard() {
                   color: "var(--portal-info-text,#475569)",
                 }}
               >
-                <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}>🗓️</div>
+                <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.5rem' }}>
                   No Timetable Entries Published Yet
                 </h3>
@@ -1115,6 +1128,7 @@ export default function TeacherDashboard() {
         {/* TAB 3: MY ASSIGNED PAPERS & CLASS ROSTERS */}
         {activeTab === 'rosters' && (
           <div>
+            {loadingProfile && <LoadingState layout="cards" message="Loading assigned courses…" />}
             {assignedCourses.length === 0 && !loadingProfile && (
               <div
                 style={{
@@ -1127,7 +1141,7 @@ export default function TeacherDashboard() {
                   marginBottom: '1rem',
                 }}
               >
-                <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}>📚</div>
+                <div style={{ fontSize: '2.25rem', marginBottom: '0.5rem' }}><UiBookOpen size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: '0 0 0.5rem' }}>
                   No Courses Currently Assigned
                 </h3>
@@ -1140,7 +1154,7 @@ export default function TeacherDashboard() {
             {/* Paper Selection Card */}
             <div className={styles.filterCard}>
               <div className={styles.filterCardHeader}>
-                <p className={styles.filterCardTitle}>🔍 Assigned Papers & Course Selection</p>
+                <p className={styles.filterCardTitle}>Assigned Papers & Course Selection</p>
               </div>
 
               <div className={styles.filterControlsGrid}>
@@ -1178,10 +1192,7 @@ export default function TeacherDashboard() {
             </div>
 
             {loadingRoster && (
-              <div className={styles.loadingState}>
-                <div className={styles.spinner} />
-                <p className={styles.loadingText}>Fetching enrolled student roster...</p>
-              </div>
+              <LoadingState layout="table" message="Fetching enrolled student roster…" />
             )}
 
             {!loadingRoster && rosterData && (
@@ -1240,7 +1251,7 @@ export default function TeacherDashboard() {
 
                   {rosterData.total_students > 0 && (
                     <button className={styles.downloadBtn} onClick={handleOpenPdfModal}>
-                      📄 Download Attendance Sheet (PDF)
+                      Download Attendance Sheet (PDF)
                     </button>
                   )}
                 </div>
@@ -1248,13 +1259,13 @@ export default function TeacherDashboard() {
                 <div className={styles.tableWrapper}>
                   {rosterData.total_students === 0 ? (
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>📭</div>
+                      <div className={styles.emptyIcon}><UiInbox size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                       <p className={styles.emptyTitle}>No students enrolled</p>
                       <p className={styles.emptySubtitle}>No students have registered for this assigned paper yet.</p>
                     </div>
                   ) : displayedStudents.length === 0 ? (
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>🔍</div>
+                      <div className={styles.emptyIcon}><UiSearch size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                       <p className={styles.emptyTitle}>No matching students</p>
                       <p className={styles.emptySubtitle}>No students enrolled from the selected department.</p>
                     </div>
@@ -1296,7 +1307,7 @@ export default function TeacherDashboard() {
             <div className={styles.attendanceModalHeader}>
               <div>
                 <h3 className={styles.modalPeriodTitle}>
-                  📝 Period {activeSlotForMarking.period_number} Attendance
+                  Period {activeSlotForMarking.period_number} Attendance
                 </h3>
                 <p className={styles.modalPeriodSub}>
                   {activeSlotForMarking.course_title} ({activeSlotForMarking.course_code}) •{' '}
@@ -1309,14 +1320,14 @@ export default function TeacherDashboard() {
                 onClick={() => setActiveSlotForMarking(null)}
                 aria-label="Close"
               >
-                ✕
+                <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
               </button>
             </div>
 
             {markingError && <div className={styles.errorBanner} style={{ margin: '0.75rem 1.25rem 0' }}>{markingError}</div>}
             {conflictRevision !== null && (
               <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.75rem', background: "var(--portal-warning-bg,#fef3c7)", border: "1px solid var(--portal-warning-border,#f59e0b)", borderRadius: '0.375rem', color: "var(--portal-warning-text,#92400e)", fontSize: '0.875rem' }}>
-                <strong>⚠️ Concurrent edit detected:</strong> Another teacher modified this record (now at revision {conflictRevision}). Your entered selections above are preserved. Click <strong>Overwrite with My Marks</strong> to submit your selections, or <strong>Cancel</strong> to discard.
+                <strong>Concurrent edit detected:</strong> Another teacher modified this record (now at revision {conflictRevision}). Your entered selections above are preserved. Click <strong>Overwrite with My Marks</strong> to submit your selections, or <strong>Cancel</strong> to discard.
               </div>
             )}
 
@@ -1324,10 +1335,10 @@ export default function TeacherDashboard() {
               <div className={styles.attendanceStatsLive}>
                 <span>Total: <strong>{markingRoster.length}</strong></span>
                 <span className={styles.statLivePresent}>
-                  ✓ Present: <strong>{markingRoster.length - absentStudentIds.size}</strong>
+                  Present: <strong>{markingRoster.length - absentStudentIds.size}</strong>
                 </span>
                 <span className={styles.statLiveAbsent}>
-                  ✗ Absent: <strong>{absentStudentIds.size}</strong>
+                  Absent: <strong>{absentStudentIds.size}</strong>
                 </span>
               </div>
               <div className={styles.quickActionGroup}>
@@ -1350,10 +1361,7 @@ export default function TeacherDashboard() {
 
             <div className={styles.attendanceStudentList}>
               {loadingMarkingRoster ? (
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner} />
-                  <p className={styles.loadingText}>Loading enrolled student roster...</p>
-                </div>
+                <LoadingState layout="table" message="Loading enrolled student roster…" />
               ) : markingRoster.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-muted,#64748b)" }}>
                   No students registered for this course.
@@ -1385,7 +1393,7 @@ export default function TeacherDashboard() {
                         }`}
                         onClick={() => handleToggleStudentStatus(student.id)}
                       >
-                        {isAbsent ? '✗ ABSENT' : '✓ PRESENT'}
+                        {isAbsent ? 'ABSENT' : 'PRESENT'}
                       </button>
                     </div>
                   )
@@ -1411,7 +1419,7 @@ export default function TeacherDashboard() {
                   style={{ backgroundColor: '#d97706' }}
                 >
                   {submittingAttendance
-                    ? 'Submitting...'
+                    ? <LoadingIndicator message="Submitting…" />
                     : `Overwrite with My Marks (Revision ${conflictRevision})`}
                 </button>
               ) : (
@@ -1422,7 +1430,7 @@ export default function TeacherDashboard() {
                   disabled={submittingAttendance || loadingMarkingRoster}
                 >
                   {submittingAttendance
-                    ? 'Submitting...'
+                    ? <LoadingIndicator message="Submitting…" />
                     : `Save & Submit (${markingRoster.length - absentStudentIds.size} Present, ${absentStudentIds.size} Absent)`}
                 </button>
               )}
@@ -1436,14 +1444,14 @@ export default function TeacherDashboard() {
         <div className={styles.modalOverlay} onClick={() => setShowPdfModal(false)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>📄 Export Attendance Sheet (PDF)</h3>
+              <h3 className={styles.modalTitle}>Export Attendance Sheet (PDF)</h3>
               <button
                 type="button"
                 className={styles.modalCloseBtn}
                 onClick={() => setShowPdfModal(false)}
                 aria-label="Close modal"
               >
-                ✕
+                <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
               </button>
             </div>
 
@@ -1462,7 +1470,7 @@ export default function TeacherDashboard() {
                   className={styles.radioInput}
                 />
                 <div className={styles.radioOptionContent}>
-                  <span className={styles.radioOptionTitle}>🌐 All Departments</span>
+                  <span className={styles.radioOptionTitle}>All Departments</span>
                   <span className={styles.radioOptionDesc}>Includes all {rosterData.total_students} enrolled students</span>
                 </div>
               </label>
@@ -1481,7 +1489,7 @@ export default function TeacherDashboard() {
                   className={styles.radioInput}
                 />
                 <div className={styles.radioOptionContent}>
-                  <span className={styles.radioOptionTitle}>🏷️ Select Specific Departments</span>
+                  <span className={styles.radioOptionTitle}>Select Specific Departments</span>
                   <span className={styles.radioOptionDesc}>Choose which department students to include</span>
                 </div>
               </label>
@@ -1547,7 +1555,7 @@ export default function TeacherDashboard() {
 
             {pdfDeptMode === 'custom' && selectedPdfDepts.length === 0 && (
               <div className={styles.pdfWarningBanner}>
-                ⚠️ Please select at least one department to export.
+                Please select at least one department to export.
               </div>
             )}
 
@@ -1573,7 +1581,7 @@ export default function TeacherDashboard() {
                 onClick={handleGeneratePDF}
                 disabled={generatingPdf || (pdfDeptMode === 'custom' && selectedPdfDepts.length === 0)}
               >
-                {generatingPdf ? 'Generating PDF...' : `Download PDF (${pdfStudents.length})`}
+                {generatingPdf ? <LoadingIndicator message="Generating PDF…" /> : `Download PDF (${pdfStudents.length})`}
               </button>
             </div>
           </div>

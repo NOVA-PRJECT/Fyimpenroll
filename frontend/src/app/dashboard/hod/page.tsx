@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
+
+import { Check as UiCheck, FolderOpen as UiFolderOpen, Pencil as UiPencil, Trash2 as UiTrash2, Users as UiUsers, X as UiX } from 'lucide-react'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
@@ -7,11 +11,11 @@ import { logoutPortal } from '@/core/security/logout'
 import dynamic from 'next/dynamic'
 import PageLoading from '@/components/PageLoading'
 import { sessionRedirect } from '@/core/security/session-response'
-const BlueprintTab = dynamic(() => import('./BlueprintTab'), { loading: () => <PageLoading message="Loading section…" /> })
-const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'), { loading: () => <PageLoading message="Loading section…" /> })
-const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'), { loading: () => <PageLoading message="Loading section…" /> })
-const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'), { loading: () => <PageLoading message="Loading section…" /> })
-const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'), { loading: () => <PageLoading message="Loading section…" /> })
+const BlueprintTab = dynamic(() => import('./BlueprintTab'), { loading: () => <PageLoading layout="form" message="Loading course blueprint…" /> })
+const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'), { loading: () => <PageLoading layout="cards" message="Loading teacher assignments…" /> })
+const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'), { loading: () => <PageLoading layout="table" message="Loading period attendance…" /> })
+const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'), { loading: () => <PageLoading layout="table" message="Loading campus attendance…" /> })
+const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'), { loading: () => <PageLoading layout="table" message="Loading course allocations…" /> })
 import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -496,7 +500,7 @@ export default function HodDashboard() {
     const semesterTitle = defaulterSemester === 'all' ? '' : ` - Semester ${defaulterSemester}`
     const semesterBody = defaulterSemester === 'all' ? '' : ` of Semester ${defaulterSemester}`
     const lines = [
-      `📋 FYIMP Course Registration${semesterTitle}`,
+      `FYIMP Course Registration${semesterTitle}`,
       `Department: ${hodInfo?.department_name}`,
       ``,
       `The following students${semesterBody} have *not yet submitted* their course registration:`,
@@ -548,7 +552,7 @@ export default function HodDashboard() {
 
           {/* 2. HOD Details Block (Exact original hierarchy: Name on top, Badges below) */}
           {loadingHod ? (
-            <div className={styles.topBarSkeleton} />
+            <ProfilePlaceholder />
           ) : (
             <div className={styles.hodIdentity}>
               <p className={styles.hodName}>{hodInfo?.full_name ?? 'HOD'}</p>
@@ -574,7 +578,7 @@ export default function HodDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -642,7 +646,7 @@ export default function HodDashboard() {
                   }}
                 >
                   <span className={styles.dropdownItemLabel}>{tab.label}</span>
-                  {activeTab === tab.id && <span className={styles.activeCheck}>✓</span>}
+                  {activeTab === tab.id && <span className={styles.activeCheck}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>}
                 </button>
               ))}
             </div>
@@ -710,13 +714,13 @@ export default function HodDashboard() {
                 />
                 {selectedFile ? (
                   <>
-                    <div className={styles.dropzoneIcon}>✅</div>
+                    <div className={styles.dropzoneIcon}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                     <p className={styles.dropzoneFileName}>{selectedFile.name}</p>
                     <p className={styles.dropzoneSubtext}>{(selectedFile.size / 1024).toFixed(1)} KB — Ready to upload</p>
                   </>
                 ) : (
                   <>
-                    <div className={styles.dropzoneIcon}>📂</div>
+                    <div className={styles.dropzoneIcon}><UiFolderOpen size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                     <p className={styles.dropzoneText}>Tap to select CSV file</p>
                     <p className={styles.dropzoneSubtext}>Only .csv files accepted</p>
                   </>
@@ -750,7 +754,7 @@ export default function HodDashboard() {
                     textAlign: 'center',
                   }}
                 >
-                  ❌ Remove Selected File
+                  Remove Selected File
                 </button>
               )}
 
@@ -812,16 +816,16 @@ export default function HodDashboard() {
                 disabled={exportingExcel}
                 title="Download Excel sheet with student details and all selected papers"
               >
-                {exportingExcel ? 'Exporting...' : '📊 Export Excel (Students & Papers)'}
+                {exportingExcel ? <LoadingIndicator message="Exporting…" /> : 'Export Excel (Students & Papers)'}
               </button>
             </div>
 
             <div className={styles.tableWrapper}>
               {loadingStudents ? (
-                <div className={styles.loadingState}><div className={styles.spinner} /><p className={styles.loadingText}>Loading students...</p></div>
+                <LoadingState layout="table" message="Loading students…" />
               ) : students.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>👥</div>
+                  <div className={styles.emptyIcon}><UiUsers size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No students found</p>
                   <p className={styles.emptySubtitle}>No students in Semester {studentSemester}. Click <b>+ Add Student</b> to create one.</p>
                 </div>
@@ -836,8 +840,8 @@ export default function HodDashboard() {
                         <td>{student.current_semester}</td>
                         <td>
                           <div className={styles.actionBtns}>
-                            <button className={styles.approveBtn} onClick={() => { setEditStudent(student); setEditName(student.full_name); setEditCap(student.cap_application_number ?? ''); setEditSemester(student.current_semester); setStudentError(''); setStudentSuccess('') }}>✏️</button>
-                            <button className={styles.rejectBtn} onClick={() => { setDeleteStudent(student); setStudentError(''); setStudentSuccess('') }}>🗑️</button>
+                            <button className={styles.approveBtn} onClick={() => { setEditStudent(student); setEditName(student.full_name); setEditCap(student.cap_application_number ?? ''); setEditSemester(student.current_semester); setStudentError(''); setStudentSuccess('') }} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
+                            <button className={styles.rejectBtn} onClick={() => { setDeleteStudent(student); setStudentError(''); setStudentSuccess('') }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                           </div>
                         </td>
                       </tr>
@@ -903,7 +907,7 @@ export default function HodDashboard() {
                   {studentError && <div className={styles.errorBanner} style={{ marginBottom: '1rem' }}>{studentError}</div>}
                   <div className={styles.modalActions}>
                     <button className={styles.modalCancelBtn} onClick={() => { setShowAddModal(false); setAddName(''); setAddCap(''); setAddEmail(''); setAddPassword(''); setAddYearJoined(getDefaultAcademicYear()); setAddSemester(1); setStudentError('') }} disabled={adding}>Cancel</button>
-                    <button className={styles.modalConfirmBtn} onClick={handleAddStudent} disabled={adding}>{adding ? 'Creating...' : 'Create Student →'}</button>
+                    <button className={styles.modalConfirmBtn} onClick={handleAddStudent} disabled={adding}>{adding ? <LoadingIndicator message="Creating…" /> : 'Create Student →'}</button>
                   </div>
                 </div>
               </div>
@@ -939,7 +943,7 @@ export default function HodDashboard() {
                   {studentError && <div className={styles.errorBanner} style={{ marginBottom: '1rem' }}>{studentError}</div>}
                   <div className={styles.modalActions}>
                     <button className={styles.modalCancelBtn} onClick={() => { setEditStudent(null); setEditCap(''); setEditName(''); setStudentError('') }} disabled={updating}>Cancel</button>
-                    <button className={styles.modalConfirmBtn} onClick={handleUpdateStudent} disabled={updating}>{updating ? 'Saving...' : 'Save Changes →'}</button>
+                    <button className={styles.modalConfirmBtn} onClick={handleUpdateStudent} disabled={updating}>{updating ? <LoadingIndicator message="Saving…" /> : 'Save Changes →'}</button>
                   </div>
                 </div>
               </div>
@@ -957,7 +961,7 @@ export default function HodDashboard() {
                   {studentError && <div className={styles.errorBanner} style={{ marginBottom: '1rem' }}>{studentError}</div>}
                   <div className={styles.modalActions}>
                     <button className={styles.modalCancelBtn} onClick={() => { setDeleteStudent(null); setStudentError('') }} disabled={deleting}>Cancel</button>
-                    <button className={styles.modalDeleteBtn} onClick={handleDeleteStudent} disabled={deleting}>{deleting ? 'Removing...' : 'Yes, Remove'}</button>
+                    <button className={styles.modalDeleteBtn} onClick={handleDeleteStudent} disabled={deleting}>{deleting ? <LoadingIndicator message="Removing…" /> : 'Yes, Remove'}</button>
                   </div>
                 </div>
               </div>
@@ -997,7 +1001,7 @@ export default function HodDashboard() {
                 disabled={exportingExcel}
                 title="Download Excel sheet with student details and all selected papers"
               >
-                {exportingExcel ? 'Exporting...' : '📊 Export Excel'}
+                {exportingExcel ? <LoadingIndicator message="Exporting…" /> : 'Export Excel'}
               </button>
               <button
                 className={styles.exportBtn}
@@ -1006,12 +1010,12 @@ export default function HodDashboard() {
                 style={{ background: "var(--portal-info-bg,#f8fafc)", color: "var(--portal-info-text,#334155)", border: "1px solid var(--portal-strong-border,#cbd5e1)" }}
                 title="Refresh live student registration status from server"
               >
-                {loadingDefaulters ? 'Refreshing...' : '🔄 Refresh Status'}
+                {loadingDefaulters ? <LoadingIndicator message="Refreshing…" /> : 'Refresh Status'}
               </button>
             </div>
 
             {loadingDefaulters && (
-              <div className={styles.loadingState}><div className={styles.spinner} /><p className={styles.loadingText}>Fetching student data...</p></div>
+              <LoadingState layout="table" message="Fetching student data…" />
             )}
 
             {!loadingDefaulters && deptData && (
@@ -1038,15 +1042,15 @@ export default function HodDashboard() {
                   </p>
                   {notSubmittedStudents.length > 0 && (
                     copied
-                      ? <span className={styles.copiedMsg}>✓ Copied!</span>
-                      : <button className={styles.whatsappBtn} onClick={handleCopyWhatsApp}>📋 Copy Pending for WhatsApp</button>
+                      ? <span className={styles.copiedMsg}>Copied!</span>
+                      : <button className={styles.whatsappBtn} onClick={handleCopyWhatsApp}>Copy Pending for WhatsApp</button>
                   )}
                 </div>
 
                 <div className={styles.tableWrapper}>
                   {deptData.total_students === 0 ? (
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>👥</div>
+                      <div className={styles.emptyIcon}><UiUsers size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                       <p className={styles.emptyTitle}>No students found</p>
                       <p className={styles.emptySubtitle}>No students in your department{defaulterSemester !== 'all' ? ` for Semester ${defaulterSemester}` : ''}.</p>
                     </div>
@@ -1071,7 +1075,7 @@ export default function HodDashboard() {
                                 background: student.submitted ? "var(--portal-success-bg,#dcfce7)" : "var(--portal-danger-bg,#fee2e2)",
                                 color: student.submitted ? "var(--portal-success-text,#16a34a)" : "var(--portal-danger-text,#dc2626)",
                               }}>
-                                {student.submitted ? '✓ Submitted' : '⏳ Pending'}
+                                {student.submitted ? 'Submitted' : 'Pending'}
                               </span>
                             </td>
                           </tr>
@@ -1093,9 +1097,9 @@ export default function HodDashboard() {
       {(uploadSuccess || studentSuccess) && (
         <div className={styles.successModalOverlay} onClick={() => { setUploadSuccess(''); setStudentSuccess('') }}>
           <div className={styles.successModalContent} onClick={e => e.stopPropagation()}>
-            <div className={styles.successModalIcon}>✓</div>
+            <div className={styles.successModalIcon}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
             <p className={styles.successModalText}>{uploadSuccess || studentSuccess}</p>
-            <button className={styles.successModalClose} onClick={() => { setUploadSuccess(''); setStudentSuccess('') }}>✕</button>
+            <button className={styles.successModalClose} onClick={() => { setUploadSuccess(''); setStudentSuccess('') }} aria-label="Close"><UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
           </div>
         </div>
       )}

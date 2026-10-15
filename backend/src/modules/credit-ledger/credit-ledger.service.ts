@@ -8,7 +8,7 @@ export { LevelBandKey }
 
 export interface RegisteredCourseItem {
   id: string; courseCode: string; title: string; credits: number; category: string
-  normalizedCategory: string; levelBand: LevelBandKey; isAdditional: boolean
+  normalizedCategory: string; levelBand: LevelBandKey
   departmentId: string; departmentName: string; semester: number; academicYear: string
   creditSource: 'registration_snapshot' | 'current_catalogue_missing_snapshot'
 }
@@ -61,12 +61,10 @@ export class CreditLedgerService {
         creditSource: hasSnapshot ? 'registration_snapshot' : 'current_catalogue_missing_snapshot',
         category, normalizedCategory: this.normalizeCategory(category, c.course_code),
         levelBand: this.deriveLevelBand(c.course_code, hasSnapshot ? snapshot.academic_level : c.academic_level),
-        isAdditional: slot >= 7, departmentId: c.department_id, departmentName: c.departments?.name || 'Unknown',
+        departmentId: c.department_id, departmentName: c.departments?.name || 'Unknown',
         semester: reg.semester, academicYear: reg.academic_year }
     })
-    const coreCredits = registeredCourses.filter(c => !c.isAdditional).reduce((a,c) => a+c.credits,0)
-    const additionalCredits = registeredCourses.filter(c => c.isAdditional).reduce((a,c) => a+c.credits,0)
-    const totalCredits = coreCredits + additionalCredits
+    const totalCredits = registeredCourses.reduce((sum, course) => sum + course.credits, 0)
     const categories = [...new Set([...CANONICAL_CATEGORIES,...registeredCourses.map(c => c.normalizedCategory)])].map(category => {
       const registered = registeredCourses.filter(c => c.normalizedCategory === category).reduce((a,c) => a+c.credits,0)
       return { category, title: category, registeredCredits: registered, earned: registered,
@@ -90,7 +88,7 @@ export class CreditLedgerService {
       advisoryMatrixVersion: null, requirementsAvailable: false, disclaimer: ADVISORY_CREDIT_DISCLAIMER,
       unresolvedRequirementNote: UNRESOLVED_REQUIREMENT_NOTE, totalCredits, totalRegisteredCredits: totalCredits,
       historicalSnapshotsComplete: registeredCourses.every(c => c.creditSource === 'registration_snapshot'),
-      coreCredits, additionalCredits, categories, levelBands, byDepartment,
+      categories, levelBands, byDepartment,
       exitEligibility: { threeYear: pending('3-Year UG'), fourYear: pending('4-Year Honours'), fiveYear: pending('5-Year Integrated PG') }, registeredCourses,
     }
   }

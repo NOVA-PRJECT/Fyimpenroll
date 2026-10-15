@@ -74,8 +74,8 @@ async function bootstrap() {
   const port = process.env.PORT || 4000
   await app.listen(port, '0.0.0.0')
 
-  logger.log(`🚀 NestJS Backend running at http://127.0.0.1:${port}`)
-  logger.log(`🔒 Supabase database & auth connected`)
+  logger.log(`NestJS Backend running at http://127.0.0.1:${port}`)
+  logger.log(`Supabase database & auth connected`)
 }
 
 bootstrap()

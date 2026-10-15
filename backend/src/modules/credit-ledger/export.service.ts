@@ -210,8 +210,8 @@ export class ExportService {
     const ledger=await this.creditLedgerService.getCreditLedger(id,user)
     const rows=ledger.registeredCourses.map(c=>({'Student Name':ledger.student.fullName,'CAP App No':ledger.student.capApplicationNumber,
       'Department':ledger.student.departmentName,'Academic Year':c.academicYear,'Semester':c.semester,'Course Code':c.courseCode,'Course Title':c.title,'Category':c.normalizedCategory,
-      'Academic Level':c.levelBand,'Type':c.isAdditional?'Additional / Elective':'Core','Registered Credits':c.credits,'Credit Source':c.creditSource}))
-    return this.renderOutput(rows,'Credit_Ledger',format,{totalRegisteredCredits:ledger.totalRegisteredCredits,coreCredits:ledger.coreCredits,additionalCredits:ledger.additionalCredits,
+      'Registered Credits':c.credits,'Credit Source':c.creditSource}))
+    return this.renderOutput(rows,'Credit_Ledger',format,{totalRegisteredCredits:ledger.totalRegisteredCredits,
       advisoryMatrixVersion:ledger.advisoryMatrixVersion,disclaimer:ledger.disclaimer})
   }
   private async renderOutput(rows:Record<string,any>[],prefix:string,format?:'csv'|'xlsx'|'json',metadata?:Record<string,any>) {

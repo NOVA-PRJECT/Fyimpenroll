@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
+import { BookOpen as UiBookOpen, Check as UiCheck, Info as UiInfo, Pencil as UiPencil, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
+
 import { useState, useEffect, useEffectEvent } from 'react'
 import { GripVertical, ChevronDown } from 'lucide-react'
 import styles from './hod-dashboard.module.css'
@@ -818,7 +822,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
               onClick={() => removeSlotFromPathway(pathwayIdx, slotIdx)}
               className={styles.slotRemoveBtn}
             >
-              ✕ Remove
+              Remove
             </button>
           )}
         </div>
@@ -1028,9 +1032,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       {success && (
         <div className={styles.successModalOverlay} onClick={() => setSuccess('')}>
           <div className={styles.successModalContent} onClick={e => e.stopPropagation()}>
-            <div className={styles.successModalIcon}>✓</div>
+            <div className={styles.successModalIcon}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
             <p className={styles.successModalText}>{success}</p>
-            <button className={styles.successModalClose} onClick={() => setSuccess('')}>✕</button>
+            <button className={styles.successModalClose} onClick={() => setSuccess('')} aria-label="Close"><UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
           </div>
         </div>
       )}
@@ -1051,10 +1055,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       </div>
 
       {loading ? (
-        <div className={styles.loadingState}>
-          <div className={styles.spinner} />
-          <p className={styles.loadingText}>Loading Semester {semester} data...</p>
-        </div>
+        <LoadingState layout="form" message={`Loading semester ${semester} data…`} />
       ) : (
         <>
           {/* ── BLUEPRINT EDITOR ── */}
@@ -1114,7 +1115,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     alignItems: 'center',
                     gap: '0.35rem'
                   }}>
-                    ⚠️ <b>Configuration Error:</b> {warningMessage}
+                    <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <b>Configuration Error:</b> {warningMessage}
                   </div>
                 )}
                 {!isImpossible && maxCredits !== '' && (
@@ -1131,7 +1132,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     alignItems: 'center',
                     gap: '0.35rem'
                   }}>
-                    ℹ️ <b>Info:</b> The current configured slots require a minimum of {overallMin} credits, which fits below your maximum limit of {maxCredits} credits.
+                    <UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <b>Info:</b> The current configured slots require a minimum of {overallMin} credits, which fits below your maximum limit of {maxCredits} credits.
                   </div>
                 )}
               </div>
@@ -1192,7 +1193,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                 fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                               }}
                             >
-                              ✏️ Edit
+                              Edit
                             </button>
                             <button
                               type="button"
@@ -1207,7 +1208,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                 cursor: pathways.length <= 1 ? 'not-allowed' : 'pointer',
                               }}
                             >
-                              🗑️ Delete
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -1324,7 +1325,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     }}
                     disabled={saving}
                   >
-                    {saving ? 'Saving...' : 'Save Blueprint →'}
+                    {saving ? <LoadingIndicator message="Saving…" /> : 'Save Blueprint →'}
                   </button>
                 </div>
               )}
@@ -1357,13 +1358,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
 
               <div className={styles.tableWrapper}>
                 {loadingCourses ? (
-                  <div className={styles.loadingState}>
-                    <div className={styles.spinner} />
-                    <p className={styles.loadingText}>Loading courses...</p>
-                  </div>
+                  <LoadingState layout="cards" message="Loading courses…" />
                 ) : courses.length === 0 ? (
                   <div className={styles.emptyState}>
-                    <div className={styles.emptyIcon}>📚</div>
+                    <div className={styles.emptyIcon}><UiBookOpen size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                     <p className={styles.emptyTitle}>No courses yet</p>
                     <p className={styles.emptySubtitle}>Add courses for Semester {semester}.</p>
                   </div>
@@ -1414,7 +1412,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                   setError(''); setSuccess('')
                                 }}
                               >
-                                ✏️
+                                <UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
                               </button>
                               <button
                                 className={styles.deleteBtn}
@@ -1424,7 +1422,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                   setDeleteCourse(course); setError(''); setSuccess('')
                                 }}
                               >
-                                🗑️
+                                <UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
                               </button>
                             </div>
                           </td>
@@ -1470,7 +1468,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     title="Close"
                     aria-label="Close"
                   >
-                    ✕
+                    <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
                   </button>
                 </div>
 
@@ -1628,9 +1626,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         gap: '0.45rem'
                       }}>
                         {loadingRules ? (
-                          <div style={{ padding: '0.8rem', textAlign: 'center', fontSize: '0.75rem', color: "var(--portal-muted,#64748b)" }}>
-                            Loading constraints...
-                          </div>
+                          <LoadingState layout="list" rows={2} compact message="Loading constraints…" />
                         ) : courseRules.length === 0 ? (
                           <div style={{
                             fontSize: '0.75rem',
@@ -1708,7 +1704,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     }}
                                     title="Remove department constraint"
                                   >
-                                    ✕ Remove
+                                    Remove
                                   </button>
                                 </div>
                               )
@@ -1751,7 +1747,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     }}
                                     title="Remove course prerequisite"
                                   >
-                                    ✕ Remove
+                                    Remove
                                   </button>
                                 </div>
                               )
@@ -1978,9 +1974,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                     {/* Courses List */}
                                     <div className={styles.priorCourseList}>
                                       {loadingPriorCourses ? (
-                                        <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: "var(--portal-muted,#64748b)" }}>
-                                          Loading prior courses...
-                                        </div>
+                                        <LoadingState layout="list" rows={2} compact message="Loading prior courses…" />
                                       ) : (
                                         (() => {
                                           const filtered = priorCourses.filter(c => {
@@ -2122,7 +2116,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     onClick={handleSaveCourse}
                     disabled={savingCourse}
                   >
-                    {savingCourse ? 'Saving...' : editCourse ? 'Save Changes →' : 'Add Course →'}
+                    {savingCourse ? <LoadingIndicator message="Saving…" /> : editCourse ? 'Save Changes →' : 'Add Course →'}
                   </button>
                 </div>
               </div>
@@ -2141,7 +2135,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                 <div className={styles.modalActions}>
                   <button className={styles.modalCancelBtn} onClick={() => { setDeleteCourse(null); setError('') }} disabled={deletingCourse}>Cancel</button>
                   <button className={styles.modalDeleteBtn} onClick={handleDeleteCourse} disabled={deletingCourse}>
-                    {deletingCourse ? 'Deleting...' : 'Yes, Delete'}
+                    {deletingCourse ? <LoadingIndicator message="Deleting…" /> : 'Yes, Delete'}
                   </button>
                 </div>
               </div>

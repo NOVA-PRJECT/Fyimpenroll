@@ -1,6 +1,9 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
 import { useEffect, useState } from 'react'
+import styles from '@/components/campus-attendance/campus-attendance.module.css'
 
 const fields = [
   ['center_latitude', 'Campus centre latitude', 'number'],
@@ -24,6 +27,7 @@ export default function CampusAttendanceSettings() {
     const controller = new AbortController()
     async function load() {
       setReady(false)
+      setError('')
       try {
         const res = await fetch('/api/director/attendance-settings', { cache: 'no-store', signal: controller.signal })
         const data = await res.json()
@@ -54,26 +58,37 @@ export default function CampusAttendanceSettings() {
     finally { setSaving(false) }
   }
 
-  return <section style={{ background: "var(--portal-surface,#fff)", border: "1px solid var(--portal-strong-border,#e2e8f0)", borderRadius: 12, padding: 24, marginBottom: 24 }}>
-    <h2 style={{ marginTop: 0 }}>Campus sign-in settings</h2>
-    <p>Use a verified campus centre and a radius that covers the campus. All attendance times are in IST.</p>
-    {error && <p role="alert" style={{ color: "var(--portal-danger-text,#991b1b)" }}>{error} {!ready && <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
-    {!ready && !error && <p role="status">Loading attendance settings…</p>}
-    {success && <p role="status" style={{ color: "var(--portal-success-text,#065f46)" }}>{success}</p>}
-    <form onSubmit={save}>
-      <fieldset disabled={!ready || saving} style={{ border: 0, padding: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-          {fields.map(([key, label, type]) => <label key={key} style={{ display: 'grid', gap: 6 }}>
-            {label}
-            <input required type={type} value={values[key] ?? ''}
-              step={type === 'time' || key === 'radius_meters' ? 1 : 'any'}
-              min={key === 'center_latitude' ? -90 : key === 'center_longitude' ? -180 : key === 'radius_meters' ? 1 : undefined}
-              max={key === 'center_latitude' ? 90 : key === 'center_longitude' ? 180 : undefined}
-              onChange={event => { setSuccess(''); setValues(previous => ({ ...previous, [key]: event.target.value })) }}
-              style={{ padding: 10, border: "1px solid var(--portal-strong-border,#94a3b8)", borderRadius: 6 }} />
-          </label>)}
+  function renderField([key, label, type]: typeof fields[number]) {
+    return <label key={key} className={styles.field}>
+      {label}
+      <input required type={type} value={values[key] ?? ''} className={styles.input}
+        step={type === 'time' || key === 'radius_meters' ? 1 : 'any'}
+        min={key === 'center_latitude' ? -90 : key === 'center_longitude' ? -180 : key === 'radius_meters' ? 1 : undefined}
+        max={key === 'center_latitude' ? 90 : key === 'center_longitude' ? 180 : undefined}
+        onChange={event => { setSuccess(''); setValues(previous => ({ ...previous, [key]: event.target.value })) }} />
+    </label>
+  }
+
+  return <section className={styles.card} aria-labelledby="campus-settings-title">
+    <span className={styles.eyebrow}>Attendance configuration</span>
+    <h2 id="campus-settings-title" className={styles.title}>Campus sign-in settings</h2>
+    <p className={styles.description}>Manage the campus location and daily sign-in checkpoints. These settings are separate from course registration.</p>
+    {error && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{error} {!ready && <button type="button" className={styles.secondaryButton} onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
+    {!ready && !error && <LoadingState layout="form" rows={7} compact message="Loading attendance settings…" />}
+    {success && <p role="status" className={`${styles.notice} ${styles.successNotice}`}>{success}</p>}
+    <form hidden={!ready} onSubmit={save}>
+      <fieldset disabled={!ready || saving} className={styles.fieldset}>
+        <div className={styles.formSection}>
+          <h3 className={styles.sectionTitle}>Campus location</h3>
+          <p className={styles.sectionDescription}>Use a verified centre point and a radius that covers the campus.</p>
+          <div className={styles.settingsGrid}>{fields.slice(0, 3).map(renderField)}</div>
         </div>
-        <button type="submit" style={{ marginTop: 16, padding: '10px 16px' }}>{saving ? 'Saving…' : 'Save campus sign-in settings'}</button>
+        <div className={styles.formSection}>
+          <h3 className={styles.sectionTitle}>Daily checkpoints</h3>
+          <p className={styles.sectionDescription}>All checkpoint times use Indian Standard Time (IST).</p>
+          <div className={styles.settingsGrid}>{fields.slice(3).map(renderField)}</div>
+        </div>
+        <button type="submit" className={styles.primaryButton}>{saving ? <LoadingIndicator message="Saving…" /> : 'Save campus sign-in settings'}</button>
       </fieldset>
     </form>
   </section>

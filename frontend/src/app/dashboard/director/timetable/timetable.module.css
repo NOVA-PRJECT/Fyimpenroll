@@ -85,6 +85,7 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.85rem;
+  min-width: 0;
 }
 
 .controlsRight {
@@ -92,6 +93,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.65rem;
+  min-width: 0;
+}
+
+.exportActions {
+  display: flex;
+  gap: .65rem;
+  min-width: 0;
 }
 
 .fieldGroup {
@@ -547,7 +555,7 @@
 }
 
 .bannerWarning {
-  background: #fffbebf5;
+  background: var(--portal-warning-bg, #fffbeb);
   border: 1px solid var(--portal-warning-border,#fde68a);
   border-radius: 0.5rem;
   padding: 1rem;
@@ -1320,6 +1328,32 @@
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
+  }
+  .controlsLeft {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .controlsLeft .fieldGroup { min-width: 0; }
+  .controlsLeft .select {
+    min-width: 0;
+    padding-inline: .6rem;
+    min-height: 44px;
+  }
+  .controlsLeft .rulesTriggerBtn { grid-column: 1 / -1; }
+  .controlsRight {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .exportActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .controlsRight button {
+    min-width: 0;
+    min-height: 44px;
+    height: auto;
+    padding-inline: .6rem;
+    line-height: 1.4;
   }
   .fieldGroup {
     width: 100%;

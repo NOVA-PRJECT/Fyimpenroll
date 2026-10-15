@@ -242,7 +242,7 @@ export class CampusAttendanceService {
       signed_in_at: inserted.signed_in_at,
       message:
         status === 'on_time'
-          ? `✓ ${sessionType.toUpperCase()} sign-in verified on-time at ${campus.name}!`
+          ? `${sessionType.toUpperCase()} sign-in verified on-time at ${campus.name}!`
           : status === 'late'
           ? `Morning sign-in recorded (late: after ${formatCampusTime(settings.morning_cutoff_time)} IST).`
           : `Evening sign-in recorded (early leave: before ${formatCampusTime(settings.evening_cutoff_time)} IST).`,

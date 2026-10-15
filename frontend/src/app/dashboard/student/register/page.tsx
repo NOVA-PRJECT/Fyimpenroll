@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
+import { Check as UiCheck, ClipboardList as UiClipboardList, GraduationCap as UiGraduationCap, Info as UiInfo, RefreshCw as UiRefreshCw, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
+
 import NavigationLink from '@/components/NavigationLink'
 import { sessionRedirect } from '@/core/security/session-response'
 
@@ -100,7 +104,7 @@ export default function RegisterPage() {
   const [slotChangesRemaining, setSlotChangesRemaining] = useState<number>(3)
   const [slotChangesNextReset, setSlotChangesNextReset] = useState<string | null>(null)
 
-  const windowIsOpen = serverWindowIsOpen && (!blueprint?.deadline || currentTime < Date.parse(blueprint.deadline))
+  const windowIsOpen = serverWindowIsOpen && !!blueprint?.deadline && currentTime < Date.parse(blueprint.deadline)
 
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
@@ -108,7 +112,7 @@ export default function RegisterPage() {
 
   async function loadBlueprint() {
     try {
-      const response = await fetch('/api/registrations/blueprint')
+      const response = await fetch('/api/registrations/blueprint', { cache: 'no-store' })
       const data = await response.json()
       const destination = sessionRedirect(response.status, data)
       if (destination) { router.replace(destination); return }
@@ -231,6 +235,13 @@ export default function RegisterPage() {
   }, [])
 
   async function handleUpdateSlot(slotNumber: number, courseId: string) {
+    if (!windowIsOpen || !blueprint?.deadline || Date.now() >= Date.parse(blueprint.deadline)) {
+      setWindowIsOpen(false)
+      setEditingSlot(null)
+      setSelectedCourseForSlot('')
+      setError('')
+      return
+    }
     if (!courseId) {
       setError('Please select an available paper from the list.')
       return
@@ -252,7 +263,15 @@ export default function RegisterPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to update course registration')
+        const message = typeof data.message === 'string' ? data.message : data.error || 'Failed to update course registration'
+        if (res.status === 403 && /registration window.*closed|after the deadline/i.test(message)) {
+          setWindowIsOpen(false)
+          setEditingSlot(null)
+          setSelectedCourseForSlot('')
+          setError('')
+          return
+        }
+        throw new Error(message)
       }
 
       if (data.slotChangesRemaining !== undefined) {
@@ -335,6 +354,7 @@ export default function RegisterPage() {
   }
 
   function handleAddPaper() {
+    if (!windowIsOpen) return
     if (extraSlotsCount < 2) {
       setExtraSlotsCount((prev) => prev + 1)
       setError('')
@@ -342,6 +362,7 @@ export default function RegisterPage() {
   }
 
   function handleRemovePaper(slotNum: number) {
+    if (!windowIsOpen) return
     if (slotNum === 8 && extraSlotsCount === 2) {
       setExtraSlotsCount(1)
       setRankedPreferences((prev) => {
@@ -493,7 +514,7 @@ export default function RegisterPage() {
   }
 
   async function handleSubmit() {
-    if (!blueprint || !selectedPathwayId) return
+    if (!blueprint || !selectedPathwayId || !windowIsOpen) return
 
     const preferencesPayload: Record<string, { course_id: string; rank: number }[]> = {}
     const chosenRank1Courses = new Map<string, number>()
@@ -513,7 +534,7 @@ export default function RegisterPage() {
         const rank1Id = currentPrefs.rank1 || existingSlots[slotKey]
 
         if (!rank1Id) {
-          setError(`Please select at least a 1st choice preference for "${slot.name}" (or click "✕ Remove Paper" if not taking it).`)
+          setError(`Please select at least a 1st choice preference for "${slot.name}" (or click "Remove Paper" if not taking it).`)
           return
         }
 
@@ -660,7 +681,7 @@ export default function RegisterPage() {
             ← Back to Dashboard
           </NavigationLink>
           <button className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
-            {loggingOut ? 'Logging out...' : 'Logout'}
+            {loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}
           </button>
         </div>
       </header>
@@ -669,18 +690,13 @@ export default function RegisterPage() {
 
         {/* Loading Blueprint */}
         {pageState === 'loading_blueprint' && (
-          <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-            <p>Loading course registration…</p>
-            <div style={{ height: '3.5rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
-            <div style={{ height: '10rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
-            <div style={{ height: '10rem', borderRadius: '0.75rem' }} className={styles.skeletonLightPulse} />
-          </div>
+          <LoadingState layout="cards" rows={3} message="Loading course registration…" />
         )}
 
         {/* Error / Blueprint Not Configured State */}
         {pageState === 'error' && (
           <div className={styles.closedState}>
-            <div className={styles.closedIcon}>📋</div>
+            <div className={styles.closedIcon}><UiClipboardList size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
             <p className={styles.closedTitle}>Registration Unavailable</p>
             <p className={styles.closedSubtitle}>
               {error || 'Your department course blueprint or campus registration settings are not currently available.'}
@@ -710,7 +726,7 @@ export default function RegisterPage() {
         {/* Closed with no existing registration */}
         {pageState === 'closed' && (
           <div className={styles.closedState}>
-            <div className={styles.closedIcon}>🔒</div>
+            <div className={styles.closedIcon}><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
             <p className={styles.closedTitle}>Registration Window is Closed</p>
             <p className={styles.closedSubtitle}>
               {error ||
@@ -742,7 +758,7 @@ export default function RegisterPage() {
           <div className={styles.trackPickerContainer}>
             <div className={styles.trackHeader}>
               <span className={styles.trackCategoryTag}>
-                <span>🎓</span> ACADEMIC PATHWAY SELECTION
+                <span><UiGraduationCap size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> ACADEMIC PATHWAY SELECTION
               </span>
               <h2 className={styles.trackTitle}>Select Your Academic Track</h2>
               <p className={styles.trackSubtitle}>
@@ -791,10 +807,7 @@ export default function RegisterPage() {
 
         {/* Loading Pathway Slots */}
         {pageState === 'loading_slots' && (
-          <div className={styles.loadingState}>
-            <div className={styles.spinner} />
-            <p className={styles.loadingText}>Loading track courses...</p>
-          </div>
+          <LoadingState layout="cards" message="Loading track courses…" />
         )}
 
         {/* Ready / Submitting / Submitted */}
@@ -803,7 +816,17 @@ export default function RegisterPage() {
           resolvedSlots.length > 0 && (
             <>
               {/* Window Status Banner */}
-              {allocationCompleted ? (
+              {!windowIsOpen ? (
+                <div role="status" className={`${styles.windowBanner} ${styles.closed}`}>
+                  <div className={styles.windowDot} />
+                  <div>
+                    <strong>Registration window is closed — course changes are locked.</strong>
+                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem' }}>
+                      Your registered courses remain available to view. Courses cannot be changed or added while registration is closed, even if you have changes remaining.
+                    </p>
+                  </div>
+                </div>
+              ) : allocationCompleted ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1.25rem' }}>
                   <div
                     className={styles.windowBanner}
@@ -815,7 +838,7 @@ export default function RegisterPage() {
                     }}
                   >
                     <div className={styles.windowDot} style={{ background: '#0284c7' }} />
-                    ✓ Course Allocation Complete — Direct Seat Registration Mode (Seats update in real time; only papers with available seats can be chosen)
+                    Course Allocation Complete — Direct Seat Registration Mode (Seats update in real time; only papers with available seats can be chosen)
                   </div>
 
                   {/* 27-Hour Slot Change Quota Indicator */}
@@ -835,7 +858,7 @@ export default function RegisterPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                       <span style={{ fontSize: '1.25rem' }}>
-                        {slotChangesRemaining > 0 ? '🔄' : '🔒'}
+                        {slotChangesRemaining > 0 ? <UiRefreshCw size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : <UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />}
                       </span>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>
@@ -900,7 +923,7 @@ export default function RegisterPage() {
                     {!windowIsOpen
                       ? 'Registration window is closed'
                       : isClosingSoon
-                      ? `⚠️ Closing Soon — Registration closes in ${hoursLeft} hour${
+                      ? `Closing Soon — Registration closes in ${hoursLeft} hour${
                           hoursLeft === 1 ? '' : 's'
                         } (${new Date(blueprint.deadline).toLocaleDateString('en-IN', {
                           day: 'numeric',
@@ -970,12 +993,12 @@ export default function RegisterPage() {
                     </span>
                     {isValidCredits && (
                       <span style={{ fontSize: '0.72rem', background: "var(--portal-success-bg,#dcfce7)", color: "var(--portal-success-text,#15803d)", padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
-                        ✓ Valid Load
+                        Valid Load
                       </span>
                     )}
                     {!isValidCredits && baseCredits > 0 && (
                       <span style={{ fontSize: '0.72rem', background: "var(--portal-danger-bg,#fee2e2)", color: "var(--portal-danger-text,#b91c1c)", padding: '0.15rem 0.55rem', borderRadius: '9999px', fontWeight: 700 }}>
-                        ⚠️ {baseCredits < minCredits ? `Need ${minCredits - baseCredits} more cr` : `Exceeds max by ${baseCredits - maxCredits} cr`}
+                        <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {baseCredits < minCredits ? `Need ${minCredits - baseCredits} more cr` : `Exceeds max by ${baseCredits - maxCredits} cr`}
                       </span>
                     )}
                   </div>
@@ -989,7 +1012,7 @@ export default function RegisterPage() {
 
               <p className={styles.sectionTitle}>
                 {allocationCompleted
-                  ? 'Your Course Allocations & Available Slots'
+                  ? windowIsOpen ? 'Your Course Allocations & Available Slots' : 'Your Registered Courses'
                   : windowIsOpen
                   ? 'Select Your Ranked Preferences'
                   : 'Course Allocation Status'}
@@ -1019,7 +1042,7 @@ export default function RegisterPage() {
                     : getCourseForSlot(slot)
 
                   const isConfirmed = isAllocated || (isFixed && !!slot.course)
-                  const isCurrentlyEditing = editingSlot === slot.slot
+                  const isCurrentlyEditing = windowIsOpen && slotChangesRemaining > 0 && editingSlot === slot.slot
 
                   return (
                     <div
@@ -1035,7 +1058,7 @@ export default function RegisterPage() {
                             </span>
                           )}
                         </span>
-                        {slot.slot > 6 && (windowIsOpen || allocationCompleted) && !isConfirmed && (
+                        {slot.slot > 6 && windowIsOpen && !isConfirmed && (
                           <button
                             type="button"
                             onClick={() => handleRemovePaper(slot.slot)}
@@ -1056,7 +1079,7 @@ export default function RegisterPage() {
                             onMouseEnter={(e) => (e.currentTarget.style.background = '#fee2e2')}
                             onMouseLeave={(e) => (e.currentTarget.style.background = '#fef2f2')}
                           >
-                            ✕ Remove Paper
+                            Remove Paper
                           </button>
                         )}
                       </div>
@@ -1093,7 +1116,7 @@ export default function RegisterPage() {
                                     options={optionsWithSeats}
                                     value={selectedCourseForSlot || existingCourseId || ''}
                                     onChange={(val) => setSelectedCourseForSlot(val)}
-                                    disabled={updatingSlot}
+                                    disabled={!windowIsOpen || updatingSlot}
                                     placeholder="— Select a course with open seats —"
                                   />
 
@@ -1101,7 +1124,7 @@ export default function RegisterPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleUpdateSlot(slot.slot, selectedCourseForSlot || existingCourseId || '')}
-                                      disabled={updatingSlot || (!selectedCourseForSlot && !existingCourseId)}
+                                      disabled={!windowIsOpen || updatingSlot || slotChangesRemaining === 0 || (!selectedCourseForSlot && !existingCourseId)}
                                       style={{
                                         background: '#0284c7',
                                         color: '#ffffff',
@@ -1116,7 +1139,7 @@ export default function RegisterPage() {
                                         gap: '0.4rem',
                                       }}
                                     >
-                                      {updatingSlot ? 'Registering Seat...' : '✓ Confirm & Register Seat'}
+                                      {updatingSlot ? <LoadingIndicator message="Registering Seat…" /> : 'Confirm & Register Seat'}
                                     </button>
                                     <button
                                       type="button"
@@ -1157,9 +1180,9 @@ export default function RegisterPage() {
                                     border: `1px solid ${isFixedSlot ? "var(--portal-strong-border,#cbd5e1)" : "var(--portal-success-border,#a7f3d0)"}`,
                                   }}
                                 >
-                                  {isFixedSlot ? '🔒 Fixed Core Course' : '✓ Confirmed Allocation'}
+                                  {isFixedSlot ? 'Fixed Core Course' : 'Confirmed Allocation'}
                                 </span>
-                                {!isFixedSlot && (
+                                {!isFixedSlot && windowIsOpen && (
                                   slotChangesRemaining > 0 ? (
                                     <button
                                       type="button"
@@ -1182,7 +1205,7 @@ export default function RegisterPage() {
                                       onMouseEnter={(e) => (e.currentTarget.style.background = '#e0f2fe')}
                                       onMouseLeave={(e) => (e.currentTarget.style.background = '#f0f9ff')}
                                     >
-                                      Change Course ✎
+                                      Change Course
                                     </button>
                                   ) : (
                                     <span
@@ -1201,7 +1224,7 @@ export default function RegisterPage() {
                                         cursor: 'not-allowed',
                                       }}
                                     >
-                                      🔒 Limit Reached (3/3)
+                                      Limit Reached (3/3)
                                     </span>
                                   )
                                 )}
@@ -1234,13 +1257,15 @@ export default function RegisterPage() {
                           <div className={styles.unallocatedCard} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                             <div>
                               <p className={styles.unallocatedTitle} style={{ margin: 0 }}>
-                                <span>⚠️</span> Unassigned Paper Slot
+                                <span><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Unassigned Paper Slot
                               </p>
                               <p className={styles.unallocatedText} style={{ margin: '0.25rem 0 0 0' }}>
-                                This slot is unassigned. Choose from courses with remaining seats.
+                                {windowIsOpen
+                                  ? 'This slot is unassigned. Choose from courses with remaining seats.'
+                                  : 'Registration is closed. Contact your department HOD about this unassigned slot.'}
                               </p>
                             </div>
-                            <button
+                            {windowIsOpen && <button
                               type="button"
                               onClick={() => {
                                 setEditingSlot(slot.slot)
@@ -1259,8 +1284,8 @@ export default function RegisterPage() {
                                 cursor: slotChangesRemaining > 0 ? 'pointer' : 'not-allowed',
                               }}
                             >
-                              {slotChangesRemaining > 0 ? 'Choose Course +' : '🔒 Changes Locked'}
-                            </button>
+                              {slotChangesRemaining > 0 ? 'Choose Course +' : 'Changes Locked'}
+                            </button>}
                           </div>
                         )
                       ) : (
@@ -1302,7 +1327,7 @@ export default function RegisterPage() {
                         ) : !windowIsOpen ? (
                           <div className={styles.unallocatedCard}>
                             <p className={styles.unallocatedTitle}>
-                              <span>⚠️</span> Not yet allocated — contact your HOD
+                              <span><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Not yet allocated — contact your HOD
                             </p>
                             <p className={styles.unallocatedText}>
                               Your submitted preferences could not be resolved during automated rounds.
@@ -1437,7 +1462,7 @@ export default function RegisterPage() {
               {extraSlotsCount === 2 && windowIsOpen && (
                 <div style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: "var(--portal-info-text,#0369a1)", background: "var(--portal-info-bg,#f0f9ff)", padding: '0.35rem 0.85rem', borderRadius: '9999px', border: "1px solid var(--portal-info-border,#bae6fd)", fontWeight: 600 }}>
-                    ✓ Maximum 8 papers reached (6 blueprint + 2 minor electives)
+                    Maximum 8 papers reached (6 blueprint + 2 minor electives)
                   </span>
                 </div>
               )}
@@ -1446,13 +1471,13 @@ export default function RegisterPage() {
               {successMsg && (
                 <div className={styles.successModalOverlay} onClick={() => setSuccessMsg('')}>
                   <div className={styles.successModalContent} onClick={(e) => e.stopPropagation()}>
-                    <div className={styles.successModalIcon}>✓</div>
+                    <div className={styles.successModalIcon}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                     <p className={styles.successModalText}>{successMsg}</p>
                     <button
                       className={styles.successModalClose}
                       onClick={() => setSuccessMsg('')}
-                    >
-                      ✕
+                     aria-label="Close">
+                      <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
                     </button>
                   </div>
                 </div>

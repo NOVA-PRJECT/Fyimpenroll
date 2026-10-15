@@ -1,7 +1,12 @@
 'use client'
 
+import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
+
+import { Check as UiCheck, Info as UiInfo, TriangleAlert as UiTriangleAlert } from 'lucide-react'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 import CampusAttendanceSettings from './CampusAttendanceSettings'
+import DirectorNavigation, { type DirectorSection } from './DirectorNavigation'
 
 import NavigationLink from '@/components/NavigationLink'
 import { sessionRedirect } from '@/core/security/session-response'
@@ -19,7 +24,6 @@ import {
   utcIsoToKolkataInput,
   kolkataInputToUtcIso,
   formatKolkataDisplay,
-  ASIA_KOLKATA_OFFSET_MS,
 } from '@/core/utils/dateTime'
 
 export default function DirectorDashboard() {
@@ -27,7 +31,7 @@ export default function DirectorDashboard() {
   useBfcacheGuard()
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<'registration' | 'timetable' | 'promotion' | 'allocation'>('registration')
+  const [activeTab, setActiveTab] = useState<DirectorSection>('registration')
 
   const [directorName, setDirectorName] = useState('')
   const [campusName, setCampusName] = useState('')
@@ -38,7 +42,7 @@ export default function DirectorDashboard() {
 
   // Window settings state
   const [currentDeadline, setCurrentDeadline] = useState<string | null>(null)
-  const [deadline, setDeadline] = useState('')
+  const [deadline, setDeadline] = useState<string | null>(null)
   const [savingWindow, setSavingWindow] = useState(false)
   const [windowSuccess, setWindowSuccess] = useState('')
   const [windowError, setWindowError] = useState('')
@@ -74,6 +78,9 @@ export default function DirectorDashboard() {
 
   // Derived window status
   const windowIsOpen = currentDeadline !== null && currentTime < Date.parse(currentDeadline)
+  // Keep a saved future deadline; a new window starts from the live IST clock.
+  // A typed or preset value stays untouched by background settings refreshes.
+  const deadlineInput = deadline ?? utcIsoToKolkataInput(windowIsOpen ? currentDeadline : new Date(currentTime))
 
   function invalidateDirectorCache() {
     if (typeof window !== 'undefined') {
@@ -103,7 +110,6 @@ export default function DirectorDashboard() {
 
       if (data.settings) {
         setCurrentDeadline(data.settings.deadline)
-        setDeadline(utcIsoToKolkataInput(data.settings.deadline))
         setLastPromotedAt(data.settings.last_promoted_at ?? null)
       }
     } catch (error) {
@@ -128,7 +134,6 @@ export default function DirectorDashboard() {
 
         if (data.settings) {
           setCurrentDeadline(data.settings.deadline)
-          setDeadline(utcIsoToKolkataInput(data.settings.deadline))
           setLastPromotedAt(data.settings.last_promoted_at ?? null)
         }
         setLoadingDirector(false)
@@ -183,13 +188,8 @@ export default function DirectorDashboard() {
   }, [activeTab, allocationSemester, allocationAcademicYear, allocationRun?.status])
 
   function handleSetPreset(days: number) {
-    const nowUtcMs = Date.now()
-    const kolkataNow = new Date(nowUtcMs + ASIA_KOLKATA_OFFSET_MS)
-    kolkataNow.setUTCDate(kolkataNow.getUTCDate() + days)
-    const y = kolkataNow.getUTCFullYear()
-    const m = String(kolkataNow.getUTCMonth() + 1).padStart(2, '0')
-    const d = String(kolkataNow.getUTCDate()).padStart(2, '0')
-    setDeadline(`${y}-${m}-${d}T23:59`)
+    setDeadline(utcIsoToKolkataInput(new Date(Date.now() + days * 24 * 60 * 60 * 1000)))
+    setWindowError('')
   }
 
   async function handleRunAllocation() {
@@ -218,7 +218,7 @@ export default function DirectorDashboard() {
         body: JSON.stringify({ deadline: nowIso }),
       })
       setCurrentDeadline(nowIso)
-      setDeadline(nowIso.slice(0, 16))
+      setDeadline(null)
       // Keep sessionStorage in sync so returning to the tab shows correct status
       if (typeof window !== 'undefined') {
         const cached = sessionStorage.getItem('fyimp_director_settings_cache')
@@ -268,14 +268,18 @@ export default function DirectorDashboard() {
 
   // Save window settings (F58, F59, F60)
   async function handleSaveWindow() {
-    if (!deadline) {
+    if (!deadlineInput) {
       setWindowError('Please set a deadline')
       return
     }
 
-    const utcIso = kolkataInputToUtcIso(deadline)
+    const utcIso = kolkataInputToUtcIso(deadlineInput)
     if (!utcIso) {
       setWindowError('Invalid deadline date format')
+      return
+    }
+    if (Date.parse(utcIso) <= Date.now()) {
+      setWindowError('Choose a future date and time to open registration. The form starts from the current IST time.')
       return
     }
 
@@ -301,7 +305,7 @@ export default function DirectorDashboard() {
       }
 
       setCurrentDeadline(utcIso)
-      setDeadline(utcIsoToKolkataInput(utcIso))
+      setDeadline(null)
       setWindowSuccess(data.message || 'Registration window updated successfully.')
       invalidateDirectorCache()
     } catch (err: unknown) {
@@ -337,7 +341,7 @@ export default function DirectorDashboard() {
       }
 
       setCurrentDeadline(nowIso)
-      setDeadline(utcIsoToKolkataInput(nowIso))
+      setDeadline(null)
       setWindowSuccess('Registration window closed successfully. Timetable generation is now unlocked.')
       invalidateDirectorCache()
     } catch (err: unknown) {
@@ -467,7 +471,7 @@ export default function DirectorDashboard() {
 
           {/* 2. Director Details Block */}
           {loadingDirector ? (
-            <div className={styles.topBarSkeleton} />
+            <ProfilePlaceholder />
           ) : (
             <div className={styles.directorIdentity}>
               <p className={styles.directorName}>{directorName || 'Campus Director'}</p>
@@ -493,45 +497,19 @@ export default function DirectorDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
           </button>
         </div>
       </header>
 
-      {/* Tab Bar */}
-      <div className={styles.tabBar}>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'registration' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('registration')}
-        >
-          Registration Window
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'timetable' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('timetable')}
-        >
-          Timetable Generator
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'promotion' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('promotion')}
-        >
-          Semester Promotion
-        </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === 'allocation' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('allocation')}
-        >
-          Course Allocation
-        </button>
-      </div>
+      <DirectorNavigation activeTab={activeTab} onSelect={setActiveTab} />
 
       {/* Main Content */}
       <div className={styles.mainContent}>
-        {activeTab === 'registration' && <CampusAttendanceSettings />}
+        {activeTab === 'campus-signin' && <CampusAttendanceSettings />}
         {settingsError && <div role="alert" className={styles.errorBanner}>{settingsError} <button onClick={() => loadSettingsData()}>Try again</button></div>}
-        {loadingDirector && <p role="status">Loading campus settings…</p>}
-        <fieldset disabled={!settingsReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        {loadingDirector && activeTab !== 'campus-signin' && <LoadingState layout="form" message="Loading campus settings…" />}
+        <fieldset hidden={loadingDirector} disabled={!settingsReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
 
         {/* ── TAB 1: REGISTRATION WINDOW ── */}
         {activeTab === 'registration' && (
@@ -539,7 +517,7 @@ export default function DirectorDashboard() {
             <p className={styles.sectionTitle}>Registration Window Management</p>
 
             {windowError && <div className={styles.errorBanner}>{windowError}</div>}
-            {windowSuccess && <div className={styles.successBanner}>✓ {windowSuccess}</div>}
+            {windowSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {windowSuccess}</div>}
 
             <div className={styles.windowCard}>
 
@@ -548,11 +526,11 @@ export default function DirectorDashboard() {
                 {windowIsOpen ? (
                   <>
                     <span className={styles.statusDot} />
-                    🟢 Registration Window OPEN — closes {formatKolkataDisplay(currentDeadline)}
+                    Registration Window OPEN — closes {formatKolkataDisplay(currentDeadline)}
                   </>
                 ) : (
                   <>
-                    ⛔ Registration Window CLOSED
+                    Registration Window CLOSED
                     {currentDeadline
                       ? ` — deadline was ${formatKolkataDisplay(currentDeadline)}`
                       : ' — no deadline set yet'}
@@ -564,7 +542,7 @@ export default function DirectorDashboard() {
 
                 <div className={styles.field}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className={styles.label}>
+                    <label className={styles.label} htmlFor="registration-deadline">
                       Registration Deadline
                       <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: "var(--portal-muted,#64748b)", fontWeight: 'normal' }}>
                         (Asia/Kolkata IST, UTC+05:30)
@@ -595,13 +573,20 @@ export default function DirectorDashboard() {
                     </div>
                   </div>
                   <input
+                    id="registration-deadline"
                     type="datetime-local"
                     className={styles.input}
-                    value={deadline}
-                    onChange={e => setDeadline(e.target.value)}
+                    value={deadlineInput}
+                    min={utcIsoToKolkataInput(new Date(currentTime))}
+                    aria-describedby="registration-deadline-help"
+                    onChange={e => { setDeadline(e.target.value); setWindowError('') }}
                   />
-                  <p className={styles.fieldHint}>
+                  <p className={styles.fieldHint} id="registration-deadline-help">
                     Students will be able to select and submit their ranked elective choices until this deadline (Indian Standard Time).
+                  </p>
+                  <p className={styles.fieldHint}>
+                    Current time: {formatKolkataDisplay(new Date(currentTime))}
+                    <button type="button" className={styles.useCurrentTimeBtn} onClick={() => setDeadline(utcIsoToKolkataInput(new Date()))}>Use current time</button>
                   </p>
                 </div>
 
@@ -647,7 +632,7 @@ export default function DirectorDashboard() {
                     onClick={handleCloseImmediately}
                     disabled={savingWindow}
                   >
-                    🔒 Close Registration Immediately
+                    Close Registration Immediately
                   </button>
                 )}
               </div>
@@ -684,7 +669,7 @@ export default function DirectorDashboard() {
               }}
             >
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: "var(--portal-danger-text,#f87171)", margin: 0 }}>
-                🔒 Close Registration Window?
+                Close Registration Window?
               </h3>
               <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                 This will <strong>immediately close</strong> course registration for this campus. Students will no longer be able to submit or change their elective preferences.
@@ -737,7 +722,7 @@ export default function DirectorDashboard() {
             <p className={styles.sectionTitle}>Semester Promotion</p>
 
             {promoteError && <div className={styles.errorBanner}>{promoteError}</div>}
-            {promoteSuccess && <div className={styles.successBanner}>✓ {promoteSuccess}</div>}
+            {promoteSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {promoteSuccess}</div>}
             {failedGraduations.length > 0 && (
               <div style={{
                 background: "var(--portal-warning-bg,#fff3cd)",
@@ -752,7 +737,7 @@ export default function DirectorDashboard() {
                 fontSize: '0.88rem'
               }}>
                 <span>
-                  ⚠️ <strong>{failedGraduations.length}</strong> graduating student account(s) pending Auth cleanup.
+                  <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <strong>{failedGraduations.length}</strong> graduating student account(s) pending Auth cleanup.
                 </span>
                 <button
                   className={styles.secondaryBtn}
@@ -760,7 +745,7 @@ export default function DirectorDashboard() {
                   disabled={retryingGraduation}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
                 >
-                  {retryingGraduation ? 'Retrying...' : 'Retry Cleanup Now'}
+                  {retryingGraduation ? <LoadingIndicator message="Retrying…" /> : 'Retry Cleanup Now'}
                 </button>
               </div>
             )}
@@ -792,7 +777,7 @@ export default function DirectorDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   <div style={{ background: "var(--portal-warning-bg,#fff8e6)", border: "1px solid var(--portal-warning-border,#f5d78c)", borderRadius: '0.6rem', padding: '0.9rem 1rem' }}>
                     <p style={{ fontSize: '0.78rem', fontWeight: 700, color: "var(--portal-warning-text,#8b6914)", margin: '0 0 0.3rem' }}>
-                      📅 Last Promotion
+                      Last Promotion
                     </p>
                     <p style={{ fontSize: '0.85rem', color: "var(--portal-muted,#44474e)", margin: 0 }}>
                       {lastPromotedAt
@@ -844,7 +829,7 @@ export default function DirectorDashboard() {
                         boxSizing: 'border-box',
                         textAlign: 'center',
                       }}>
-                        <p style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>🔒</p>
+                        <p style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></p>
                         <p style={{ fontSize: '0.92rem', fontWeight: 700, color: "var(--portal-danger-text,#c0392b)", margin: '0 0 0.5rem' }}>
                           Promotion Locked
                         </p>
@@ -870,7 +855,7 @@ export default function DirectorDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'center' }}>
                     <div style={{ background: "var(--portal-danger-bg,#fdf2f2)", border: "1px solid var(--portal-danger-border,#f5c6c6)", borderRadius: '0.6rem', padding: '0.9rem 1rem', width: '100%', maxWidth: '28rem', boxSizing: 'border-box' }}>
                       <p style={{ fontSize: '0.85rem', fontWeight: 700, color: "var(--portal-danger-text,#c0392b)", margin: 0 }}>
-                        ⚠️ Has the next semester officially started?
+                        Has the next semester officially started?
                       </p>
                       <p style={{ fontSize: '0.78rem', color: "var(--portal-muted,#44474e)", margin: '0.35rem 0 0' }}>
                         This will increment every student&apos;s semester by 1 and permanently remove Semester 10 graduates.
@@ -914,7 +899,7 @@ export default function DirectorDashboard() {
             <p className={styles.sectionTitle}>Scored Course Allocation System</p>
 
             {allocationError && <div className={styles.errorBanner}>{allocationError}</div>}
-            {allocationSuccess && <div className={styles.successBanner}>✓ {allocationSuccess}</div>}
+            {allocationSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {allocationSuccess}</div>}
 
             <div className={styles.windowCard}>
               <p className={styles.windowDescription}>
@@ -1026,7 +1011,7 @@ export default function DirectorDashboard() {
                         border: '1px solid rgba(34, 197, 94, 0.4)',
                       }}
                     >
-                      ✓ Completed
+                      Completed
                     </span>
                   ) : (
                     <span
@@ -1040,7 +1025,7 @@ export default function DirectorDashboard() {
                         border: '1px solid rgba(239, 68, 68, 0.4)',
                       }}
                     >
-                      ✕ Failed
+                      Failed
                     </span>
                   )}
                 </div>
@@ -1119,7 +1104,7 @@ export default function DirectorDashboard() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          Dismiss ✕
+                          Dismiss
                         </button>
                       </div>
                     )}
@@ -1143,7 +1128,7 @@ export default function DirectorDashboard() {
                     gap: '0.6rem',
                   }}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                  <span style={{ fontSize: '1.1rem' }}><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>
                   <div>
                     <strong>Registration Window is Currently Open</strong>
                     <div style={{ color: "var(--portal-info-text,#cbd5e1)", fontSize: '0.8rem', marginTop: '0.2rem' }}>
@@ -1166,7 +1151,7 @@ export default function DirectorDashboard() {
                     gap: '0.6rem',
                   }}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>✓</span>
+                  <span style={{ fontSize: '1.1rem' }}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>
                   <div>
                     <strong>Registration Window is Closed</strong>
                     <div style={{ color: "var(--portal-info-text,#94a3b8)", fontSize: '0.8rem', marginTop: '0.2rem' }}>
@@ -1202,7 +1187,7 @@ export default function DirectorDashboard() {
                         Allocating Courses...
                       </>
                     ) : allocationRun?.status === 'completed' ? (
-                      '✓ Allocation Completed (Locked for this semester)'
+                      'Allocation Completed (Locked for this semester)'
                     ) : allocationRun?.status === 'failed' ? (
                       'Retry Course Allocation →'
                     ) : (
@@ -1212,7 +1197,7 @@ export default function DirectorDashboard() {
                 </div>
                 {allocationRun?.status === 'completed' && (
                   <p style={{ margin: 0, fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: "var(--portal-success-text,#10b981)", fontSize: '1rem' }}>🔒</span>
+                    <span style={{ color: "var(--portal-success-text,#10b981)", fontSize: '1rem' }}><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>
                     In production, allocation can only be executed once per semester per academic year. Students can now make direct slot changes for available seats.
                   </p>
                 )}
@@ -1247,7 +1232,7 @@ export default function DirectorDashboard() {
                   }}
                 >
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: "var(--portal-danger-text,#f87171)", margin: 0 }}>
-                    ⚠️ Re-Run Allocation Confirmation
+                    Re-Run Allocation Confirmation
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                     This will reset all elective allocations including any manual HOD placements. Fixed slot assignments are preserved.
@@ -1304,7 +1289,7 @@ export default function DirectorDashboard() {
                   }}
                 >
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: "var(--portal-warning-text,#fbbf24)", margin: 0 }}>
-                    ⚠️ Registration Window Still Open
+                    Registration Window Still Open
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: "var(--portal-info-text,#cbd5e1)", lineHeight: 1.5, margin: 0 }}>
                     The course registration window is currently <strong>OPEN</strong>. According to academic protocol, student preference submissions must be closed and frozen before executing the course allocation engine.

@@ -1,5 +1,7 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Clock,
@@ -270,7 +272,7 @@ export default function PeriodMarkingTab() {
             title="Export official department APC statement as styled XLSX"
           >
             <FileSpreadsheet size={15} />
-            {exporting ? 'Generating Statement...' : `Export Sem ${semesterFilter === 'all' ? 1 : semesterFilter} Statement (XLSX)`}
+            {exporting ? <LoadingIndicator message="Generating Statement…" /> : `Export Sem ${semesterFilter === 'all' ? 1 : semesterFilter} Statement (XLSX)`}
           </button>
 
           <div style={{ padding: '6px 14px', borderRadius: '8px', background: "var(--portal-info-bg,#f8fafc)", border: "1px solid var(--portal-strong-border,#e2e8f0)", fontSize: '12px' }}>
@@ -388,7 +390,7 @@ export default function PeriodMarkingTab() {
           {/* Slots List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '560px', overflowY: 'auto' }}>
             {loadingSlots ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>Loading slots...</div>
+              <LoadingState layout="list" message="Loading slots…" />
             ) : filteredSlots.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>No timetable slots found.</div>
             ) : (
@@ -425,11 +427,11 @@ export default function PeriodMarkingTab() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {slot.is_marked ? (
                           <span style={{ fontSize: '10px', background: "var(--portal-success-bg,#dcfce7)", color: "var(--portal-success-text,#15803d)", padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            ✓ Marked ({slot.present_count} Pres, {slot.absent_count} Abs)
+                            Marked ({slot.present_count} Pres, {slot.absent_count} Abs)
                           </span>
                         ) : (
                           <span style={{ fontSize: '10px', background: "var(--portal-warning-bg,#fef3c7)", color: "var(--portal-warning-text,#b45309)", padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            ⏳ Pending / Unmarked
+                            Pending / Unmarked
                           </span>
                         )}
                       </div>
@@ -519,7 +521,7 @@ export default function PeriodMarkingTab() {
               {/* Students Table */}
               <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
                 {loadingRoster ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>Loading student roster...</div>
+                  <LoadingState layout="table" message="Loading student roster…" />
                 ) : filteredStudents.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>No students found matching filter.</div>
                 ) : (

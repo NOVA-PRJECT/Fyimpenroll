@@ -1,5 +1,7 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   ReactFlow,
@@ -984,9 +986,9 @@ export default function TeacherAssignmentTab({
         {/* Canvas / List view toggle hint on desktop */}
         <div style={{ fontSize: '12px', color: "var(--portal-muted,#64748b)" }}>
           {isMobileView ? (
-            <span>📱 Showing Touch List View</span>
+            <span>Showing Touch List View</span>
           ) : (
-            <span>🖥️ Canvas View (Drag node handle to assign)</span>
+            <span>Canvas View (Drag node handle to assign)</span>
           )}
         </div>
       </div>
@@ -1022,7 +1024,7 @@ export default function TeacherAssignmentTab({
       )}
 
       {/* ── Main View: Interactive Node Canvas (>= 1024px) ── */}
-      {!isMobileView ? (
+      {loading ? <LoadingState layout="cards" message="Loading teachers and course assignments…" /> : !isMobileView ? (
         <div
           style={{
             height: '650px',
@@ -1329,7 +1331,7 @@ export default function TeacherAssignmentTab({
                 onClick={handleConfirmReassign}
                 disabled={!reassignTeacherId || reassigning}
               >
-                {reassigning ? 'Reassigning...' : 'Confirm Reassignment →'}
+                {reassigning ? <LoadingIndicator message="Reassigning…" /> : 'Confirm Reassignment →'}
               </button>
             </div>
           </div>
@@ -1349,7 +1351,7 @@ export default function TeacherAssignmentTab({
             </p>
 
             <div style={{ background: "var(--portal-danger-bg,#fef2f2)", padding: '10px 14px', borderRadius: '8px', marginBottom: '1rem', border: "1px solid var(--portal-danger-border,#fecaca)", fontSize: '12px', color: "var(--portal-danger-text,#991b1b)" }}>
-              ⚠️ The course will become unassigned until another faculty member is assigned.
+              The course will become unassigned until another faculty member is assigned.
             </div>
 
             {removeModalError && (
@@ -1374,7 +1376,7 @@ export default function TeacherAssignmentTab({
                 onClick={handleConfirmRemove}
                 disabled={removing}
               >
-                {removing ? 'Removing...' : 'Yes, Remove'}
+                {removing ? <LoadingIndicator message="Removing…" /> : 'Yes, Remove'}
               </button>
             </div>
           </div>
@@ -1579,7 +1581,7 @@ export default function TeacherAssignmentTab({
                   className={styles.modalConfirmBtn}
                   disabled={addingTeacher || !newTeacherName.trim() || !newTeacherEmail.trim() || !newTeacherPassword.trim()}
                 >
-                  {addingTeacher ? 'Creating Account...' : 'Create Teacher →'}
+                  {addingTeacher ? <LoadingIndicator message="Creating Account…" /> : 'Create Teacher →'}
                 </button>
               </div>
             </form>
@@ -1696,7 +1698,7 @@ export default function TeacherAssignmentTab({
                         }}
                       >
                         <Trash2 size={13} />
-                        {deletingTeacherId === t.id ? 'Removing...' : 'Remove'}
+                        {deletingTeacherId === t.id ? <LoadingIndicator message="Removing…" /> : 'Remove'}
                       </button>
                     </div>
                   )
@@ -1787,7 +1789,7 @@ export default function TeacherAssignmentTab({
               }}
             >
               {savingBatch ? (
-                <>Saving Changes...</>
+                <LoadingIndicator message="Saving changes…" />
               ) : (
                 <>
                   <Check size={14} /> Save All Assignments

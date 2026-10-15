@@ -1,5 +1,7 @@
 'use client'
 
+import LoadingState from '@/components/LoadingState'
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   MapPin,
@@ -325,7 +327,7 @@ export default function CampusAttendanceTab() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
-                🌅 MORNING ARRIVAL (Cutoff: 09:30 AM)
+                MORNING ARRIVAL (Cutoff: 09:30 AM)
               </span>
               <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>Window closes 01:30 PM</span>
             </div>
@@ -364,7 +366,7 @@ export default function CampusAttendanceTab() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: "var(--portal-brand-text,#002147)" }}>
-                🌆 EVENING CHECKPOINT (Cutoff: 03:30 PM)
+                EVENING CHECKPOINT (Cutoff: 03:30 PM)
               </span>
               <span style={{ fontSize: '11px', color: "var(--portal-muted,#64748b)" }}>Day closes 05:00 PM</span>
             </div>
@@ -456,9 +458,7 @@ export default function CampusAttendanceTab() {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>
-            Loading campus attendance roster...
-          </div>
+          <LoadingState layout="table" message="Loading campus attendance roster…" />
         ) : filteredStudents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: "var(--portal-info-text,#94a3b8)", fontSize: '13px' }}>
             No students found for this filter.

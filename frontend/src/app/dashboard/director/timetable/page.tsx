@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
+import { Building2 as UiBuilding2, CalendarCheck as UiCalendarCheck, Check as UiCheck, CircleAlert as UiCircleAlert, Settings2 as UiSettings2, Timer as UiTimer, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
+
 import NavigationLink from '@/components/NavigationLink';
 import { sessionRedirect } from '@/core/security/session-response';
 import { useRouter } from 'next/navigation';
@@ -18,6 +22,7 @@ interface TimetableEntry {
   courseId: string;
   courseName: string;
   courseCode: string;
+  teacherId?: string | null;
   category?: string;
   departmentId: string;
   departmentName: string;
@@ -109,6 +114,10 @@ export default function CampusDirectorTimetablePage() {
   const [allConflicts, setAllConflicts] = useState<ConflictItem[]>([]);
   const [reviewDraft, setReviewDraft] = useState(false);
   const [unscheduledPeriods, setUnscheduledPeriods] = useState(0);
+  const [publication, setPublication] = useState<{ published: boolean; publishedAt: string | null; publishedCount: number } | null>(null);
+  const entriesRequest = useRef(0);
+  const cohortRef = useRef('');
+  cohortRef.current = `${academicYear}:${semester}`;
   const [departments, setDepartments] = useState<{ id: string; name: string; code?: string }[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [conflictDeptFilter, setConflictDeptFilter] = useState<string>('all');
@@ -183,15 +192,17 @@ export default function CampusDirectorTimetablePage() {
   const fetchEntries = useCallback(
     async (forceRefresh = false) => {
       if (!academicYear || !semester) return;
-
+      const request = ++entriesRequest.current;
+      const cohort = `${academicYear}:${semester}`;
       setLoading(true);
       setError(null);
 
       try {
         const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
-        const res = await fetch(`/api/timetable/entries?academicYear=${academicYear}&semester=${semester}${cacheBuster}`);
+        const res = await fetch(`/api/timetable/entries?academicYear=${academicYear}&semester=${semester}${cacheBuster}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`Failed to load timetable (${res.status})`);
         const data = await res.json();
+        if (request !== entriesRequest.current || cohort !== cohortRef.current) return;
 
         const entriesList = data.entries ?? [];
         const conflictsList = data.conflicts ?? [];
@@ -206,14 +217,18 @@ export default function CampusDirectorTimetablePage() {
         }
 
         setAllEntries(entriesList);
+        setPublication(data.publication ?? { published: entriesList.some((e: TimetableEntry) => e.status === 'published'), publishedAt: null, publishedCount: entriesList.filter((e: TimetableEntry) => e.status === 'published').length });
         setAllConflicts(conflictsList);
         setReviewDraft(data.reviewDraft === true);
         setUnscheduledPeriods(data.unscheduledPeriods || 0);
         setDepartments(deptList);
       } catch (err: unknown) {
-        setError((err instanceof Error ? err.message : ''));
+        if (request === entriesRequest.current && cohort === cohortRef.current) {
+          setPublication(null);
+          setError((err instanceof Error ? err.message : 'Failed to load timetable'));
+        }
       } finally {
-        setLoading(false);
+        if (request === entriesRequest.current && cohort === cohortRef.current) setLoading(false);
       }
     },
     [academicYear, semester]
@@ -235,6 +250,8 @@ export default function CampusDirectorTimetablePage() {
     setJobProgress(0);
     setStepMessage(null);
     setShowGenerationOverlay(false);
+    setPublication(null);
+    setShowPublishModal(false);
 
     if (!academicYear || !semester) return;
 
@@ -406,7 +423,8 @@ export default function CampusDirectorTimetablePage() {
 
   // Handle Generate Timetable
   async function handleGenerate() {
-    if (!settingsReady || !rulesReady || !baseConstraints) return;
+    if (!settingsReady || !rulesReady || !baseConstraints || loading || error || !publication || publishing) return;
+    if (publication.published) { setErrorMsg('This timetable is published. Generation is locked for this academic year and semester.'); return; }
     if (!registrationClosed) {
       setShowCloseWindowConfirmModal(true);
       return;
@@ -415,7 +433,7 @@ export default function CampusDirectorTimetablePage() {
   }
 
   async function executeGeneration() {
-    if (!settingsReady || !rulesReady || !baseConstraints) return;
+    if (!settingsReady || !rulesReady || !baseConstraints || loading || error || !publication || publication.published || publishing) return;
     setErrorMsg(null);
     setSuccessMsg(null);
     setJobError(null);
@@ -452,8 +470,8 @@ export default function CampusDirectorTimetablePage() {
     }
   }
 
-  async function handlePublish(force = false) {
-    if (!settingsReady || loading || error) return;
+  async function handlePublish() {
+    if (!settingsReady || loading || error || publishing || publication?.published) return;
     if (reviewDraft || allConflicts.length > 0) {
       setErrorMsg('Resolve unscheduled sessions and generate a complete verified timetable before publication.');
       return;
@@ -467,7 +485,7 @@ export default function CampusDirectorTimetablePage() {
       const res = await fetch('/api/timetable/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ academicYear, semester, force }),
+        body: JSON.stringify({ academicYear, semester }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -482,15 +500,18 @@ export default function CampusDirectorTimetablePage() {
           setPublishModalError(msg);
           setErrorMsg(msg);
         }
-      } else {
+      } else if (data.success === true && Number.isInteger(data.publishedCount) && data.publishedCount > 0) {
         const countMsg = data.publishedCount ? ` (${data.publishedCount} active sessions)` : '';
         setSuccessMsg((data.message || 'Timetable published successfully') + countMsg);
         setShowPublishModal(false);
         setPublishModalError(null);
         setPublishConflicts(null);
-        // Instantly update entries locally to show "published" status
-        setAllEntries((prev) => prev.map((e) => ({ ...e, status: 'published' })));
-        invalidateCache();
+        setPublication({ published: true, publishedAt: data.publishedAt ?? null, publishedCount: data.publishedCount });
+        await fetchEntries(true);
+      } else {
+        const message = 'Publication was not confirmed by the server. Refresh the timetable and try again.';
+        setPublishModalError(message);
+        setErrorMsg(message);
       }
     } catch {
       const netErr = 'Network error while publishing timetable. Please check your connection.';
@@ -660,6 +681,7 @@ export default function CampusDirectorTimetablePage() {
 
   const totalConflictingStudents = allConflicts.reduce((sum, c) => sum + (c.conflictingStudentCount || 0), 0);
   const impactedDeptIds = new Set(departments.filter(d => entriesForDepartment(allConflicts, d.id).length).map(d => d.id));
+  const unassignedCourses = new Set(allEntries.filter(entry => !entry.teacherId).map(entry => entry.courseId)).size;
 
   return (
     <div className={styles.pageWrapper}>
@@ -684,20 +706,30 @@ export default function CampusDirectorTimetablePage() {
       </div>
 
       <div className={styles.mainContent}>
+        {publication?.published && <div role="status" className={styles.bannerSuccess}>
+          <strong>Published — Semester {semester} ({academicYear})</strong>
+          <p>{publication.publishedCount} sessions are published. Generation is locked for this campus, academic year and semester.</p>
+        </div>}
+        {!reviewDraft && unassignedCourses > 0 && <div role="status" className={styles.bannerWarning}>
+          <strong>{unassignedCourses} courses have no assigned teacher in this timetable.</strong>
+          <p>{publication?.published
+            ? 'Assign teachers to the published sessions so they appear in the teachers’ schedules.'
+            : `Assign teachers for ${academicYear}, Semester ${semester}, then generate again before publishing to include them in teacher schedules and clash checks.`}</p>
+        </div>}
         {reviewDraft && <div role="status" className={styles.bannerWarning}>
           <strong>Incomplete review draft — {unscheduledPeriods} course periods remain unscheduled.</strong>
           <p>The displayed sessions satisfy the scheduling rules. Review the unscheduled sessions, adjust the catalogue or rules as appropriate, then generate again. This draft cannot be published.</p>
           <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
         </div>}
-        {!rulesReady && !rulesError && <p role="status">Loading scheduling rules…</p>}
+        {!rulesReady && !rulesError && <LoadingState layout="list" rows={2} compact message="Loading scheduling rules…" />}
         {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
-        {!settingsReady && !settingsError && <p role="status">Loading campus settings…</p>}
+        {!settingsReady && !settingsError && <LoadingState layout="form" rows={2} compact message="Loading campus settings…" />}
         {settingsError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{settingsError}<button onClick={() => setSettingsRetry(value => value + 1)}>Try again</button></div>}
         {/* Registration Window Warning Banner */}
         {settingsReady && !registrationClosed && (
           <div className={styles.registrationWarningBanner}>
             <div className={styles.registrationWarningContent}>
-              <span className={styles.registrationWarningIcon}>⚠️</span>
+              <span className={styles.registrationWarningIcon}><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>
               <div>
                 <p className={styles.registrationWarningTitle}>
                   Student Registration Window is Currently Open
@@ -722,10 +754,12 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.controlsRow}>
             <div className={styles.controlsLeft}>
               <div className={styles.fieldGroup}>
-                <label className={styles.label}>Academic Year</label>
+                <label className={styles.label} htmlFor="timetable-academic-year">Academic Year</label>
                 <select
+                  id="timetable-academic-year"
                   className={styles.select}
                   value={academicYear}
+                  disabled={publishing}
                   onChange={(e) => setAcademicYear(e.target.value)}
                 >
                   <option value="2026-27">2026-27</option>
@@ -735,10 +769,12 @@ export default function CampusDirectorTimetablePage() {
               </div>
 
               <div className={styles.fieldGroup}>
-                <label className={styles.label}>Semester</label>
+                <label className={styles.label} htmlFor="timetable-semester">Semester</label>
                 <select
+                  id="timetable-semester"
                   className={styles.select}
                   value={semester}
+                  disabled={publishing}
                   onChange={(e) => setSemester(Number(e.target.value))}
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
@@ -755,7 +791,7 @@ export default function CampusDirectorTimetablePage() {
                 onClick={() => setShowRulesModal(true)}
                 title="Manage custom and base scheduling constraints"
               >
-                <span>⚙️ Scheduling Rules</span>
+                <span>Scheduling Rules</span>
                 <span className={styles.rulesBadge}>{baseConstraints?.rules.length ?? 0} Rules</span>
               </button>
             </div>
@@ -764,24 +800,25 @@ export default function CampusDirectorTimetablePage() {
               <button
                 className={styles.generateBtn}
                 onClick={handleGenerate}
-                disabled={!settingsReady || !rulesReady || !baseConstraints || jobStatus === 'running' || jobStatus === 'queued'}
+                disabled={!settingsReady || !rulesReady || !baseConstraints || loading || !!error || !publication || publication.published || publishing || jobStatus === 'running' || jobStatus === 'queued'}
                 title={
-                  !registrationClosed
+                  publication?.published ? 'Published timetables cannot be regenerated' : !registrationClosed
                     ? 'Registration window must be closed before generation'
                     : 'Generate automated AI timetable'
                 }
               >
-                {jobStatus === 'running' || jobStatus === 'queued' ? 'Generating...' : '⚡ Generate AI Timetable'}
+                {publication?.published ? 'Published — Generation Locked' : jobStatus === 'running' || jobStatus === 'queued' ? <LoadingIndicator message="Generating…" /> : 'Generate AI Timetable'}
               </button>
 
               {(allEntries.length > 0 || reviewDraft) && (
                 <>
+                  <div className={styles.exportActions}>
                   <button
                     className={styles.exportExcelBtn}
                     onClick={() => handleOpenExportModal('excel')}
                     title="Export timetable as Excel workbook (.xlsx)"
                   >
-                    📊 Export Excel (.xlsx)
+                    Export Excel
                   </button>
 
                   <button
@@ -789,8 +826,9 @@ export default function CampusDirectorTimetablePage() {
                     onClick={() => handleOpenExportModal('pdf')}
                     title="Export timetable as PDF"
                   >
-                    📄 Export PDF
+                    Export PDF
                   </button>
+                  </div>
 
                   <button
                     className={styles.exportExcelBtn}
@@ -799,11 +837,11 @@ export default function CampusDirectorTimetablePage() {
                       setPublishConflicts(null);
                       setShowPublishModal(true);
                     }}
-                    disabled={!settingsReady || loading || !!error || reviewDraft || allConflicts.length > 0}
+                    disabled={!settingsReady || loading || !!error || publication?.published || publishing || jobStatus === 'running' || jobStatus === 'queued' || reviewDraft || allConflicts.length > 0}
                     title="Publish timetable for students and faculty"
                     style={{ background: '#059669' }}
                   >
-                    🚀 Publish Timetable
+                    {publication?.published ? 'Published' : 'Publish Timetable'}
                   </button>
                 </>
               )}
@@ -812,13 +850,13 @@ export default function CampusDirectorTimetablePage() {
         </div>
 
         {/* Feedback Banners */}
-        {errorMsg && <div className={styles.bannerError}>❌ {errorMsg}</div>}
-        {successMsg && <div className={styles.bannerSuccess}>✓ {successMsg}</div>}
+        {errorMsg && <div className={styles.bannerError}><UiCircleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {errorMsg}</div>}
+        {successMsg && <div className={styles.bannerSuccess}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {successMsg}</div>}
 
         {/* Page-level Fetch Error State with Retry Button */}
         {error && (
           <div className={styles.bannerError} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>❌ {error}</span>
+            <span><UiCircleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {error}</span>
             <button
               style={{
                 background: '#ef4444',
@@ -842,7 +880,7 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.bannerWarning} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <p style={{ fontWeight: 700, margin: '0 0 0.25rem 0', fontSize: '0.95rem' }}>
-                ⚠️ {allConflicts.length} Course Scheduling Conflict(s) Require Attention
+                <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {allConflicts.length} Course Scheduling Conflict(s) Require Attention
               </p>
               <p style={{ margin: 0, fontSize: '0.82rem', color: "var(--portal-warning-text,#78350f)" }}>
                 Required sessions remain unscheduled under the current hours, available periods and scheduling rules.
@@ -862,7 +900,7 @@ export default function CampusDirectorTimetablePage() {
               }}
               onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}
             >
-              🔍 View All {allConflicts.length} Conflicts →
+              View All {allConflicts.length} Conflicts →
             </button>
           </div>
         )}
@@ -887,7 +925,7 @@ export default function CampusDirectorTimetablePage() {
               onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}
               title="View all scheduling conflicts across campus"
             >
-              ⚠️ Unresolved Conflicts ({allConflicts.length})
+              Unresolved Conflicts ({allConflicts.length})
             </button>
           )}
         </div>
@@ -898,7 +936,7 @@ export default function CampusDirectorTimetablePage() {
             <div className={styles.conflictsSectionHeader}>
               <div>
                 <h3 className={styles.conflictsSectionTitle}>
-                  ⚠️ Campus Scheduling Conflicts ({allConflicts.length})
+                  Campus Scheduling Conflicts ({allConflicts.length})
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: "var(--portal-muted,#64748b)" }}>
                   These required sessions remain unscheduled. Partially scheduled courses may still appear in the timetable grid.
@@ -948,7 +986,7 @@ export default function CampusDirectorTimetablePage() {
                     </div>
                     {c.departmentName && (
                       <span className={styles.conflictDeptBadge}>
-                        🏢 Department: {c.departmentName}
+                        Department: {c.departmentName}
                       </span>
                     )}
                   </div>
@@ -958,7 +996,7 @@ export default function CampusDirectorTimetablePage() {
                   </div>
 
                   <div className={styles.conflictFooter}>
-                    <span>👥 Impacted Students: <strong>{c.conflictingStudentCount} student(s)</strong></span>
+                    <span>Impacted Students: <strong>{c.conflictingStudentCount} student(s)</strong></span>
                     {departments.some(d => entriesForDepartment([c], d.id).length) && (
                       <button
                         style={{
@@ -985,9 +1023,7 @@ export default function CampusDirectorTimetablePage() {
           /* VIEW 2: Regular Department Timetable Grid */
           <div>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '4rem', color: "var(--portal-info-text,#6366f1)", background: "var(--portal-surface,#ffffff)", borderRadius: '0.75rem', border: "1px solid var(--portal-strong-border,#e2e8f0)" }}>
-                <p style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Loading timetable data...</p>
-              </div>
+              <LoadingState layout="timetable" message="Loading timetable data…" />
             ) : departments.length > 0 ? (
               <div>
                 {/* Active Department Header Banner */}
@@ -996,7 +1032,7 @@ export default function CampusDirectorTimetablePage() {
                   return (
                     <div className={styles.activeDeptBanner}>
                       <span className={styles.activeDeptTitle}>
-                        🏛️ {activeDept?.name || 'Department'} ({activeDept?.code || 'Dept'}) Timetable
+                        <UiBuilding2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {activeDept?.name || 'Department'} ({activeDept?.code || 'Dept'}) Timetable
                       </span>
                       <span className={styles.activeDeptSub}>
                         Semester {semester} • Academic Year {academicYear}
@@ -1075,7 +1111,7 @@ export default function CampusDirectorTimetablePage() {
               <div className={styles.conflictsSectionCard} style={{ marginTop: '2rem' }}>
                 <div className={styles.conflictsSectionHeader}>
                   <h4 className={styles.conflictsSectionTitle} style={{ fontSize: '1rem' }}>
-                    ⚠️ Scheduling Conflicts in Active View ({visibleConflicts.length} of {allConflicts.length})
+                    Scheduling Conflicts in Active View ({visibleConflicts.length} of {allConflicts.length})
                   </h4>
                   <button
                     style={{
@@ -1103,7 +1139,7 @@ export default function CampusDirectorTimetablePage() {
                           </div>
                           {c.departmentName && (
                             <span className={styles.conflictDeptBadge}>
-                              🏢 {c.departmentName}
+                              <UiBuilding2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {c.departmentName}
                             </span>
                           )}
                         </div>
@@ -1111,14 +1147,14 @@ export default function CampusDirectorTimetablePage() {
                           <strong>Reason:</strong> {c.reason}
                         </div>
                         <div className={styles.conflictFooter}>
-                          <span>👥 Impacted Students: <strong>{c.conflictingStudentCount} student(s)</strong></span>
+                          <span>Impacted Students: <strong>{c.conflictingStudentCount} student(s)</strong></span>
                         </div>
                       </div>
                     ))}
 
                   {visibleConflicts.length === 0 && (
                     <p style={{ margin: '0.5rem 0', color: "var(--portal-success-text,#166534)", fontWeight: 600, fontSize: '0.85rem' }}>
-                      ✓ Zero conflicts in this department! (The remaining {allConflicts.length} conflict(s) are in other campus departments).
+                      Zero conflicts in this department! (The remaining {allConflicts.length} conflict(s) are in other campus departments).
                     </p>
                   )}
                 </div>
@@ -1134,7 +1170,7 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.generationModalCard}>
             <div className={styles.generationModalHeader}>
               <div className={styles.generationModalIcon}>
-                {jobStatus === 'completed' ? '✓' : (jobStatus === 'failed' || !!jobError) ? '⚠️' : '✨'}
+                {jobStatus === 'completed' ? <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : (jobStatus === 'failed' || !!jobError) ? <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : <UiSettings2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />}
               </div>
               <div style={{ flex: 1 }}>
                 <h3 className={styles.generationModalTitle}>
@@ -1149,8 +1185,8 @@ export default function CampusDirectorTimetablePage() {
                   {jobError
                     ? jobError
                     : jobStatus === 'completed'
-                    ? (stepMessage || '🎉 Timetable generation complete! All department schedules placed.')
-                    : (stepMessage || '🧠 Processing scheduling constraints and student registrations with OR-Tools...')}
+                    ? (stepMessage || 'Timetable generation complete! All department schedules placed.')
+                    : (stepMessage || 'Processing scheduling constraints and student registrations with OR-Tools...')}
                 </p>
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: "var(--portal-info-text,#818cf8)" }}>
@@ -1172,19 +1208,19 @@ export default function CampusDirectorTimetablePage() {
             {/* Step Pills */}
             <div className={styles.aiStepsContainer}>
               <div className={`${styles.aiStepPill} ${jobProgress >= 20 ? (jobProgress > 20 ? styles.aiStepDone : styles.aiStepActive) : ''}`}>
-                <span>{jobProgress > 20 ? '✓' : '1'}</span>
+                <span>{jobProgress > 20 ? <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : '1'}</span>
                 <span>Input Loaded</span>
               </div>
               <div className={`${styles.aiStepPill} ${jobProgress >= 40 ? (jobProgress > 40 ? styles.aiStepDone : styles.aiStepActive) : ''}`}>
-                <span>{jobProgress > 40 ? '✓' : '2'}</span>
+                <span>{jobProgress > 40 ? <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : '2'}</span>
                 <span>Scheduling</span>
               </div>
               <div className={`${styles.aiStepPill} ${jobProgress >= 70 ? (jobProgress > 70 ? styles.aiStepDone : styles.aiStepActive) : ''}`}>
-                <span>{jobProgress > 70 ? '✓' : '3'}</span>
+                <span>{jobProgress > 70 ? <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : '3'}</span>
                 <span>Validation</span>
               </div>
               <div className={`${styles.aiStepPill} ${jobProgress === 100 ? styles.aiStepDone : ''}`}>
-                <span>{jobProgress === 100 ? '✓' : '4'}</span>
+                <span>{jobProgress === 100 ? <UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> : '4'}</span>
                 <span>Ready</span>
               </div>
             </div>
@@ -1203,7 +1239,7 @@ export default function CampusDirectorTimetablePage() {
                 width: '100%',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>⏱</span>
+                  <span style={{ fontSize: '1.1rem' }}><UiTimer size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <span style={{ fontSize: '0.65rem', color: "var(--portal-info-text,#a5b4fc)", letterSpacing: '0.05em', fontWeight: 600 }}>
                       ESTIMATED TIME REMAINING
@@ -1248,7 +1284,7 @@ export default function CampusDirectorTimetablePage() {
                     }}
                     onClick={handleGenerate}
                   >
-                    ⚡ Retry Generation
+                    Retry Generation
                   </button>
                 )}
                 <button
@@ -1351,7 +1387,7 @@ export default function CampusDirectorTimetablePage() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>
-              {exportType === 'excel' ? '📊 Export Excel (.xlsx)' : '📄 Export PDF'}
+              {exportType === 'excel' ? 'Export Excel (.xlsx)' : 'Export PDF'}
             </h3>
             <p className={styles.modalSubtitle}>
               Select which department schedule you want to export for Semester {semester} ({academicYear}):
@@ -1365,10 +1401,10 @@ export default function CampusDirectorTimetablePage() {
                 value={exportTargetDept}
                 onChange={(e) => setExportTargetDept(e.target.value)}
               >
-                <option value="all">🌐 All Departments (Entire Campus)</option>
+                <option value="all">All Departments (Entire Campus)</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
-                    🏢 {d.name} ({d.code || d.name})
+                    {d.name} ({d.code || d.name})
                   </option>
                 ))}
               </select>
@@ -1416,7 +1452,7 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.modal} style={{ maxWidth: '480px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 className={styles.modalTitle} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🚀</span> Confirm Timetable Publication
+                <span><UiCalendarCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Confirm Timetable Publication
               </h3>
               <button
                 type="button"
@@ -1434,8 +1470,8 @@ export default function CampusDirectorTimetablePage() {
                   cursor: 'pointer',
                   padding: '0.25rem',
                 }}
-              >
-                ✕
+               aria-label="Close">
+                <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
               </button>
             </div>
 
@@ -1455,7 +1491,7 @@ export default function CampusDirectorTimetablePage() {
                   color: "var(--portal-danger-text,#991b1b)",
                 }}
               >
-                <strong>⚠️ Note:</strong> {publishModalError}
+                <strong>Note:</strong> {publishModalError}
               </div>
             )}
 
@@ -1523,10 +1559,9 @@ export default function CampusDirectorTimetablePage() {
                     cursor: publishing ? 'not-allowed' : 'pointer',
                     opacity: publishing ? 0.7 : 1,
                   }}
-                  onClick={() => handlePublish(true)}
-                  disabled={publishing}
+                  disabled
                 >
-                  {publishing ? 'Publishing...' : 'Publish Anyway with Conflicts ⚠️'}
+                  Resolve conflicts before publishing
                 </button>
               ) : (
                 <button
@@ -1542,10 +1577,10 @@ export default function CampusDirectorTimetablePage() {
                     cursor: publishing ? 'not-allowed' : 'pointer',
                     opacity: publishing ? 0.7 : 1,
                   }}
-                  onClick={() => handlePublish(false)}
+                  onClick={() => handlePublish()}
                   disabled={publishing}
                 >
-                  {publishing ? 'Publishing...' : 'Yes, Publish Timetable 🚀'}
+                  {publishing ? <LoadingIndicator message="Publishing…" /> : 'Yes, Publish Timetable'}
                 </button>
               )}
             </div>
@@ -1558,14 +1593,14 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.rulesModal} style={{ maxWidth: '460px' }}>
             <div className={styles.rulesModalHeader}>
               <h3 className={styles.rulesModalTitle}>
-                <span>⚠️ Registration Window Open</span>
+                <span>Registration Window Open</span>
               </h3>
               <button
                 className={styles.rulesModalCloseBtn}
                 onClick={() => setShowCloseWindowConfirmModal(false)}
                 disabled={closingWindow}
-              >
-                ✕
+               aria-label="Close">
+                <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
               </button>
             </div>
             <div style={{ padding: '1.25rem 1.5rem' }}>
@@ -1610,7 +1645,7 @@ export default function CampusDirectorTimetablePage() {
                   onClick={() => handleCloseRegistrationWindow(true)}
                   disabled={closingWindow}
                 >
-                  {closingWindow ? 'Closing & Generating...' : 'Close Window & Generate ⚡'}
+                  {closingWindow ? <LoadingIndicator message="Closing and generating…" /> : 'Close Window & Generate'}
                 </button>
               </div>
             </div>

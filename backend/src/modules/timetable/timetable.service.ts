@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -22,6 +23,7 @@ import * as crypto from 'crypto'
 import { RuleDefinitionSchema } from './solver/schemas'
 import { readReviewDraft } from './solver/review-draft'
 import { loadTimetableAudience, belongsToCohort } from './timetable-audience'
+import { fetchAllPaginated } from '../../core/database/pagination.util'
 
 @Injectable()
 export class TimetableService implements OnModuleInit, OnModuleDestroy {
@@ -56,8 +58,19 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     throw new BadRequestException('Rules are saved in your browser and sent with generation requests. Server files are read-only.');
   }
 
+  private async publicationState(campusId: string, academicYear: string, semester: number) {
+    const { data, error, count } = await this.supabase.admin.from('timetable_entries')
+      .select('id, published_at', { count: 'exact' })
+      .eq('campus_id', campusId).eq('academic_year', academicYear).eq('semester', semester)
+      .eq('status', 'published').order('published_at', { ascending: false }).limit(1)
+    if (error) throw new ServiceUnavailableException('Could not verify timetable publication. Please retry.')
+    return { published: !!data?.length, publishedAt: data?.[0]?.published_at ?? null, publishedCount: count ?? 0 }
+  }
+
   async getEntries(academicYear: string, semester: number, departmentId: string | undefined, user: AuthUser) {
     const scope = AuthorizationPolicy.resolveTimetableScope(user)
+    const publication = user.role === 'campus_director' && scope.campusId
+      ? await this.publicationState(scope.campusId, academicYear, semester) : undefined
 
     let campusDeptIds: string[] = []
     let campusDepartments: any[] = []
@@ -80,6 +93,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       return {
         academicYear,
         semester,
+        publication,
         departments: [],
         entries: [],
         conflicts: [],
@@ -113,9 +127,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       campusDepartments = campusDepartments.filter(d => audience!.departmentCounts.has(d.id))
         .map(d => ({ ...d, registeredStudentCount: audience!.departmentCounts.get(d.id) }))
       if (campusDepartments.length === 0 || (departmentId && !audience.departmentCounts.has(departmentId))) {
-        return { academicYear, semester, departments: campusDepartments, entries: [], conflicts: [] }
+        return { academicYear, semester, publication, departments: campusDepartments, entries: [], conflicts: [] }
       }
-      const review = await readReviewDraft(this.supabase.admin, scope.campusId, academicYear, semester)
+      const review = publication?.published ? null : await readReviewDraft(this.supabase.admin, scope.campusId, academicYear, semester)
       if (review) {
         const decorate = <T extends { courseId: string }>(entry: T) => ({ ...entry,
           enrolledDepartmentIds: audience!.courseDepartments.get(entry.courseId) || [] })
@@ -123,6 +137,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         const conflicts = review.conflicts.map(decorate)
         return {
           academicYear, semester, departments: campusDepartments, reviewDraft: true,
+          publication,
           unscheduledPeriods: review.unscheduledPeriods, diagnostics: review.diagnostics,
           entries: departmentId ? entries.filter(entry => belongsToCohort(entry, departmentId)) : entries,
           conflicts: departmentId ? conflicts.filter(entry => belongsToCohort(entry, departmentId)) : conflicts,
@@ -138,6 +153,16 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         .select('course_id')
         .eq('teacher_id', user.userId)
       teacherAssignedCourseIds = (assignments || []).map((a: any) => a.course_id)
+    }
+
+    let studentCourseIds: string[] = []
+    if (user.role === 'student') {
+      const fields = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id`)
+      const registrations = await fetchAllPaginated<any>(this.supabase.admin.from('student_registrations')
+        .select(fields.join(',')).eq('student_id', user.userId).eq('campus_id', scope.campusId)
+        .eq('academic_year', academicYear).eq('semester', semester).order('id'))
+      studentCourseIds = [...new Set<string>(registrations.flatMap(row => fields.map(field => row[field]).filter(Boolean)))]
+      if (!studentCourseIds.length) return { academicYear, semester, departments: [], entries: [], conflicts: [] }
     }
 
     let deptsFetchQuery = this.supabase.admin.from('departments').select('id, name, code').order('name')
@@ -180,11 +205,13 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
 
     // STUDENTS only see published entries, NEVER drafts or generated unreviewed schedules
     if (user.role === 'student') {
-      query = query.eq('status', 'published')
+      query = query.eq('status', 'published').eq('campus_id', scope.campusId).in('course_id', studentCourseIds)
     }
 
     // Apply strict server-derived department / assignment scoping (R05, R06)
-    if (user.role === 'teacher') {
+    if (user.role === 'student') {
+      // Enrollment, rather than catalogue ownership, determines a student's courses.
+    } else if (user.role === 'teacher') {
       if (teacherAssignedCourseIds.length === 0) {
         return {
           academicYear,
@@ -218,12 +245,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const { data: entries, error } = await query
-
-    if (error) {
-      this.serverLogger.error('Failed to fetch timetable entries', error.message)
-      throw new InternalServerErrorException('Failed to fetch timetable entries')
-    }
+    const entries = await fetchAllPaginated<any>(query.order('id'))
 
     const formattedEntries = (entries || []).map((entry: any) => ({
       id: entry.id,
@@ -240,6 +262,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       tag: entry.courses?.tag,
       credits: entry.courses?.credits,
       isLabBlock: entry.is_lab_block,
+      sessionType: entry.session_type,
       status: entry.status,
       ...(audience ? { enrolledDepartmentIds: audience.courseDepartments.get(entry.course_id) || [] } : {}),
     }))
@@ -313,6 +336,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     return {
       academicYear,
       semester,
+      publication,
       departments: allDepartmentsData || [],
       entries: audience && departmentId ? formattedEntries.filter(entry => belongsToCohort(entry, departmentId)) : formattedEntries,
       conflicts: formattedConflicts,
@@ -322,6 +346,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   // ──────────────── Generate (F33, F41, F42) ────────────────
   async generate(academicYear: string, semester: number, dynamicConstraints: any[] | undefined, user: AuthUser, rules?: unknown) {
     if (!user.campus_id) throw new BadRequestException('An explicit campus is required for generation')
+    if ((await this.publicationState(user.campus_id, academicYear, semester)).published) {
+      throw new ConflictException('This timetable is already published. Generation is locked for this campus, academic year and semester.')
+    }
     const parsedRules = rules === undefined ? undefined : z.array(RuleDefinitionSchema).min(1).max(100).safeParse(rules)
     if (parsedRules && !parsedRules.success) throw new BadRequestException(parsedRules.error.issues[0].message)
     const effectiveRules = parsedRules?.success ? parsedRules.data : undefined
@@ -586,7 +613,15 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       p_campus_id: user.campus_id, p_academic_year: academicYear, p_semester: semester,
     })
     if (error) throw new BadRequestException(`Publication rejected: ${error.message}`)
-    if (!data?.success) throw new InternalServerErrorException('Publication did not commit')
+    if (data?.success !== true || !Number.isInteger(data.published_count) || data.published_count < 1) {
+      throw new InternalServerErrorException('Publication did not commit any timetable sessions.')
+    }
+    const { count, error: verificationError } = await this.supabase.admin.from('timetable_entries')
+      .select('id', { count: 'exact', head: true }).eq('campus_id', user.campus_id)
+      .eq('academic_year', academicYear).eq('semester', semester).eq('status', 'published')
+    if (verificationError || count !== data.published_count) {
+      throw new InternalServerErrorException('Publication could not be verified: the saved sessions are still drafts or do not match the reported count. Apply the timetable publication repair migration, then retry.')
+    }
     const nowIso = data.published_at
     const publishedCount = data.published_count
 

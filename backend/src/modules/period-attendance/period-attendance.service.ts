@@ -14,6 +14,7 @@ import { AuthUser } from '../../core/auth/types';
 import { AuthorizationPolicy } from '../../core/auth/authorization-policy';
 import { getISTDateTime } from '../../core/utils/date-time.util';
 import { CopyPracticalDto } from './dto/copy-practical.dto';
+import { fetchAllPaginated } from '../../core/database/pagination.util';
 
 @Injectable()
 export class PeriodAttendanceService {
@@ -483,21 +484,7 @@ export class PeriodAttendanceService {
       dayOfWeek = this.getCalendarDayOfWeek(queryDate);
     }
 
-    if (assignedCourseIds.length === 0) {
-      return {
-        teacherName: faculty?.full_name || '',
-        departmentName: (faculty as any)?.departments?.name || '',
-        campusName: (faculty as any)?.campuses?.name || '',
-        date: dateStr,
-        dayOfWeek,
-        assignedCourses: [],
-        periods: [],
-        weeklySchedule: [],
-        message: 'No courses currently assigned to you. Contact your HOD.',
-      };
-    }
-
-    const { data: rawEntries, error: entriesError } = await this.supabase.admin
+    let scheduleQuery = this.supabase.admin
       .from('timetable_entries')
       .select(`
         id,
@@ -513,15 +500,16 @@ export class PeriodAttendanceService {
         time_slots(id, day_of_week, period_number, start_time, end_time),
         departments(campus_id)
       `)
-      .in('course_id', assignedCourseIds)
       .eq('status', 'published');
-
-    if (entriesError) {
-      throw new InternalServerErrorException(`Failed to fetch timetable entries: ${entriesError.message}`);
-    }
+    scheduleQuery = assignedCourseIds.length
+      ? scheduleQuery.or(`teacher_id.eq.${user.userId},course_id.in.(${[...new Set(assignedCourseIds)].join(',')})`)
+      : scheduleQuery.eq('teacher_id', user.userId);
+    const rawEntries = await fetchAllPaginated<any>(scheduleQuery.order('id'));
 
     const entries = (rawEntries || []).filter((e: any) => {
       if (e.teacher_id === user.userId) return true;
+      // A direct substitution takes precedence over an older course assignment.
+      if (e.teacher_id) return false;
       const hostCampusId = e.campus_id || e.departments?.campus_id;
       return (assignments || []).some((a: any) => {
         if (a.course_id !== e.course_id) return false;
@@ -538,7 +526,7 @@ export class PeriodAttendanceService {
       course_code: entry.courses?.course_code || '',
       course_title: entry.courses?.title || '',
       course_category: entry.courses?.category || '',
-      course_semester: entry.courses?.semester || 1,
+      course_semester: entry.semester,
       credits: entry.courses?.credits,
       is_lab_block: entry.is_lab_block || false,
       session_type: entry.session_type || 'theory',
@@ -602,7 +590,7 @@ export class PeriodAttendanceService {
           course_code: entry.courses?.course_code || '',
           course_title: entry.courses?.title || '',
           course_category: entry.courses?.category || '',
-          course_semester: entry.courses?.semester || 1,
+          course_semester: entry.semester,
           is_lab_block: entry.is_lab_block || false,
           session_type: entry.session_type || 'theory',
           period_number: slot?.period_number || 1,

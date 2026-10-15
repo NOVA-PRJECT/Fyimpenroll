@@ -1,5 +1,7 @@
 'use client'
 
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, AlertTriangle, UserCheck, BookOpen, RefreshCw } from 'lucide-react'
 
@@ -252,9 +254,7 @@ export default function ManualAllocationTab() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)", fontSize: '0.85rem' }}>
-              Loading unresolved students...
-            </div>
+            <LoadingState layout="table" message="Loading unresolved students…" />
           ) : unresolvedStudents.length === 0 ? (
             <div
               style={{
@@ -410,9 +410,7 @@ export default function ManualAllocationTab() {
           </div>
 
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: "var(--portal-info-text,#94a3b8)", fontSize: '0.85rem' }}>
-              Loading capacities...
-            </div>
+            <LoadingState layout="table" message="Loading capacities…" />
           ) : remainingCourses.length === 0 ? (
             <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#64748b)", margin: 0 }}>
               No departmental courses configured for Semester {selectedSemester}.
@@ -637,7 +635,7 @@ export default function ManualAllocationTab() {
                   opacity: submitting || !selectedCourseId ? 0.6 : 1,
                 }}
               >
-                {submitting ? 'Allocating...' : 'Confirm Allocation →'}
+                {submitting ? <LoadingIndicator message="Allocating…" /> : 'Confirm Allocation →'}
               </button>
             </div>
           </div>

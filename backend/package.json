@@ -3,6 +3,7 @@
   "version": "7.0.0",
   "private": true,
   "scripts": {
+    "test:timetable": "node --test test/timetable-publication.test.cjs",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",

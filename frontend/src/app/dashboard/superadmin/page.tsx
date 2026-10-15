@@ -1,5 +1,9 @@
 'use client'
 
+import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
+
+import { Building2 as UiBuilding2, Check as UiCheck, FileText as UiFileText, Pencil as UiPencil, Search as UiSearch, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, UserRound as UiUserRound } from 'lucide-react'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
@@ -403,17 +407,17 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
         <button className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
-          {loggingOut ? 'Logging out...' : 'Logout'}
+          {loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}
         </button>
       </div>
 
       {/* Info Card */}
       <div className={styles.infoCard}>
-        {loadingAdmin ? <div style={{ height: '2.5rem' }} /> : (
+        {loadingAdmin ? <ProfilePlaceholder /> : (
           <>
             <p className={styles.adminName}>{adminName || 'Super Admin'}</p>
             <div className={styles.adminDetails}>
-              <span className={styles.detailBadge}>⚡ Super Admin</span>
+              <span className={styles.detailBadge}>Super Admin</span>
             </div>
           </>
         )}
@@ -428,12 +432,12 @@ export default function SuperAdminDashboard() {
             onClick={() => { setActiveTab(tab); clearMessages() }}
           >
             {tab === 'campuses'
-              ? '🏛️ Campuses'
+              ? 'Campuses'
               : tab === 'departments'
-              ? '🏫 Departments'
+              ? 'Departments'
               : tab === 'faculty'
-              ? '👤 Faculty'
-              : '📜 System & Audit Logs'}
+              ? 'Faculty'
+              : 'System & Audit Logs'}
           </button>
         ))}
       </div>
@@ -442,7 +446,7 @@ export default function SuperAdminDashboard() {
       <div className={styles.mainContent}>
 
         {error && <div className={styles.errorBanner}>{error}</div>}
-        {success && <div className={styles.successBanner}>✓ {success}</div>}
+        {success && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {success}</div>}
 
         {/* ══ CAMPUSES TAB ══ */}
         {activeTab === 'campuses' && (
@@ -456,13 +460,10 @@ export default function SuperAdminDashboard() {
 
             <div className={styles.tableWrapper}>
               {loadingCampuses ? (
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner} />
-                  <p className={styles.loadingText}>Loading campuses...</p>
-                </div>
+                <LoadingState layout="table" message="Loading campuses…" />
               ) : campuses.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>🏛️</div>
+                  <div className={styles.emptyIcon}><UiBuilding2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No campuses yet</p>
                   <p className={styles.emptySubtitle}>Add your first campus to get started.</p>
                 </div>
@@ -484,10 +485,10 @@ export default function SuperAdminDashboard() {
                               setCampusName(campus.name)
                               setCampusCode(campus.code)
                               clearMessages()
-                            }}>✏️</button>
+                            }} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                             <button className={styles.deleteBtn} onClick={() => {
                               setDeleteCampus(campus); clearMessages()
-                            }}>🗑️</button>
+                            }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                           </div>
                         </td>
                       </tr>
@@ -513,7 +514,7 @@ export default function SuperAdminDashboard() {
               <input
                 type="text"
                 className={styles.searchInput}
-                placeholder="🔍 Search department..."
+                placeholder="Search department..."
                 value={deptSearch}
                 onChange={e => setDeptSearch(e.target.value)}
               />
@@ -521,13 +522,10 @@ export default function SuperAdminDashboard() {
 
             <div className={styles.tableWrapper}>
               {loadingDepts ? (
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner} />
-                  <p className={styles.loadingText}>Loading departments...</p>
-                </div>
+                <LoadingState layout="table" message="Loading departments…" />
               ) : departments.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>🏫</div>
+                  <div className={styles.emptyIcon}><UiBuilding2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No departments yet</p>
                   <p className={styles.emptySubtitle}>Add campuses first, then add departments.</p>
                 </div>
@@ -540,7 +538,7 @@ export default function SuperAdminDashboard() {
                 if (filteredDepts.length === 0) {
                   return (
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>🔍</div>
+                      <div className={styles.emptyIcon}><UiSearch size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                       <p className={styles.emptyTitle}>No matching departments</p>
                       <p className={styles.emptySubtitle}>No department found matching &quot;{deptSearch}&quot;.</p>
                     </div>
@@ -567,10 +565,10 @@ export default function SuperAdminDashboard() {
                                 setDeptCode(dept.code)
                                 setDeptCampusId(dept.campus_id)
                                 clearMessages()
-                              }}>✏️</button>
+                              }} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                               <button className={styles.deleteBtn} onClick={() => {
                                 setDeleteDept(dept); clearMessages()
-                              }}>🗑️</button>
+                              }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                             </div>
                           </td>
                         </tr>
@@ -595,15 +593,12 @@ export default function SuperAdminDashboard() {
 
             {loadingFaculty ? (
               <div className={styles.tableWrapper}>
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner} />
-                  <p className={styles.loadingText}>Loading faculty...</p>
-                </div>
+                <LoadingState layout="table" message="Loading faculty…" />
               </div>
             ) : faculty.length === 0 ? (
               <div className={styles.tableWrapper}>
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>👤</div>
+                  <div className={styles.emptyIcon}><UiUserRound size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No faculty yet</p>
                   <p className={styles.emptySubtitle}>Add faculty members to manage the portal.</p>
                 </div>
@@ -617,7 +612,7 @@ export default function SuperAdminDashboard() {
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
                         <h4 className={styles.facultyGroupTitle}>
-                          🏢 Campus Directors
+                          Campus Directors
                         </h4>
                         <span className={styles.countBadge}>{directors.length}</span>
                       </div>
@@ -649,8 +644,8 @@ export default function SuperAdminDashboard() {
                                   <td><span className={styles.rolePillDirector}>Campus Director</span></td>
                                   <td>
                                     <div className={styles.actionBtns}>
-                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)}>✏️</button>
-                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }}>🗑️</button>
+                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
+                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                                     </div>
                                   </td>
                                 </tr>
@@ -670,7 +665,7 @@ export default function SuperAdminDashboard() {
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
                         <h4 className={styles.facultyGroupTitle}>
-                          🎓 Heads of Department (HODs)
+                          Heads of Department (HODs)
                         </h4>
                         <span className={styles.countBadge}>{hods.length}</span>
                       </div>
@@ -704,8 +699,8 @@ export default function SuperAdminDashboard() {
                                   <td><span className={styles.rolePillHod}>HOD</span></td>
                                   <td>
                                     <div className={styles.actionBtns}>
-                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)}>✏️</button>
-                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }}>🗑️</button>
+                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
+                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                                     </div>
                                   </td>
                                 </tr>
@@ -725,7 +720,7 @@ export default function SuperAdminDashboard() {
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
                         <h4 className={styles.facultyGroupTitle}>
-                          👨‍🏫 Teaching Staff
+                          Teaching Staff
                         </h4>
                         <span className={styles.countBadge}>{staff.length}</span>
                       </div>
@@ -759,8 +754,8 @@ export default function SuperAdminDashboard() {
                                   <td><span className={styles.rolePillStaff}>Teaching Staff</span></td>
                                   <td>
                                     <div className={styles.actionBtns}>
-                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)}>✏️</button>
-                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }}>🗑️</button>
+                                      <button className={styles.editBtn} onClick={() => openEditFaculty(f)} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
+                                      <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                                     </div>
                                   </td>
                                 </tr>
@@ -793,7 +788,7 @@ export default function SuperAdminDashboard() {
                 disabled={loadingLogs}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                🔄 Refresh Logs
+                Refresh Logs
               </button>
             </div>
 
@@ -803,7 +798,7 @@ export default function SuperAdminDashboard() {
                 <input
                   type="text"
                   className={styles.searchInput}
-                  placeholder="🔍 Search actions, events, errors..."
+                  placeholder="Search actions, events, errors..."
                   value={logSearch}
                   onChange={e => setLogSearch(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && fetchLogs()}
@@ -840,13 +835,10 @@ export default function SuperAdminDashboard() {
             {/* Table */}
             <div className={styles.tableWrapper}>
               {loadingLogs ? (
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner} />
-                  <p className={styles.loadingText}>Loading system logs...</p>
-                </div>
+                <LoadingState layout="table" message="Loading system logs…" />
               ) : logs.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>📜</div>
+                  <div className={styles.emptyIcon}><UiFileText size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                   <p className={styles.emptyTitle}>No system logs found</p>
                   <p className={styles.emptySubtitle}>No records match your selected filters.</p>
                 </div>
@@ -894,7 +886,7 @@ export default function SuperAdminDashboard() {
                             </div>
                             {log.error_message && (
                               <div style={{ fontSize: '0.72rem', color: "var(--portal-danger-text,#dc2626)", marginTop: '2px' }}>
-                                ⚠️ {log.error_message}
+                                <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {log.error_message}
                               </div>
                             )}
                           </td>
@@ -919,7 +911,7 @@ export default function SuperAdminDashboard() {
                               style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem' }}
                               onClick={() => setSelectedLog(log)}
                             >
-                              🔍 View
+                              View
                             </button>
                           </td>
                         </tr>
@@ -958,7 +950,7 @@ export default function SuperAdminDashboard() {
                 onClick={() => { setShowAddCampus(false); setEditCampus(null); setCampusName(''); setCampusCode('') }}
                 disabled={savingCampus}>Cancel</button>
               <button className={styles.modalConfirmBtn} onClick={handleSaveCampus} disabled={savingCampus}>
-                {savingCampus ? 'Saving...' : editCampus ? 'Save Changes →' : 'Add Campus →'}
+                {savingCampus ? <LoadingIndicator message="Saving…" /> : editCampus ? 'Save Changes →' : 'Add Campus →'}
               </button>
             </div>
           </div>
@@ -998,7 +990,7 @@ export default function SuperAdminDashboard() {
                 onClick={() => { setShowAddDept(false); setEditDept(null); setDeptName(''); setDeptCode(''); setDeptCampusId('') }}
                 disabled={savingDept}>Cancel</button>
               <button className={styles.modalConfirmBtn} onClick={handleSaveDept} disabled={savingDept}>
-                {savingDept ? 'Saving...' : editDept ? 'Save Changes →' : 'Add Department →'}
+                {savingDept ? <LoadingIndicator message="Saving…" /> : editDept ? 'Save Changes →' : 'Add Department →'}
               </button>
             </div>
           </div>
@@ -1078,7 +1070,7 @@ export default function SuperAdminDashboard() {
                 }}
                 disabled={savingFaculty}>Cancel</button>
               <button className={styles.modalConfirmBtn} onClick={handleAddFaculty} disabled={savingFaculty}>
-                {savingFaculty ? 'Creating...' : 'Create Account →'}
+                {savingFaculty ? <LoadingIndicator message="Creating…" /> : 'Create Account →'}
               </button>
             </div>
           </div>
@@ -1159,7 +1151,7 @@ export default function SuperAdminDashboard() {
                 onClick={handleUpdateFaculty}
                 disabled={updatingFaculty}
               >
-                {updatingFaculty ? 'Saving...' : 'Save Changes →'}
+                {updatingFaculty ? <LoadingIndicator message="Saving…" /> : 'Save Changes →'}
               </button>
             </div>
           </div>
@@ -1172,14 +1164,14 @@ export default function SuperAdminDashboard() {
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Delete Campus</h3>
             <p className={styles.modalSubtitle}>
-              ⚠️ This will permanently delete <strong>{deleteCampus.name}</strong> and ALL data under it —
+              This will permanently delete <strong>{deleteCampus.name}</strong> and ALL data under it —
               departments, students, faculty, courses, blueprints and registrations.
               This cannot be undone.
             </p>
             <div className={styles.modalActions}>
               <button className={styles.modalCancelBtn} onClick={() => setDeleteCampus(null)} disabled={deletingCampus}>Cancel</button>
               <button className={styles.modalDeleteBtn} onClick={handleDeleteCampus} disabled={deletingCampus}>
-                {deletingCampus ? 'Deleting...' : 'Yes, Delete Everything'}
+                {deletingCampus ? <LoadingIndicator message="Deleting…" /> : 'Yes, Delete Everything'}
               </button>
             </div>
           </div>
@@ -1192,13 +1184,13 @@ export default function SuperAdminDashboard() {
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Delete Department</h3>
             <p className={styles.modalSubtitle}>
-              ⚠️ This will permanently delete <strong>{deleteDept.name}</strong> and all its students,
+              This will permanently delete <strong>{deleteDept.name}</strong> and all its students,
               courses, blueprints and registrations. This cannot be undone.
             </p>
             <div className={styles.modalActions}>
               <button className={styles.modalCancelBtn} onClick={() => setDeleteDept(null)} disabled={deletingDept}>Cancel</button>
               <button className={styles.modalDeleteBtn} onClick={handleDeleteDept} disabled={deletingDept}>
-                {deletingDept ? 'Deleting...' : 'Yes, Delete Everything'}
+                {deletingDept ? <LoadingIndicator message="Deleting…" /> : 'Yes, Delete Everything'}
               </button>
             </div>
           </div>
@@ -1217,7 +1209,7 @@ export default function SuperAdminDashboard() {
             <div className={styles.modalActions}>
               <button className={styles.modalCancelBtn} onClick={() => setDeleteFaculty(null)} disabled={deletingFaculty}>Cancel</button>
               <button className={styles.modalDeleteBtn} onClick={handleDeleteFaculty} disabled={deletingFaculty}>
-                {deletingFaculty ? 'Removing...' : 'Yes, Remove'}
+                {deletingFaculty ? <LoadingIndicator message="Removing…" /> : 'Yes, Remove'}
               </button>
             </div>
           </div>

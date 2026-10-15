@@ -67,7 +67,7 @@ export async function runGenerationJob(
 
   try {
     if (!fencingToken) throw new Error('A worker fencing token is required');
-    await reportProgress(5, '🚀 Initializing OR-Tools CP-SAT timetable generation job...');
+    await reportProgress(5, 'Initializing OR-Tools CP-SAT timetable generation job...');
 
     // Resolve campus departments
     let deptIds: string[] = [];
@@ -143,7 +143,7 @@ export async function runGenerationJob(
 
     await reportProgress(
       25,
-      `📚 Loaded ${courses.length} courses across ${parallelGroups.length} parallel baskets. Compiling OR-Tools model (Rule hash: ${ruleHash.slice(0, 12)})...`,
+      `Loaded ${courses.length} courses across ${parallelGroups.length} parallel baskets. Compiling OR-Tools model (Rule hash: ${ruleHash.slice(0, 12)})...`,
       { ...loadStats, preflightDiagnosticsCount: preflightDiagnostics.length }
     );
 
@@ -191,7 +191,7 @@ export async function runGenerationJob(
       },
     };
 
-    await reportProgress(40, '⚙️ Executing local OR-Tools CP-SAT constraint optimization...');
+    await reportProgress(40, 'Executing local OR-Tools CP-SAT constraint optimization...');
 
     // 4. Run solver process
     let solverResult = await runOrtoolsSolver(ortoolsPayload);
@@ -218,7 +218,7 @@ export async function runGenerationJob(
 
     await reportProgress(
       70,
-      `🔍 Solver completed in ${solverResult.stats.wall_time_seconds.toFixed(2)}s with status ${solverResult.status}. Validating output independently...`,
+      `Solver completed in ${solverResult.stats.wall_time_seconds.toFixed(2)}s with status ${solverResult.status}. Validating output independently...`,
       { ...solverResult.stats, solverStatus: solverResult.status, wallTime: solverResult.stats.wall_time_seconds }
     );
 
@@ -290,7 +290,7 @@ export async function runGenerationJob(
 
     await reportProgress(
       80,
-      '✅ Schedule independently verified with 0 violations. Preparing database commit...',
+      'Schedule independently verified with 0 violations. Preparing database commit...',
       loadStats
     );
 
@@ -333,7 +333,7 @@ export async function runGenerationJob(
     // 8. Atomic replacement of DRAFT entries (R22)
     await reportProgress(
       90,
-      `💾 Committing ${solverResult.assignments.length} verified schedule entries to database atomically...`,
+      `Committing ${solverResult.assignments.length} verified schedule entries to database atomically...`,
       {
         ...loadStats,
         placedEntries: solverResult.assignments.length,
@@ -347,7 +347,7 @@ export async function runGenerationJob(
     });
     if (replaceErr) throw new Error(`Atomic draft replacement failed: ${replaceErr.message}`);
 
-    const completionMsg = `🎉 OR-Tools Timetable generated successfully with ${solverResult.assignments.length} entries (${solverResult.status}). Zero violations!`;
+    const completionMsg = `OR-Tools Timetable generated successfully with ${solverResult.assignments.length} entries (${solverResult.status}). Zero violations!`;
 
     const finalPayload = {
       status: 'completed',

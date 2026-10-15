@@ -1,6 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import LoadingState from '@/components/LoadingState'
+
+import { Info as UiInfo } from 'lucide-react'
+
+import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import styles from './credit-ledger.module.css'
 
 interface CategoryItem {
@@ -14,17 +18,6 @@ interface CategoryItem {
   shortfall4Year: number
   isMet3Year: boolean
   isMet4Year: boolean
-  advisoryStatus?: string
-}
-
-interface LevelBandItem {
-  band: string
-  title: string
-  registeredCredits?: number
-  earned: number
-  minimum: number
-  shortfall: number
-  isMet: boolean
   advisoryStatus?: string
 }
 
@@ -65,10 +58,7 @@ interface CreditLedgerData {
   unresolvedRequirementNote?: string
   totalCredits: number
   totalRegisteredCredits?: number
-  coreCredits?: number
-  additionalCredits?: number
   categories: CategoryItem[]
-  levelBands: LevelBandItem[]
   byDepartment: DeptItem[]
   exitEligibility: {
     threeYear: ExitMilestone
@@ -82,8 +72,6 @@ interface CreditLedgerData {
     credits: number
     category: string
     normalizedCategory: string
-    levelBand: string
-    isAdditional?: boolean
     departmentName: string
     semester: number
     academicYear?: string
@@ -143,10 +131,7 @@ export default function CreditLedgerView({
   if (loading) {
     return (
       <div className={styles.container}>
-        <div className={styles.loadingContainer}>
-          <div className={styles.spinner} />
-          <p>Loading registered coursework...</p>
-        </div>
+        <LoadingState layout="dashboard" message="Loading registered coursework…" />
       </div>
     )
   }
@@ -166,10 +151,7 @@ export default function CreditLedgerView({
 
   const {
     totalCredits,
-    coreCredits = totalCredits,
-    additionalCredits = 0,
     categories,
-    levelBands,
     byDepartment,
     registeredCourses,
     advisoryMatrixVersion = 'Academic matrix pending',
@@ -179,6 +161,9 @@ export default function CreditLedgerView({
 
   const exportUrl = (fmt: 'csv' | 'xlsx') =>
     `/api/export/credit-ledger/${studentId || 'me'}?format=${fmt}`
+  const registeredTotal = data.totalRegisteredCredits ?? totalCredits
+  const categoryTotal = categories.reduce((sum, category) => sum + (category.registeredCredits ?? category.earned), 0)
+  const categoryColors = ['#3b82f6', '#14b8a6', '#a78bfa', '#f59e0b', '#38bdf8', '#f472b6']
 
   return (
     <div className={styles.container}>
@@ -202,7 +187,7 @@ export default function CreditLedgerView({
                 className={styles.backBtn}
                 style={{ textDecoration: 'none', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
               >
-                📥 Export CSV
+                Export CSV
               </a>
               <a
                 href={exportUrl('xlsx')}
@@ -210,82 +195,48 @@ export default function CreditLedgerView({
                 className={styles.backBtn}
                 style={{ textDecoration: 'none', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
               >
-                📊 Export Excel
+                Export Excel
               </a>
             </div>
           </div>
           <div className={styles.totalCreditsBox}>
             <div className={styles.totalCreditsLabel}>Total Registered Credits</div>
-            <div className={styles.totalCreditsValue}>{totalCredits}</div>
-            <div style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", marginTop: '0.25rem' }}>
-              Core: {coreCredits} cr | Addl: {additionalCredits} cr
-            </div>
+            <div className={styles.totalCreditsValue}>{registeredTotal}<span> credits</span></div>
           </div>
         </section>
 
         {/* Advisory Disclaimer Box (F50, F52) */}
         {disclaimer && (
-          <div style={{
-            background: "var(--portal-warning-bg,#fffbeb)",
-            border: "1px solid var(--portal-warning-border,#fef3c7)",
-            borderLeft: "4px solid var(--portal-warning-border,#f59e0b)",
-            borderRadius: '8px',
-            padding: '0.85rem 1.25rem',
-            marginBottom: '1.25rem',
-            fontSize: '0.85rem',
-            color: "var(--portal-warning-text,#92400e)",
-            lineHeight: 1.45,
-          }}>
-            <strong>Advisory Notice:</strong> {disclaimer}
+          <details className={styles.advisoryNotice}>
+            <summary><UiInfo size={15} aria-hidden="true" /> Registered credits do not confirm course completion</summary>
+            <p>{disclaimer}</p>
             {unresolvedRequirementNote && (
-              <div style={{ marginTop: '0.4rem', color: "var(--portal-warning-text,#78350f)", fontSize: '0.8rem' }}>
-                ℹ️ {unresolvedRequirementNote}
-              </div>
+              <p>{unresolvedRequirementNote}</p>
             )}
-          </div>
+          </details>
         )}
 
         <section className={styles.sectionCard}>
-          <h2>Registered credits by category</h2>
-          <p>Degree requirements are unavailable until the academic matrix is approved. Missing historical snapshots use current catalogue credits and are not certified historical totals.</p>
-          <div className={styles.circularGrid}>{categories.map(c => <div key={c.category} className={styles.circularCard}><strong>{c.category}</strong><span>{c.registeredCredits ?? c.earned} credits</span></div>)}</div>
-        </section>
-
-        {/* Section 3: Level Band Breakdown Table (F51 Parsed Levels) */}
-        <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <div>
-              <h2 className={styles.sectionTitle}>Course Level Band Distribution</h2>
-              <p className={styles.sectionSub}>Explicit catalogue levels only. Course serial numbers do not determine academic level.</p>
+              <h2 className={styles.sectionTitle}>Registered credits by category</h2>
             </div>
           </div>
-
-          <div className={styles.tableResponsive}>
-            <table className={styles.ledgerTable}>
-              <thead>
-                <tr>
-                  <th>Level Band</th>
-                  <th>Level Description</th>
-                  <th>Registered Credits</th>
-                </tr>
-              </thead>
-              <tbody>
-                {levelBands.map((band) => (
-                  <tr key={band.band}>
-                    <td>
-                      <strong>{band.band}</strong>
-                    </td>
-                    <td>
-                      <span>{band.title}</span>
-                    </td>
-                    <td>
-                      <strong style={{ fontSize: '1rem', color: "var(--portal-brand-text,#0f172a)" }}>{band.earned} Credits</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className={styles.circularGrid}>{categories.map((category, index) => {
+            const credits = category.registeredCredits ?? category.earned
+            const share = categoryTotal > 0 ? credits / categoryTotal : 0
+            return <article key={category.category} className={`${styles.circularCard} ${credits === 0 ? styles.emptyCategory : ''}`}
+              style={{ '--category-color': categoryColors[index % categoryColors.length] } as CSSProperties}>
+              <span className={styles.categoryCardCode}>{category.category}</span>
+              <div className={styles.circleWrapper}>
+                <svg viewBox="0 0 96 96" className={styles.circleSvg} aria-hidden="true">
+                  <circle cx="48" cy="48" r="39" className={styles.circleTrack} />
+                  <circle cx="48" cy="48" r="39" className={styles.circleFill} pathLength="100" strokeDasharray={`${Math.min(100, Math.max(0, share * 100))} 100`} />
+                </svg>
+                <div className={styles.circleCenter}><strong className={styles.circleCreditNum}>{credits}</strong><span className={styles.circleCreditUnit}>credits</span></div>
+              </div>
+            </article>
+          })}</div>
         </section>
 
         {/* Section 4: Department Distribution Bar Graph */}
@@ -347,8 +298,6 @@ export default function CreditLedgerView({
                   <th>Code</th>
                   <th>Course Title</th>
                   <th>Category</th>
-                  <th>Level</th>
-                  <th>Track</th>
                   <th>Department</th>
                   <th>Credits</th>
                 </tr>
@@ -364,16 +313,6 @@ export default function CreditLedgerView({
                     </td>
                     <td>{c.title}</td>
                     <td>{c.normalizedCategory}</td>
-                    <td>
-                      <span style={{ fontSize: '0.75rem', background: "var(--portal-info-bg,#f1f5f9)", padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                        {c.levelBand}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.75rem', color: c.isAdditional ? "var(--portal-warning-text,#b45309)" : "var(--portal-success-text,#047857)" }}>
-                        {c.isAdditional ? 'Additional' : 'Core'}
-                      </span>
-                    </td>
                     <td>{c.departmentName}</td>
                     <td>
                       <strong title={c.creditSource === 'registration_snapshot' ? 'Registration snapshot' : 'Current catalogue; historical snapshot unavailable'}>{c.credits}</strong>

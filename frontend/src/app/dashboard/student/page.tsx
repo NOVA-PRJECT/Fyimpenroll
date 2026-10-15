@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import StudentDashboardClient from './StudentDashboardClient'
 import styles from './student-dashboard.module.css'
 import NavigationLink from '@/components/NavigationLink'
+import LoadingState, { ProfilePlaceholder } from '@/components/LoadingState'
 import { sessionRedirect } from '@/core/security/session-response'
 
 interface StudentInfo {
@@ -121,7 +122,7 @@ export default function StudentDashboardPage() {
     setRetry(value => value + 1)
   }
 
-  // Modern Skeleton Loading Screen (Theme-matched, zero white page flash)
+  // Keep the portal shell visible while the student summary loads.
   if (!studentInfo && (loading || summaryError)) {
     return (
       <div className={styles.pageWrapper}>
@@ -145,47 +146,16 @@ export default function StudentDashboardPage() {
               </div>
             </div>
             <div className={styles.topBarDivider} />
-            <div style={{ width: '12rem', height: '1.5rem', borderRadius: '0.35rem' }} className={styles.skeletonPulse} />
+            {loading && <ProfilePlaceholder message="Loading student profile…" />}
           </div>
-          <div style={{ width: '70px', height: '28px', borderRadius: '0.45rem' }} className={styles.skeletonPulse} />
         </header>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 p-4" role={summaryError ? 'alert' : 'status'}>
-          <p>{summaryError || 'Loading your dashboard data…'}</p>
-          {summaryError && <button onClick={retrySummary} className="rounded-lg bg-[color:var(--portal-primary,#002147)] px-4 py-2 text-white">Try again</button>}
-          <NavigationLink href="/dashboard/student/register" className={styles.regCtaBtn}>Open course registration →</NavigationLink>
-        </div>
-        {/* Tab Bar Skeleton */}
-        <div className={styles.tabBar} style={{ padding: '0.75rem 1rem', gap: '1rem' }}>
-          <div style={{ width: '5rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
-          <div style={{ width: '6rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
-          <div style={{ width: '7rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
-          <div style={{ width: '5rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
-          <div style={{ width: '6rem', height: '1.2rem', borderRadius: '0.25rem' }} className={styles.skeletonPulse} />
-        </div>
-
-        {/* Main Content Skeleton */}
         <main className={styles.tabContentWrapper}>
-          <div className={styles.profileSection}>
-            <div className={styles.profileTop}>
-              <div className={`${styles.skeletonAvatar} ${styles.skeletonPulse}`} />
-              <div className={styles.profileMeta} style={{ gap: '0.5rem', display: 'flex', flexDirection: 'column' }}>
-                <div className={`${styles.skeletonTextLg} ${styles.skeletonPulse}`} />
-                <div className={`${styles.skeletonTextSm} ${styles.skeletonPulse}`} style={{ width: '110px' }} />
-              </div>
-            </div>
-
-            <div className={styles.profileGrid} style={{ marginTop: '1.5rem' }}>
-              <div className={`${styles.skeletonChip} ${styles.skeletonPulse}`} />
-              <div className={`${styles.skeletonChip} ${styles.skeletonPulse}`} />
-              <div className={`${styles.skeletonChip} ${styles.skeletonPulse}`} />
-              <div className={`${styles.skeletonChip} ${styles.skeletonPulse}`} />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <div style={{ height: '3rem', borderRadius: '0.65rem' }} className={styles.skeletonPulse} />
-            </div>
-          </div>
+          {summaryError ? <div className="flex flex-wrap items-center justify-between gap-3 p-4" role="alert">
+            <p>{summaryError}</p>
+            <button onClick={retrySummary} className="rounded-lg bg-[color:var(--portal-primary,#002147)] px-4 py-2 text-white">Try again</button>
+            <NavigationLink href="/dashboard/student/register" className={styles.regCtaBtn}>Open course registration →</NavigationLink>
+          </div> : <LoadingState layout="dashboard" message="Loading your dashboard…" />}
         </main>
       </div>
     )
