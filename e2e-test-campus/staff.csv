@@ -1,0 +1,17 @@
+staff_code,full_name,email,role,department_code,campus_code,password,must_change_password
+SA001,Staging Superadmin,superadmin.nstc@example.test,superadmin,,NSTC,NSTC-Stage-2026!ChangeMe,true
+CD001,Northstar Campus Director,director.nstc@example.test,campus_director,,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD01,HOD D01,hod.d01.nstc@example.test,hod,D01,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD02,HOD D02,hod.d02.nstc@example.test,hod,D02,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD03,HOD D03,hod.d03.nstc@example.test,hod,D03,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD04,HOD D04,hod.d04.nstc@example.test,hod,D04,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD05,HOD D05,hod.d05.nstc@example.test,hod,D05,NSTC,NSTC-Stage-2026!ChangeMe,true
+HOD06,HOD D06,hod.d06.nstc@example.test,hod,D06,NSTC,NSTC-Stage-2026!ChangeMe,true
+T001,Teacher D01 01,teacher.d01.01.nstc@example.test,teacher,D01,NSTC,NSTC-Stage-2026!ChangeMe,true
+T002,Teacher D02 01,teacher.d02.01.nstc@example.test,teacher,D02,NSTC,NSTC-Stage-2026!ChangeMe,true
+T003,Teacher D03 01,teacher.d03.01.nstc@example.test,teacher,D03,NSTC,NSTC-Stage-2026!ChangeMe,true
+T004,Teacher D04 01,teacher.d04.01.nstc@example.test,teacher,D04,NSTC,NSTC-Stage-2026!ChangeMe,true
+T005,Teacher D05 01,teacher.d05.01.nstc@example.test,teacher,D05,NSTC,NSTC-Stage-2026!ChangeMe,true
+T006,Teacher D06 01,teacher.d06.01.nstc@example.test,teacher,D06,NSTC,NSTC-Stage-2026!ChangeMe,true
+TS001,Teaching Staff D01,staff.d01.01.nstc@example.test,teaching_staff,D01,NSTC,NSTC-Stage-2026!ChangeMe,true
+TS002,Teaching Staff D02,staff.d02.01.nstc@example.test,teaching_staff,D02,NSTC,NSTC-Stage-2026!ChangeMe,true

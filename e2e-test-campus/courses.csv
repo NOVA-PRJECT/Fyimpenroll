@@ -1,0 +1,19 @@
+course_code,title,department_code,semester,category,credits,seat_limit,prerequisite_course_codes,shared_course,persona_use
+NSTC-D01-S2-CORE,Department Core D01,D01,2,DSC,4,120,,false,normal
+NSTC-D02-S2-CORE,Department Core D02,D02,2,DSC,4,120,,false,normal
+NSTC-D03-S2-CORE,Department Core D03,D03,2,DSC,4,120,,false,normal
+NSTC-D04-S2-CORE,Department Core D04,D04,2,DSC,4,120,,false,normal
+NSTC-D05-S2-CORE,Department Core D05,D05,2,DSC,4,120,,false,normal
+NSTC-D06-S2-CORE,Department Core D06,D06,2,DSC,4,120,,false,normal
+NSTC-D01-S4-CORE,Department Core D01,D01,4,DSC,4,120,NSTC-D01-S2-CORE,false,prerequisite
+NSTC-D02-S4-CORE,Department Core D02,D02,4,DSC,4,120,NSTC-D02-S2-CORE,false,prerequisite
+NSTC-D03-S4-CORE,Department Core D03,D03,4,DSC,4,120,NSTC-D03-S2-CORE,false,prerequisite
+NSTC-D04-S4-CORE,Department Core D04,D04,4,DSC,4,120,NSTC-D04-S2-CORE,false,prerequisite
+NSTC-D05-S4-CORE,Department Core D05,D05,4,DSC,4,120,NSTC-D05-S2-CORE,false,prerequisite
+NSTC-D06-S4-CORE,Department Core D06,D06,4,DSC,4,120,NSTC-D06-S2-CORE,false,prerequisite
+NSTC-EVEN-MDC-01,Shared MDC Choice,D01,2,MDC,3,15,,true,shared-seat
+NSTC-EVEN-SEC-01,Shared SEC Choice,D02,2,SEC,3,1,,true,concurrency
+NSTC-EVEN-AEC-01,Academic English Choice,D03,2,AEC,3,60,,true,three-preferences
+NSTC-EVEN-VAC-01,Value Added Choice,D04,4,VAC,2,60,,true,normal
+NSTC-EVEN-DSE-01,Elective DSE Choice,D05,4,DSE,4,30,,true,fallback
+NSTC-EVEN-PREREQ-01,Advanced Prerequisite Choice,D06,4,DSE,4,30,NSTC-D06-S2-CORE,false,prerequisite
