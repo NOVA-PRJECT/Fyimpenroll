@@ -50,7 +50,7 @@ The director's current initial staff password is in the local staff credentials 
 
 Use the actual course choices in [ACADEMIC_VALIDATION_REPORT.json](ACADEMIC_VALIDATION_REPORT.json) as a reference. Each pathway includes a sample six-paper registration and course codes. Prefer the copied TT options where available; shared language AEC options retain the approved global-catalogue behavior.
 
-- [ ] For each S2 pilot, verify two fixed majors, two minors from different test departments, an MDC and an eligible AEC. The total should be 22 credits.
+- [ ] For each S2 pilot, verify two fixed majors, two minors from different test departments, an MDC and an AEC matching the blueprint. The total should be 22 credits.
 - [ ] For each S4 pilot, verify four fixed majors, SEC and VAC. The total should be 22 credits.
 - [ ] Check that fixed majors resolve to the intended TT courses and cannot be replaced with another semester's paper.
 - [ ] Enter ranked choices for elective components, up to the supported three choices per component.
@@ -60,7 +60,7 @@ Use the actual course choices in [ACADEMIC_VALIDATION_REPORT.json](ACADEMIC_VALI
 - [ ] Test the requirement that the two S2 minor suppliers differ. Record the actual result; copying the source EXCLUDE_DEPT slots alone does not establish that this requirement is enforced.
 - [ ] Confirm that another department's HOD cannot edit this student's academic record and a student cannot open director/HOD operations.
 
-The existing Malayalam AEC prerequisite remains restricted to its source language departments. The prepared S2 sample uses the eligible Hindi option. Global baskets and EXCLUDE_DEPT remain shared across campuses as previously approved.
+Registration checks blueprint eligibility; course prerequisites are evaluated during allocation. Include an S2 pilot that ranks Malayalam AEC first and Hindi second: submission should succeed for ITTT, and allocation should skip Malayalam because its prerequisite allows only HIN/MAL, then consider Hindi at rank 2. Also test an unmet prerequisite without a fallback, which should submit successfully and remain unallocated for that slot. Global baskets and EXCLUDE_DEPT remain shared across campuses as previously approved.
 
 ## 4. Expand the rehearsal to all 120 students
 

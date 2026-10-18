@@ -33,6 +33,7 @@ export interface CourseItem {
   department_id: string
   seat_limit: number
   category: string
+  prerequisite_course_ids?: string[] | null
 }
 
 export interface PrerequisiteRule {
@@ -387,7 +388,7 @@ export class AllocationService {
     try {
       // Step C: Fetch all courses offered in this semester
       const coursesData = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
-        .select('id, course_code, title, semester, department_id, seat_limit, category').eq('semester', body.semester).order('id'))
+        .select('id, course_code, title, semester, department_id, seat_limit, category, prerequisite_course_ids').eq('semester', body.semester).order('id'))
 
       const courses: CourseItem[] = (coursesData ?? []).map((c) => ({
         id: c.id,
@@ -395,6 +396,7 @@ export class AllocationService {
         title: c.title,
         semester: c.semester,
         category: c.category,
+        prerequisite_course_ids: c.prerequisite_course_ids,
         department_id: c.department_id,
         seat_limit: c.seat_limit ? Number(c.seat_limit) : 60,
       }))
@@ -493,9 +495,10 @@ export class AllocationService {
       }
       if (skippedChoices.length) this.logger.warn(`Skipped ${skippedChoices.length} saved choices that no longer satisfy blueprint eligibility`)
 
-      // Step F: Fetch prior completed registrations for scoring COMPLETED_COURSE
+      // Step F: Fetch prior registrations for prerequisite checks by course code/ID and scoring.
       // We check courses the student was enrolled in prior semesters (semester < body.semester)
       const studentCompletedCourseCodesMap = new Map<string, Set<string>>()
+      const studentCompletedCourseIdsMap = new Map<string, Set<string>>()
       if (studentIds.length > 0) {
         const priorRegs = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin
           .from('student_registrations')
@@ -522,10 +525,13 @@ export class AllocationService {
         for (const pr of priorRegs ?? []) {
           if (!studentCompletedCourseCodesMap.has(pr.student_id)) {
             studentCompletedCourseCodesMap.set(pr.student_id, new Set())
+            studentCompletedCourseIdsMap.set(pr.student_id, new Set())
           }
           const set = studentCompletedCourseCodesMap.get(pr.student_id)!
+          const completedIds = studentCompletedCourseIdsMap.get(pr.student_id)!
           for (let s = 1; s <= 8; s++) {
             const cid = (pr as any)[`slot_${s}_course_id`]
+            if (cid) completedIds.add(cid)
             if (cid && courseCodeLookup.has(cid)) {
               set.add(courseCodeLookup.get(cid)!)
             }
@@ -710,6 +716,7 @@ export class AllocationService {
                 current_semester: studentSemester,
               },
               studentCompletedCourseCodesMap.get(pref.student_id) || new Set(),
+              studentCompletedCourseIdsMap.get(pref.student_id) || new Set(),
             )
             if (!prereqEval.eligible) {
               continue

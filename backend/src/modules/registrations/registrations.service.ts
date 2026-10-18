@@ -678,9 +678,6 @@ export class RegistrationsService {
       }
     }
 
-    const studentDept = departmentsData.find((d) => d.id === departmentId)
-    const studentDeptCode = studentDept?.code || null
-
     const settings = settingsRes.data
     const blueprint = blueprintRes.data
 
@@ -899,7 +896,7 @@ export class RegistrationsService {
       })
     }
 
-    // Collect all elective courses mentioned to validate department restriction & prerequisites
+    // Registration validates the blueprint; course prerequisites are evaluated during allocation.
     const allElectiveCourseIds = new Set<string>()
     unifiedPreferences.forEach((sItem) => {
       if (!sItem.is_fixed) {
@@ -910,7 +907,7 @@ export class RegistrationsService {
     if (allElectiveCourseIds.size > 0) {
       const { data: electiveCourses, error: elecErr } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, semester, category, prerequisite_course_ids')
+        .select('id, course_code, title, credits, department_id, semester, category')
         .in('id', Array.from(allElectiveCourseIds))
 
       if (elecErr || !electiveCourses) {
@@ -924,45 +921,7 @@ export class RegistrationsService {
         }
       }
 
-      // F19: Fetch prior registrations for prerequisite verification
-      const { data: priorRegs } = await this.supabase.admin
-        .from('student_registrations')
-        .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-        .eq('student_id', user.userId)
-        .lt('semester', currentSemester)
-
-      const priorCourseIds = new Set<string>()
-      for (const pr of priorRegs ?? []) {
-        for (let s = 1; s <= 8; s++) {
-          const cid = (pr as any)[`slot_${s}_course_id`]
-          if (cid) priorCourseIds.add(cid)
-        }
-      }
-
-      const completedCodes = new Set<string>()
-      if (priorCourseIds.size > 0) {
-        const { data: codeData } = await this.supabase.admin
-          .from('courses')
-          .select('id, course_code')
-          .in('id', Array.from(priorCourseIds))
-        for (const cd of codeData ?? []) {
-          completedCodes.add(normalizeCourseCode(cd.course_code))
-        }
-      }
-
-      // Fetch configured prerequisite rules for selected elective courses
-      const { data: rulesData } = await this.supabase.admin
-        .from('course_prerequisite_rules')
-        .select('id, course_id, rule, target')
-        .in('course_id', Array.from(allElectiveCourseIds))
-
-      const rulesByCourse = new Map<string, PrerequisiteRule[]>()
-      for (const r of (rulesData || []) as PrerequisiteRule[]) {
-        if (!rulesByCourse.has(r.course_id)) rulesByCourse.set(r.course_id, [])
-        rulesByCourse.get(r.course_id)!.push(r)
-      }
-
-      // Validate each elective choice against slot eligibility rules & prerequisites (F14, F19)
+      // Validate every ranked choice against the configured slot, independent of prerequisites.
       for (const sItem of unifiedPreferences) {
         if (sItem.is_fixed) continue
         const slotDef = getStudentSlotDefinition(pathway, sItem.slot, departmentId ?? '')
@@ -972,22 +931,6 @@ export class RegistrationsService {
           if (!course) throw new BadRequestException(`Course ID ${choice.course_id} is invalid or does not exist`)
           if (!isCourseEligibleForSlot(course, slotDef.rule, slotDef.target || '', departmentId ?? '', deptMap, currentSemester, slotDef.name)) {
             throw new BadRequestException(`Course ${course.course_code} is not eligible for Slot ${sItem.slot} (${slotDef.name || slotDef.rule}) in Semester ${currentSemester}`)
-          }
-
-          // Strict prerequisite check (F19)
-          const courseRules = rulesByCourse.get(course.id) || []
-          const prereqEval = evaluateCoursePrerequisites(
-            course,
-            courseRules,
-            { department_code: studentDeptCode, current_semester: currentSemester },
-            completedCodes,
-            priorCourseIds,
-          )
-
-          if (!prereqEval.eligible) {
-            throw new BadRequestException(
-              `Prerequisite requirement not satisfied for ${course.course_code} (${course.title}): ${prereqEval.reason}`,
-            )
           }
         }
       }

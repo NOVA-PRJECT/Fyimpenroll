@@ -40,6 +40,95 @@ function database(tables, rpc) {
 }
 const registration = db => new RegistrationsService({ admin: db }, logger, logger)
 
+function prerequisiteScenario(kind, met = false) {
+  const restricted = { ...course('restricted', 'AEC'), course_code: 'KU02AECMAL101', title: 'ROMANTIC LITERATURE' }
+  if (kind === 'legacy course IDs') restricted.prerequisite_course_ids = ['prior-a', 'prior-b']
+  const rule = {
+    'department': { rule: 'DEPARTMENT', target: 'HIN,MAL' },
+    'completed course': { rule: 'COMPLETED_COURSE', target: 'PRIOR101' },
+    'completed semester': { rule: 'COMPLETED_SEMESTER', target: met ? '1' : '2' },
+  }[kind]
+  const previousIds = kind === 'legacy course IDs' ? ['prior-a', ...(met ? ['prior-b'] : [])]
+    : kind === 'completed course' && met ? ['prior-a'] : []
+  return {
+    campus_settings: [{ campus_id: 'campus', academic_year: '2026-27', deadline: '2099-01-01' }],
+    students: [{ id: user.userId, ...user, departments: { code: kind === 'department' && met ? 'MAL' : 'ITTT' } }],
+    departments: [{ id: 'home', code: kind === 'department' && met ? 'MAL' : 'ITTT' }, { id: 'away', code: 'MAL' }],
+    semester_blueprints: [{ department_id: 'home', semester: 2, min_credits: 3, max_credits: 3,
+      pathways: [{ id: 'p', slots: [slot('GLOBAL_BASKET', 'AEC')] }] }],
+    courses: [restricted, { ...course('fallback', 'AEC'), course_code: 'KU02AECHIN103' },
+      { ...course('prior-a', 'AEC', 'away', 1), course_code: 'PRIOR101' }, course('prior-b', 'AEC', 'away', 1)],
+    course_prerequisite_rules: rule ? [{ id: 'rule', course_id: restricted.id, ...rule }] : [],
+    student_registrations: previousIds.length ? [{ id: 'history', student_id: user.userId, semester: 1,
+      slot_1_course_id: previousIds[0], slot_2_course_id: previousIds[1] }] : [],
+    registration_preferences: [],
+  }
+}
+
+for (const kind of ['department', 'completed course', 'completed semester', 'legacy course IDs']) {
+  test(`registration and resubmission accept blueprint choices with an unmet ${kind} prerequisite`, async () => {
+    const tables = prerequisiteScenario(kind)
+    const db = database(tables, () => ({ data: { success: true }, error: null }))
+    const service = registration(db)
+    const blueprint = await service.getBlueprint(user)
+    assert.deepEqual(blueprint.slots[0].options.map(c => c.id), ['restricted', 'fallback'])
+    const preferences = { slot_1: [{ course_id: 'restricted', rank: 1 }, { course_id: 'fallback', rank: 2 }] }
+    const first = await service.submitCourses({ semester: 2, pathway_id: 'p', preferences }, user)
+    assert.equal(first.success, true)
+    assert.equal(first.isUpdate, false)
+    assert.deepEqual(db.calls[0].args.p_preferences[0].choices, preferences.slot_1)
+    assert.equal(db.calls[0].name, 'submit_student_registration')
+    tables.registration_preferences.push({ id: 'saved', student_id: user.userId, semester: 2, academic_year: '2026-27',
+      pathway_id: 'p', submitted_at: db.calls[0].args.p_submitted_at })
+    preferences.slot_1 = [{ course_id: 'fallback', rank: 1 }, { course_id: 'restricted', rank: 2 }]
+    const updated = await service.submitCourses({ semester: 2, pathway_id: 'p', preferences }, user)
+    assert.equal(updated.success, true)
+    assert.equal(updated.isUpdate, true)
+    assert.deepEqual(db.calls[1].args.p_preferences[0].choices, preferences.slot_1)
+    assert.equal(db.calls[1].args.p_submitted_at, db.calls[0].args.p_submitted_at)
+  })
+
+  test(`automatic allocation checks the ${kind} prerequisite and keeps fallback ranks`, async () => {
+    for (const met of [false, true]) {
+      const tables = prerequisiteScenario(kind, met)
+      tables.campus_settings[0].deadline = '2020-01-01'
+      tables.registration_preferences.push({ id: 'pref', student_id: user.userId, campus_id: 'campus', semester: 2,
+        academic_year: '2026-27', pathway_id: 'p', submitted_at: '2026-01-01',
+        preferences: [{ slot: 1, choices: [{ course_id: 'restricted', rank: 1 }, { course_id: 'fallback', rank: 2 }] }] })
+      const db = database(tables, name => ({ data: name === 'claim_allocation_run' ? 'run' : {}, error: null }))
+      await new AllocationService({ admin: db }, logger, logger).runAllocation({ semester: 2, academicYear: '2026-27' }, user)
+      const commit = db.calls.find(call => call.name === 'apply_course_allocation').args
+      assert.equal(commit.p_allocations.length, 1)
+      assert.equal(commit.p_allocations[0].course_id, met ? 'restricted' : 'fallback')
+      assert.equal(commit.p_allocations[0].metadata.round, met ? 1 : 2)
+    }
+  })
+
+  test(`manual allocation and direct slot assignment still enforce the ${kind} prerequisite`, async () => {
+    const tables = prerequisiteScenario(kind)
+    tables.student_registrations.push({ id: 'current', student_id: user.userId, semester: 2, academic_year: '2026-27', pathway_id: 'p' })
+    const db = database(tables)
+    await assert.rejects(new AllocationService({ admin: db }, logger, logger).manualAllocate(
+      { student_id: user.userId, slot_key: 'slot_1', course_id: 'restricted' }, { ...user, role: 'hod' }), /does not meet prerequisites/)
+    await assert.rejects(registration(db).updateSlot({ slot_key: 'slot_1', course_id: 'restricted' }, user), /prerequisite requirement not satisfied/)
+    assert.equal(db.calls.length, 0)
+  })
+}
+
+test('an unmet prerequisite without a fallback can be submitted and leaves the allocation slot unresolved', async () => {
+  const tables = prerequisiteScenario('department')
+  const db = database(tables, name => ({ data: name === 'claim_allocation_run' ? 'run' : { success: true }, error: null }))
+  await registration(db).submitCourses({ semester: 2, pathway_id: 'p', preferences: { slot_1: [{ course_id: 'restricted', rank: 1 }] } }, user)
+  tables.registration_preferences.push({ id: 'pref', student_id: user.userId, campus_id: 'campus', semester: 2,
+    academic_year: '2026-27', pathway_id: 'p', submitted_at: '2026-01-01', preferences: db.calls[0].args.p_preferences })
+  tables.campus_settings[0].deadline = '2020-01-01'
+  const result = await new AllocationService({ admin: db }, logger, logger).runAllocation({ semester: 2, academicYear: '2026-27' }, user)
+  const commit = db.calls.find(call => call.name === 'apply_course_allocation').args
+  assert.equal(result.unallocated, 1)
+  assert.equal(commit.p_allocations.length, 0)
+  assert.equal(commit.p_unallocated[0].slot_key, 'slot_1')
+})
+
 test('global basket matches categories and semester, with MDC exclusion only', () => {
   for (const category of ['MDC', 'AEC', 'VAC', 'SEC', 'DSE']) {
     assert.equal(eligible(course('c', category), 'GLOBAL_BASKET', category, 'home', departments, 2), true)
