@@ -1,16 +1,22 @@
 import { clearSessionStorage, navigateAfterSessionChange } from './session-navigation'
-import { beginSessionLogout, resumeSessionAfterLogoutFailure } from './refresh-coordinator'
+import { beginSessionLogout } from './refresh-coordinator'
 
 let pending: Promise<boolean> | null = null
+let confirmLogout: (() => Promise<boolean>) | undefined
+
+export function registerLogoutDialog(handler: () => Promise<boolean>): () => void {
+  confirmLogout = handler
+  return () => { if (confirmLogout === handler) confirmLogout = undefined }
+}
 
 /** All callers share revocation, cookie cleanup, timeout and retry feedback. */
 export function logoutPortal(): Promise<boolean> {
   if (pending) return pending
-  pending = performLogout().finally(() => { pending = null })
+  pending = (confirmLogout?.() ?? Promise.resolve(false)).finally(() => { pending = null })
   return pending
 }
 
-async function performLogout(): Promise<boolean> {
+export async function performLogout(): Promise<boolean> {
   beginSessionLogout()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 12000)
@@ -25,8 +31,6 @@ async function performLogout(): Promise<boolean> {
     navigateAfterSessionChange(destination)
     return true
   } catch {
-    resumeSessionAfterLogoutFailure()
-    window.alert('Logout could not be confirmed. Check your connection and try signing out again.')
     return false
   } finally {
     clearTimeout(timeout)

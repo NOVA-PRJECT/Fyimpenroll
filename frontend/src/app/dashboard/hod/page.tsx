@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic'
 import PageLoading from '@/components/PageLoading'
 import { sessionRedirect } from '@/core/security/session-response'
 const BlueprintTab = dynamic(() => import('./BlueprintTab'), { loading: () => <PageLoading layout="form" message="Loading course blueprint…" /> })
+const CoursesTab = dynamic(() => import('./CoursesTab'), { loading: () => <LoadingState layout="form" message="Loading courses…" /> })
 const TeacherAssignmentTab = dynamic(() => import('./TeacherAssignmentTab'), { loading: () => <PageLoading layout="cards" message="Loading teacher assignments…" /> })
 const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'), { loading: () => <PageLoading layout="table" message="Loading period attendance…" /> })
 const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'), { loading: () => <PageLoading layout="table" message="Loading campus attendance…" /> })
@@ -85,6 +86,8 @@ export default function HodDashboard() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [blueprintSemester, setBlueprintSemester] = useState(1)
+  const [coursesSemester, setCoursesSemester] = useState(1)
   const [activeTab, setActiveTab] = useState<Tab>('defaulters')
   const [hodInfo, setHodInfo] = useState<HodInfo | null>(null)
   const [loadingHod, setLoadingHod] = useState(true)
@@ -969,8 +972,8 @@ export default function HodDashboard() {
           </>
         )}
 
-        {activeTab === 'blueprint' && <BlueprintTab view="blueprint" />}
-        {activeTab === 'courses' && <BlueprintTab view="courses" />}
+        {activeTab === 'blueprint' && <BlueprintTab semester={blueprintSemester} onSemesterChange={setBlueprintSemester} />}
+        {activeTab === 'courses' && <CoursesTab semester={coursesSemester} onSemesterChange={setCoursesSemester} />}
         {activeTab === 'assignments' && <TeacherAssignmentTab onDirtyChange={setIsAssignmentTabDirty} />}
         {activeTab === 'period-marking' && <PeriodMarkingTab />}
         {activeTab === 'campus-attendance' && <CampusAttendanceTab />}

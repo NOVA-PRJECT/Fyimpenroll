@@ -1,0 +1,27 @@
+{
+  "base_url": "https://fyimp-backend.onrender.com",
+  "started_at": "2026-10-18T17:17:39.248Z",
+  "checks": [
+    {
+      "scenario": "global_logout_two_sessions",
+      "passed": true,
+      "server_timing": "authentication;dur=168.9, revocation;dur=119.9, audit;dur=188.6, logout;dur=578.4",
+      "all_browser_cookies_cleared": true,
+      "both_sessions_revoked": true
+    },
+    {
+      "scenario": "invalid_access_refresh_fallback",
+      "passed": true,
+      "server_timing": "authentication;dur=227.3, revocation;dur=115.2, audit;dur=65.4, logout;dur=409.3",
+      "all_browser_cookies_cleared": true,
+      "both_sessions_revoked": true
+    },
+    {
+      "scenario": "logout_fence_blocks_refresh_cookie_restoration",
+      "passed": true
+    }
+  ],
+  "fixture_removed": true,
+  "fixture_id": "8514726c-d7a5-4e3e-b7ff-343fceb9c545",
+  "completed_at": "2026-10-18T17:17:45.356Z"
+}

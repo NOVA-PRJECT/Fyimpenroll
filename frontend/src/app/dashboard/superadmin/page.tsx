@@ -45,6 +45,7 @@ interface Department {
 }
 
 interface Faculty {
+  department_id: string | null
   id: string
   full_name: string
   email: string
@@ -306,9 +307,9 @@ export default function SuperAdminDashboard() {
         const formatted = Object.entries(fieldErrors)
           .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
           .join('; ')
-        setError(formatted || data.error || 'Failed to add faculty')
+        setError(formatted || data.message || data.error || 'Failed to add faculty')
       } else {
-        setError(data.details ?? data.error ?? 'Failed to add faculty')
+        setError(data.message ?? data.details ?? data.error ?? 'Failed to add faculty')
       }
     }
     else {
@@ -323,14 +324,13 @@ export default function SuperAdminDashboard() {
 
   // ── NEW: Edit Faculty ──
   function openEditFaculty(f: Faculty) {
+    if (f.role === 'teacher') return
     setEditFaculty(f)
     setEditFacultyName(f.full_name)
     setEditFacultyRole(f.role as 'hod' | 'campus_director' | 'teaching_staff')
     // L6 fix: Use campus_id directly instead of reverse-lookup by name
     setEditFacultyCampusId(f.campus_id ?? '')
-    // Find the dept_id from departments list by matching dept name
-    const matchedDept = departments.find(d => d.name === f.departments?.name)
-    setEditFacultyDeptId(matchedDept?.id ?? '')
+    setEditFacultyDeptId(f.department_id ?? '')
     clearMessages()
   }
 
@@ -355,7 +355,7 @@ export default function SuperAdminDashboard() {
       }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to update faculty') }
+    if (!res.ok) { setError(data.message ?? data.error ?? 'Failed to update faculty') }
     else {
       setSuccess(data.message)
       setEditFaculty(null)
@@ -445,7 +445,7 @@ export default function SuperAdminDashboard() {
       {/* Main Content */}
       <div className={styles.mainContent}>
 
-        {error && <div className={styles.errorBanner}>{error}</div>}
+        {error && !showAddFaculty && !editFaculty && <div className={styles.errorBanner}>{error}</div>}
         {success && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {success}</div>}
 
         {/* ══ CAMPUSES TAB ══ */}
@@ -612,7 +612,7 @@ export default function SuperAdminDashboard() {
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
                         <h4 className={styles.facultyGroupTitle}>
-                          Campus Directors
+                          Directors
                         </h4>
                         <span className={styles.countBadge}>{directors.length}</span>
                       </div>
@@ -665,7 +665,7 @@ export default function SuperAdminDashboard() {
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
                         <h4 className={styles.facultyGroupTitle}>
-                          Heads of Department (HODs)
+                          HODs
                         </h4>
                         <span className={styles.countBadge}>{hods.length}</span>
                       </div>
@@ -715,7 +715,7 @@ export default function SuperAdminDashboard() {
 
                 {/* Group 3: Teaching Staff */}
                 {(() => {
-                  const staff = faculty.filter(f => f.role === 'teaching_staff' || (f.role !== 'campus_director' && f.role !== 'hod'))
+                  const staff = faculty.filter(f => f.role === 'teaching_staff')
                   return (
                     <div className={styles.facultyGroup}>
                       <div className={styles.facultyGroupHeader}>
@@ -757,6 +757,57 @@ export default function SuperAdminDashboard() {
                                       <button className={styles.editBtn} onClick={() => openEditFaculty(f)} aria-label="Edit"><UiPencil size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                                       <button className={styles.deleteBtn} onClick={() => { setDeleteFaculty(f); clearMessages() }} aria-label="Delete"><UiTrash2 size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></button>
                                     </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* Group 4: Teachers */}
+                {(() => {
+                  const staff = faculty.filter(f => f.role === 'teacher')
+                  return (
+                    <div className={styles.facultyGroup}>
+                      <div className={styles.facultyGroupHeader}>
+                        <h4 className={styles.facultyGroupTitle}>
+                          Teachers
+                        </h4>
+                        <span className={styles.countBadge}>{staff.length}</span>
+                      </div>
+                      <div className={styles.facultyTableWrapper}>
+                        {staff.length === 0 ? (
+                          <p style={{ padding: '1.25rem 1rem', color: "var(--portal-subtle,#9ba1ab)", textAlign: 'center', fontSize: '0.8rem', margin: 0 }}>
+                            No teachers assigned yet.
+                          </p>
+                        ) : (
+                          <table className={styles.table}>
+                            <thead className={styles.tableHead}>
+                              <tr>
+                                <th>#</th>
+                                <th>Name & Email</th>
+                                <th>Campus</th>
+                                <th>Department</th>
+                                <th>Role</th>
+                                <th>Management</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {staff.map((f, i) => (
+                                <tr key={f.id} className={styles.tableRow}>
+                                  <td>{i + 1}</td>
+                                  <td>
+                                    <p style={{ margin: 0, fontWeight: 600, fontSize: '0.82rem' }}>{f.full_name}</p>
+                                    <p style={{ margin: 0, fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{f.email}</p>
+                                  </td>
+                                  <td>{f.campuses?.name ?? '—'}</td>
+                                  <td>{f.departments?.name ?? '—'}</td>
+                                  <td><span className={styles.rolePillStaff}>Teacher</span></td>
+                                  <td>
+                                    <span>Managed by HOD</span>
                                   </td>
                                 </tr>
                               ))}
@@ -1002,6 +1053,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Add Faculty</h3>
+            {error && <div className={styles.errorBanner} role="alert">{error}</div>}
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
                 <label className={styles.label}>Full Name</label>
@@ -1082,6 +1134,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Edit Faculty</h3>
+            {error && <div className={styles.errorBanner} role="alert">{error}</div>}
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
                 <label className={styles.label}>Full Name</label>

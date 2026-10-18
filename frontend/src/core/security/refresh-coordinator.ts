@@ -23,11 +23,15 @@ let refreshController: AbortController | null = null
 
 export function beginSessionLogout(): void {
   sessionEnding = true
+  try { document.cookie = 'session_ended=1; Path=/; SameSite=Lax' } catch { /* Provider cookie cleanup still runs. */ }
   refreshController?.abort()
   invalidateRefreshSession()
 }
 
-export function resumeSessionAfterLogoutFailure(): void { sessionEnding = false }
+export function resumeSessionAfterLogoutFailure(): void {
+  sessionEnding = false
+  try { document.cookie = 'session_ended=; Path=/; Max-Age=0; SameSite=Lax' } catch { /* Cookies may be blocked. */ }
+}
 
 export function invalidateRefreshSession(): void {
   sessionGeneration += 1
@@ -113,12 +117,15 @@ export async function apiFetch(
   init?: RequestInit,
   options?: ApiFetchOptions,
 ): Promise<Response> {
+  const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
+  if (sessionEnding && !requestUrl.includes('/api/auth/logout')) throw new DOMException('Session ending', 'AbortError')
   const originalFetch = (typeof window !== 'undefined' && window.__originalFetch) || fetch
   const generation = sessionGeneration
   const revision = refreshRevision
   // Preserve a Request body before fetch consumes it, for a permitted single retry.
   const retryInput = input instanceof Request ? input.clone() : input
   const response = await originalFetch(input, init)
+  if (sessionEnding && !requestUrl.includes('/api/auth/logout')) throw new DOMException('Session ending', 'AbortError')
 
   // Only intercept 401 Unauthorized responses for /api/ endpoints (excluding auth refresh/login/logout itself)
   const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url

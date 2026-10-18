@@ -3,6 +3,7 @@ import './theme.css'
 import { ApiRefreshInit } from '../components/ApiRefreshInit'
 import ThemeToggle from '@/components/ThemeToggle'
 import ThemeBootstrap from '@/components/ThemeBootstrap'
+import LogoutDialog from '@/components/LogoutDialog'
 
 export const metadata = {
   title: 'FYIMP COURSE REGISTRATION KUC',
@@ -29,6 +30,7 @@ export default function RootLayout({
         <ThemeBootstrap />
         <ApiRefreshInit />
         {children}
+        <LogoutDialog />
         <ThemeToggle />
       </body>
     </html>

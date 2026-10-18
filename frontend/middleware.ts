@@ -114,7 +114,7 @@ function attachAuthCookies(response: NextResponse, token: string, refreshToken?:
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isLoginRoute = pathname.startsWith('/login')
-  const isDashboardRoute = pathname.startsWith('/dashboard')
+  const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/')
   const isConsentRoute = pathname.startsWith('/consent')
   const isHomeRoute = pathname === '/'
   const isApiRoute = pathname.startsWith('/api')
@@ -129,6 +129,10 @@ export async function middleware(request: NextRequest) {
   const isPasswordResetRoute = pathname.startsWith('/reset-password')
   const isSharedChangePasswordRoute = pathname === '/change-password'
   const isStudentChangePasswordRoute = pathname === '/dashboard/student/change-password'
+
+  if (request.cookies.get('session_ended')?.value) {
+    return clearAuthCookies(isLoginRoute || isHomeRoute || isPasswordResetRoute ? NextResponse.next() : NextResponse.redirect(new URL('/login', request.url)))
+  }
 
   const needsRole = isDashboardRoute || isConsentRoute || isLoginRoute || isHomeRoute
   if (!needsRole && !isPasswordResetRoute && !isSharedChangePasswordRoute) return NextResponse.next()
@@ -228,8 +232,11 @@ export async function middleware(request: NextRequest) {
       .find((route) => pathname === route || pathname.startsWith(route + '/'))
 
     if (!matchedRoute) {
-      const response = NextResponse.redirect(new URL('/login', request.url))
-      return clearAuthCookies(response)
+      // An unknown URL is a routing miss, not an invalid session. Let Next
+      // render its not-found page and retain any credentials rotated above.
+      const response = NextResponse.next()
+      if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
+      return response
     }
 
     const requiredRole = DASHBOARD_ROLE_MAP[matchedRoute]

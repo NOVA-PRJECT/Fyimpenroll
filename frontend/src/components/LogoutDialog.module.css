@@ -1,0 +1,12 @@
+.dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); margin: auto; padding: 28px; border: 1px solid var(--portal-border, #d9dce3); border-radius: 20px; color: var(--portal-text, #172036); background: var(--portal-surface, #fff); box-shadow: 0 24px 80px #0004; font: inherit; }
+.dialog::backdrop { background: #0b142b99; backdrop-filter: blur(4px); }
+.dialog h2 { font-size: 1.4rem; margin: 18px 0 10px; font-weight: 650; }
+.dialog p { line-height: 1.6; color: var(--portal-muted, #667085); margin: 0 0 24px; }
+.icon { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 14px; background: var(--portal-surface-raised, #edf2ff); color: var(--portal-text, #172036); }
+.actions { display: flex; gap: 12px; justify-content: flex-end; }
+.actions button { padding: 10px 20px; border-radius: 10px; border: 1px solid var(--portal-border, #d9dce3); background: var(--portal-surface, #fff); color: inherit; font-weight: 600; cursor: pointer; min-height: 44px; }
+.actions .primary { background: #233d71; border-color: #233d71; color: white; }
+.actions button:focus-visible { outline: 3px solid #638be1; outline-offset: 3px; }
+.spinner { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
