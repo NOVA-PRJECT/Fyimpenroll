@@ -383,7 +383,11 @@ export class AuthService {
     let jwt = typeof userOrToken === 'string' ? userOrToken : userOrToken?.token
     const refreshToken = options?.refreshToken
     // Fence an in-flight refresh before making any provider call.
-    if (refreshToken) this.blockedRefreshes.set(this.refreshKey(refreshToken), Date.now() + 7 * 86400000)
+    if (refreshToken) {
+      for (const [key, expiry] of this.blockedRefreshes) if (expiry <= Date.now()) this.blockedRefreshes.delete(key)
+      if (this.blockedRefreshes.size >= 10000) this.blockedRefreshes.delete(this.blockedRefreshes.keys().next().value!)
+      this.blockedRefreshes.set(this.refreshKey(refreshToken), Date.now() + 60000)
+    }
     if (resolvedUser?.userId) this.invalidateUserRefreshes(resolvedUser.userId)
     const timings = { authentication: 0, revocation: 0, audit: 0 }
     let revoked = false
