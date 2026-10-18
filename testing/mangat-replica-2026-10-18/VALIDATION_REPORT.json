@@ -1,0 +1,1060 @@
+{
+  "status": "PASS_LOCAL_CONFIGURATION_WITH_APPROVED_SHARED_POOLS",
+  "live_database_writes_executed": false,
+  "checks": [
+    {
+      "department_code": "ECOTT",
+      "semester": 2,
+      "pathway_id": "tt-eco-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU02DSCECO102TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU02DSCECO103TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "target": "ECOTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "target": "ECOTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 12,
+          "test_course_count": 4,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "ECOTT",
+      "semester": 4,
+      "pathway_id": "tt-eco-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU04DSCECO205TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU04DSCECO206TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU04DSCECO207TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU04DSCECO208TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "EVSTT",
+      "semester": 2,
+      "pathway_id": "tt-evs-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU02DSCEVS102TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU02DSCEVS103TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "target": "EVSTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "target": "EVSTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 16,
+          "test_course_count": 8,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "EVSTT",
+      "semester": 4,
+      "pathway_id": "tt-evs-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU04DSCEVS205TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU04DSCEVS206TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU04DSCEVS207TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU04DSCEVS208TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "ITTT",
+      "semester": 2,
+      "pathway_id": "tt-it-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR",
+          "rule": "FIXED",
+          "target": "KU2DSCCSE102TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU2DSCCSE103TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "DEPT_RESTRICTED",
+          "target": "MATTT",
+          "eligible_count": 2,
+          "test_course_count": 2,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2 ",
+          "rule": "DEPT_RESTRICTED",
+          "target": "STATT",
+          "eligible_count": 2,
+          "test_course_count": 2,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC ",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 15,
+          "test_course_count": 7,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "ITTT",
+      "semester": 4,
+      "pathway_id": "tt-it-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU4DSCCSE205TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU4DSCCSE206TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU4DSCCSE207TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU4DSCCSE301TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "MATTT",
+      "semester": 2,
+      "pathway_id": "tt-mat-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU02DSCMAT10 1TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU02DSCMAT10 2TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "target": "MATTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "target": "MATTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 15,
+          "test_course_count": 7,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "MATTT",
+      "semester": 4,
+      "pathway_id": "tt-mat-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU04DSCMAT201TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU04DSCMAT202TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU04DSCMAT203TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU04DSCMAT204TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "PESTT",
+      "semester": 2,
+      "pathway_id": "tt-pes-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU02DSCPES102TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU02DSCPES103TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "target": "PESTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "target": "PESTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 16,
+          "test_course_count": 8,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "PESTT",
+      "semester": 4,
+      "pathway_id": "tt-pes-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU04DSCPES205TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU04DSCPES206TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU04DSCPES207TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU04DSCPES208TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "SBSTT",
+      "semester": 2,
+      "pathway_id": "tt-sbs-s2-1",
+      "source_min_credits": 20,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU02DSCPSY102TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU02DSCPSY103TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "target": "SBSTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "target": "SBSTT",
+          "eligible_count": 28,
+          "test_course_count": 13,
+          "real_course_count": 15,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "target": "MDC",
+          "eligible_count": 15,
+          "test_course_count": 7,
+          "real_course_count": 8,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "AEC",
+          "eligible_count": 1,
+          "test_course_count": 0,
+          "real_course_count": 1,
+          "prerequisite_blocked_count": 1,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    },
+    {
+      "department_code": "SBSTT",
+      "semester": 4,
+      "pathway_id": "tt-sbs-s4-1",
+      "source_min_credits": 0,
+      "source_max_credits": 22,
+      "attainable_credit_range": [
+        22,
+        22
+      ],
+      "slots": [
+        {
+          "slot": 1,
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "target": "KU04DSCPSY205TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 2,
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "target": "KU04DSCPSY206TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 3,
+          "name": "MAJOR 3",
+          "rule": "FIXED",
+          "target": "KU04DSCPSY207TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 4,
+          "name": "MAJOR 4",
+          "rule": "FIXED",
+          "target": "KU04DSCPSY208TT",
+          "eligible_count": 1,
+          "test_course_count": 1,
+          "real_course_count": 0,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 4,
+          "max_credits": 4
+        },
+        {
+          "slot": 5,
+          "name": "SEC",
+          "rule": "GLOBAL_BASKET",
+          "target": "SEC",
+          "eligible_count": 12,
+          "test_course_count": 6,
+          "real_course_count": 6,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        },
+        {
+          "slot": 6,
+          "name": "VAC",
+          "rule": "GLOBAL_BASKET",
+          "target": "VAC",
+          "eligible_count": 6,
+          "test_course_count": 3,
+          "real_course_count": 3,
+          "prerequisite_blocked_count": 0,
+          "min_credits": 3,
+          "max_credits": 3
+        }
+      ]
+    }
+  ],
+  "source_fixed_reference_repairs": [
+    {
+      "semester": 2,
+      "source_blueprint_target": "KU2DSCMAT101",
+      "source_stored_course_code": "KU02DSCMAT10 1",
+      "test_target": "KU02DSCMAT10 1TT",
+      "reason": "Source target does not exactly match the stored code. Map the copied slot to its actual TT record; do not edit the source."
+    },
+    {
+      "semester": 2,
+      "source_blueprint_target": "KU2DSCMAT102",
+      "source_stored_course_code": "KU02DSCMAT10 2",
+      "test_target": "KU02DSCMAT10 2TT",
+      "reason": "Source target does not exactly match the stored code. Map the copied slot to its actual TT record; do not edit the source."
+    }
+  ],
+  "incomplete_source_departments": [
+    {
+      "code": "STA",
+      "name": "Statistical Sciences",
+      "courses": 9,
+      "blueprints": 0
+    },
+    {
+      "code": "SWT",
+      "name": "Department of Wood Science & Technology",
+      "courses": 0,
+      "blueprints": 0
+    }
+  ],
+  "all_copied_course_and_blueprint_owners_are_test_departments": true,
+  "test_registration_starts_closed": true,
+  "shared_real_course_options_are_expected": true,
+  "note": "Local catalogue/rule validation only. No login, live registration, allocation, timetable or attendance flow has been executed."
+}

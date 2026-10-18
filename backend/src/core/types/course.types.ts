@@ -9,7 +9,6 @@ export type Course = {
   semester: Semester
   credits: number
   category: CourseCategory
-  tag: string | null
 }
 
 export type SemesterBlueprint = {

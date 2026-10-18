@@ -195,7 +195,6 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
           course_code,
           title,
           category,
-          tag,
           credits,
           department_id
         )
@@ -259,7 +258,6 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       courseCode: entry.courses?.course_code,
       courseName: entry.courses?.title,
       category: entry.courses?.category,
-      tag: entry.courses?.tag,
       credits: entry.courses?.credits,
       isLabBlock: entry.is_lab_block,
       sessionType: entry.session_type,

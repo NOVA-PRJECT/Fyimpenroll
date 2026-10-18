@@ -1,1 +1,0 @@
-defect_id,reported_at,reported_by,severity,case_id,role,department_code,semester,summary,reproduction_steps,expected,actual,evidence_path,owner,status,fix_version,retest_result,regression_result

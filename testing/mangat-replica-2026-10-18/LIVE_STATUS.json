@@ -1,0 +1,144 @@
+{
+  "status": "ACADEMIC_REPLICA_STAFF_AND_UPLOADED_STUDENTS_VERIFIED",
+  "verified_at": "2026-10-18T06:24:10.000697+00:00",
+  "project_ref": "lhnjlwtdphugjaluzrsp",
+  "campus": {
+    "id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+    "code": "MANGATTT",
+    "name": "Test KUC Mangattuparamba TT",
+    "day_end_time": "17:00:00",
+    "radius_meters": 500,
+    "center_latitude": 11.9388,
+    "center_longitude": 75.3687,
+    "midday_split_time": "13:30:00",
+    "evening_cutoff_time": "15:30:00",
+    "morning_cutoff_time": "09:30:00"
+  },
+  "departments": [
+    {
+      "id": "bf97ec6d-3b5f-4956-a885-69f153b6875e",
+      "code": "ECOTT",
+      "name": "Test Department of Economics TT"
+    },
+    {
+      "id": "5751ee44-a424-4076-963c-de7f24d76d2c",
+      "code": "EVSTT",
+      "name": "Test Environmental Studies TT"
+    },
+    {
+      "id": "77eacd1e-1577-4e39-84f2-d8e45da4f095",
+      "code": "ITTT",
+      "name": "Test Information Technology TT"
+    },
+    {
+      "id": "a3dd0c91-e402-40aa-84df-ef4ad9906964",
+      "code": "MATTT",
+      "name": "Test Mathematical Science TT"
+    },
+    {
+      "id": "57b1e81f-6b20-4900-87fb-82d49cd4a6ec",
+      "code": "PESTT",
+      "name": "Test Physical Education & Sports TT"
+    },
+    {
+      "id": "9d3e0366-5b7c-4fc4-8f7e-680967378927",
+      "code": "SBSTT",
+      "name": "Test School Of Behavioural Sciences TT"
+    },
+    {
+      "id": "255df1ce-3c98-4cdb-8c6f-148806517d29",
+      "code": "STATT",
+      "name": "Test Statistical Sciences TT"
+    },
+    {
+      "id": "59877e9e-81f1-4f5d-9633-7a6ae3457c39",
+      "code": "SWTTT",
+      "name": "Test Department of Wood Science & Technology TT"
+    }
+  ],
+  "campus_settings": {
+    "id": "70986f40-2662-46d0-b429-c68f5fa80d15",
+    "deadline": null,
+    "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+    "max_credits": 26,
+    "min_credits": 18,
+    "academic_year": "2026-27",
+    "last_promoted_at": null,
+    "timetable_constraints": null
+  },
+  "created_counts": {
+    "campuses": 1,
+    "departments": 8,
+    "campus_settings": 1,
+    "auth_accounts": 130,
+    "faculty": 10,
+    "students": 120,
+    "teachers": 0,
+    "courses": 61,
+    "blueprints": 12,
+    "semester_2_courses": 23,
+    "semester_4_courses": 38,
+    "student_auth_accounts": 120,
+    "staff_auth_accounts": 10
+  },
+  "staff_roles": {
+    "hod": 8,
+    "teaching_staff": 1,
+    "campus_director": 1
+  },
+  "verification": {
+    "invalid_staff_pairs": 0,
+    "all_ten_emails_confirmed": true,
+    "all_staff_claims_and_profiles_match_test_ownership": true,
+    "existing_campuses_departments_settings_unchanged": true,
+    "count_deltas_match_scope": true,
+    "local_auth_tests_passed": 13,
+    "academic_metadata_matches_plan": true,
+    "existing_courses_blueprints_and_prerequisite_rules_unchanged": true,
+    "pathways_verified": 12,
+    "slots_verified": 72,
+    "each_pathway_attainable_credits": 22,
+    "uploaded_students_match_all_csv_rows": true,
+    "student_auth_checks_passed": true
+  },
+  "pending": {
+    "courses": 0,
+    "blueprints": 0,
+    "students": "USER_BULK_UPLOAD_COMPLETED_VERIFIED",
+    "teachers": "DEFERRED_BY_USER"
+  },
+  "private_credentials": "../../scratch/mangat-replica-2026-10-18/AUTH_CREDENTIALS.md",
+  "private_auth_id_manifest": "../../scratch/mangat-replica-2026-10-18/auth-creation-state.json",
+  "note": "Academic setup, staff and all 120 user-uploaded students are verified. First-login password changes and the normal registration rehearsal are next. Registration remains closed; teachers remain deferred.",
+  "academic_verified_at": "2026-10-18T06:34:15.580Z",
+  "private_academic_id_manifest": "../../scratch/mangat-replica-2026-10-18/academic-verification.json",
+  "prepared_student_upload": {
+    "status": "UPLOADED_VERIFIED",
+    "folder": "bulk-upload",
+    "files": 6,
+    "total_rows": 120,
+    "rows_per_department": 20,
+    "semester_2_rows": 60,
+    "semester_4_rows": 60,
+    "validation_report": "bulk-upload/BULK_UPLOAD_VALIDATION.json",
+    "student_accounts_created_by_preparation": false,
+    "verified_rows": 120
+  },
+  "students_verified_at": "2026-10-18T07:58:59.802973+00:00",
+  "private_student_auth_id_manifest": "../../scratch/mangat-replica-2026-10-18/student-upload-verification.json",
+  "workflow_state": {
+    "preferences": 0,
+    "verified_at": "2026-10-18T07:58:30.764363+00:00",
+    "test_courses": 61,
+    "test_students": 120,
+    "allocation_runs": [],
+    "test_blueprints": 12,
+    "timetable_entries": 0,
+    "registration_deadline": null,
+    "students_without_blueprint": 0,
+    "registration_records": 0,
+    "preference_records": 0,
+    "teachers": 0
+  },
+  "next_steps_file": "NEXT_STEPS.md"
+}

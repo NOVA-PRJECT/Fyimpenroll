@@ -191,12 +191,16 @@ export default function RegisterPage() {
       }
 
       // Re-hydrate extraSlotsCount if slot 7 or 8 existed
-      const hasSlot7 = (existingPrefs.slot_7 && existingPrefs.slot_7.length > 0) || !!rawBp.existingSlots?.slot_7
-      const hasSlot8 = (existingPrefs.slot_8 && existingPrefs.slot_8.length > 0) || !!rawBp.existingSlots?.slot_8
+      const configuredSlot7 = rawBp.slots?.some((slot: BlueprintSlot) => slot.slot === 7)
+      const configuredSlot8 = rawBp.slots?.some((slot: BlueprintSlot) => slot.slot === 8)
+      const hasSlot7 = !configuredSlot7 && (!!existingPrefs.slot_7?.length || !!rawBp.existingSlots?.slot_7)
+      const hasSlot8 = !configuredSlot8 && (!!existingPrefs.slot_8?.length || !!rawBp.existingSlots?.slot_8)
       if (hasSlot8) {
-        setExtraSlotsCount(2)
+        setExtraSlotsCount(configuredSlot7 ? 1 : 2)
       } else if (hasSlot7) {
         setExtraSlotsCount(1)
+      } else {
+        setExtraSlotsCount(0)
       }
 
       // Single pathway — slots already resolved
@@ -334,60 +338,33 @@ export default function RegisterPage() {
     }
   }
 
-  // Build active slots list: base blueprint slots (1-6) + optional minor slots (7, 8)
-  const activeSlots: BlueprintSlot[] = [...resolvedSlots]
-  if (extraSlotsCount >= 1) {
-    activeSlots.push({
-      slot: 7,
-      rule: 'EXCLUDE_DEPT',
-      name: 'Paper 7 (Minor Elective)',
-      options: minorCourses,
-    })
-  }
-  if (extraSlotsCount >= 2) {
-    activeSlots.push({
-      slot: 8,
-      rule: 'EXCLUDE_DEPT',
-      name: 'Paper 8 (Minor Elective)',
-      options: minorCourses,
-    })
-  }
+  // Configured slots always take precedence; extra minors use only unconfigured positions.
+  const optionalMinorSlots = [7, 8].filter(number => !resolvedSlots.some(slot => slot.slot === number))
+  const optionalMinorCount = Math.min(extraSlotsCount, optionalMinorSlots.length)
+  const activeOptionalSlots = optionalMinorSlots.slice(0, optionalMinorCount)
+  const isOptionalMinor = (number: number) => activeOptionalSlots.includes(number)
+  const activeSlots: BlueprintSlot[] = [...resolvedSlots, ...activeOptionalSlots.map(number => ({
+    slot: number, rule: 'EXCLUDE_DEPT', name: `Paper ${number} (Minor Elective)`, options: minorCourses,
+  }))].sort((a, b) => a.slot - b.slot)
 
   function handleAddPaper() {
-    if (!windowIsOpen) return
-    if (extraSlotsCount < 2) {
-      setExtraSlotsCount((prev) => prev + 1)
-      setError('')
-    }
+    if (!windowIsOpen || optionalMinorCount >= optionalMinorSlots.length) return
+    setExtraSlotsCount(optionalMinorCount + 1)
+    setError('')
   }
 
   function handleRemovePaper(slotNum: number) {
-    if (!windowIsOpen) return
-    if (slotNum === 8 && extraSlotsCount === 2) {
-      setExtraSlotsCount(1)
-      setRankedPreferences((prev) => {
-        const next = { ...prev }
-        delete next[8]
-        return next
-      })
-    } else if (slotNum === 7) {
-      if (extraSlotsCount === 2) {
-        setExtraSlotsCount(1)
-        setRankedPreferences((prev) => {
-          const next = { ...prev }
-          next[7] = prev[8] || { rank1: '', rank2: '', rank3: '' }
-          delete next[8]
-          return next
-        })
-      } else {
-        setExtraSlotsCount(0)
-        setRankedPreferences((prev) => {
-          const next = { ...prev }
-          delete next[7]
-          return next
-        })
+    if (!windowIsOpen || !isOptionalMinor(slotNum)) return
+    setRankedPreferences(previous => {
+      const next = { ...previous }
+      const index = activeOptionalSlots.indexOf(slotNum)
+      for (let i = index; i < activeOptionalSlots.length - 1; i++) {
+        next[activeOptionalSlots[i]] = previous[activeOptionalSlots[i + 1]] || { rank1: '', rank2: '', rank3: '' }
       }
-    }
+      delete next[activeOptionalSlots[activeOptionalSlots.length - 1]]
+      return next
+    })
+    setExtraSlotsCount(Math.max(0, optionalMinorCount - 1))
     setError('')
   }
 
@@ -476,11 +453,11 @@ export default function RegisterPage() {
     return null
   }
 
-  // Calculate credits strictly for the base 6 papers (per user instruction)
+  // All configured blueprint papers contribute to the required pathway credits.
   function calculateBaseCredits(): number {
     if (!resolvedSlots.length) return 0
     let total = 0
-    resolvedSlots.slice(0, 6).forEach((slot) => {
+    resolvedSlots.forEach((slot) => {
       const course = getCourseForSlot(slot)
       if (course && course.credits != null) {
         total += Number(course.credits) || 0
@@ -489,28 +466,12 @@ export default function RegisterPage() {
     return total
   }
 
-  // Calculate optional extra credits from minor papers (slot 7 & 8)
   function calculateExtraCredits(): number {
-    let total = 0
-    if (extraSlotsCount >= 1) {
-      const p7 = rankedPreferences[7]?.rank1 || existingSlots['slot_7']
-      if (p7) {
-        const c =
-          minorCourses.find((x) => x.id === p7) ||
-          resolvedSlots.flatMap((s) => s.options || []).find((x) => x.id === p7)
-        if (c && c.credits != null) total += Number(c.credits) || 0
-      }
-    }
-    if (extraSlotsCount >= 2) {
-      const p8 = rankedPreferences[8]?.rank1 || existingSlots['slot_8']
-      if (p8) {
-        const c =
-          minorCourses.find((x) => x.id === p8) ||
-          resolvedSlots.flatMap((s) => s.options || []).find((x) => x.id === p8)
-        if (c && c.credits != null) total += Number(c.credits) || 0
-      }
-    }
-    return total
+    return activeOptionalSlots.reduce((total, number) => {
+      const courseId = rankedPreferences[number]?.rank1 || existingSlots[`slot_${number}`]
+      const course = minorCourses.find(item => item.id === courseId)
+      return total + (Number(course?.credits) || 0)
+    }, 0)
   }
 
   async function handleSubmit() {
@@ -978,8 +939,8 @@ export default function RegisterPage() {
                       {allocationCompleted
                         ? 'Total Enrolled Credits:'
                         : windowIsOpen
-                        ? 'Credits (Base 6 Papers):'
-                        : 'Total Confirmed Credits (Base 6 Papers):'}
+                        ? 'Credits (Blueprint Papers):'
+                        : 'Total Confirmed Credits (Blueprint Papers):'}
                     </span>
                     <span
                       className={`${styles.creditValue} ${
@@ -1004,7 +965,7 @@ export default function RegisterPage() {
                   </div>
                   {extraCredits > 0 && (
                     <span style={{ fontSize: '0.8rem', color: "var(--portal-info-text,#0284c7)", fontWeight: 600 }}>
-                      + {extraCredits} optional minor credits ({extraSlotsCount} paper{extraSlotsCount > 1 ? 's' : ''} added)
+                      + {extraCredits} optional minor credits ({optionalMinorCount} paper{optionalMinorCount > 1 ? 's' : ''} added)
                     </span>
                   )}
                 </div>
@@ -1052,13 +1013,13 @@ export default function RegisterPage() {
                       <div className={styles.slotHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <span className={styles.slotLabel}>
                           {slot.name}
-                          {slot.slot > 6 && (
+                          {isOptionalMinor(slot.slot) && (
                             <span style={{ marginLeft: '0.6rem', fontSize: '0.68rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: "var(--portal-info-bg,#e0f2fe)", color: "var(--portal-info-text,#0369a1)", fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               Minor Elective
                             </span>
                           )}
                         </span>
-                        {slot.slot > 6 && windowIsOpen && !isConfirmed && (
+                        {isOptionalMinor(slot.slot) && windowIsOpen && !isConfirmed && (
                           <button
                             type="button"
                             onClick={() => handleRemovePaper(slot.slot)}
@@ -1099,7 +1060,7 @@ export default function RegisterPage() {
                             </div>
 
                             {(() => {
-                              const rawOptions = slot.slot > 6 ? minorCourses : (slot.options ?? [])
+                              const rawOptions = isOptionalMinor(slot.slot) ? minorCourses : (slot.options ?? [])
                               const optionsWithSeats: Course[] = rawOptions
                                 .map((c) => {
                                   const seats = availableSeats[c.id] ?? 0
@@ -1337,7 +1298,7 @@ export default function RegisterPage() {
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             <p style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", margin: 0 }}>
-                              {slot.slot > 6
+                              {isOptionalMinor(slot.slot)
                                 ? 'Select an elective course offered by any department outside your own for this Minor Paper.'
                                 : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and prerequisites.'}
                             </p>
@@ -1428,7 +1389,7 @@ export default function RegisterPage() {
               </div>
 
               {/* Add Paper Button for Minor Electives (Slots 7 & 8) */}
-              {windowIsOpen && extraSlotsCount < 2 && pageState === 'ready' && (
+              {windowIsOpen && optionalMinorCount < optionalMinorSlots.length && pageState === 'ready' && (
                 <div style={{ marginTop: '1.25rem', marginBottom: '1rem', textAlign: 'center' }}>
                   <button
                     type="button"
@@ -1452,17 +1413,17 @@ export default function RegisterPage() {
                     onMouseLeave={(e) => (e.currentTarget.style.background = '#f8fafc')}
                   >
                     <span style={{ fontSize: '1.2rem', fontWeight: 700, lineHeight: 1 }}>+</span>
-                    Add Paper {extraSlotsCount === 0 ? '7' : '8'} (Minor Elective)
+                    Add Paper {optionalMinorSlots[optionalMinorCount]} (Minor Elective)
                   </button>
                   <p style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", marginTop: '0.4rem', marginBottom: 0 }}>
-                    Optional Minor Paper ({extraSlotsCount}/2 added) — Select an elective from outside your department
+                    Optional Minor Paper ({optionalMinorCount}/{optionalMinorSlots.length} added) — Select an elective from outside your department
                   </p>
                 </div>
               )}
-              {extraSlotsCount === 2 && windowIsOpen && (
+              {activeSlots.length >= 8 && windowIsOpen && (
                 <div style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: "var(--portal-info-text,#0369a1)", background: "var(--portal-info-bg,#f0f9ff)", padding: '0.35rem 0.85rem', borderRadius: '9999px', border: "1px solid var(--portal-info-border,#bae6fd)", fontWeight: 600 }}>
-                    Maximum 8 papers reached (6 blueprint + 2 minor electives)
+                    Maximum 8 papers reached
                   </span>
                 </div>
               )}

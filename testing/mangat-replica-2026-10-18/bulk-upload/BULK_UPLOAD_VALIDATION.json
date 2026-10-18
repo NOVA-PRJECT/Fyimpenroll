@@ -1,0 +1,110 @@
+{
+  "status": "UPLOADED_VERIFIED",
+  "generated_at": "2026-10-18T07:04:20.682Z",
+  "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+  "campus_code": "MANGATTT",
+  "headers": [
+    "full_name",
+    "cap_application_number",
+    "academic_year_joined",
+    "current_semester",
+    "email"
+  ],
+  "csv_files": 6,
+  "total_students": 120,
+  "students_per_department": 20,
+  "semester_2": {
+    "students": 60,
+    "admission_year": "2026-27"
+  },
+  "semester_4": {
+    "students": 60,
+    "admission_year": "2025-26"
+  },
+  "encoding": "UTF-8 without BOM",
+  "newline": "CRLF",
+  "batch_password_entered_separately": true,
+  "duplicate_emails": 0,
+  "duplicate_cap_numbers": 0,
+  "live_student_or_auth_writes": false,
+  "source_contract": {
+    "frontend": "frontend/src/app/dashboard/hod/page.tsx",
+    "backend": "backend/src/modules/hod/hod.controller.ts",
+    "service": "backend/src/modules/hod/hod.service.ts"
+  },
+  "files": [
+    {
+      "file": "ECOTT_students_S2_S4.csv",
+      "department_code": "ECOTT",
+      "department_id": "bf97ec6d-3b5f-4956-a885-69f153b6875e",
+      "upload_as": "hod.ecott.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "a22e3473069345ea9d400f3d79e0a20550bb3577d29c3057725b1e2ac153df51"
+    },
+    {
+      "file": "EVSTT_students_S2_S4.csv",
+      "department_code": "EVSTT",
+      "department_id": "5751ee44-a424-4076-963c-de7f24d76d2c",
+      "upload_as": "hod.evstt.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "769539cc3ef30382e1aff92bca76c51c5e3962cff37571937bf1ad783f7eff0f"
+    },
+    {
+      "file": "ITTT_students_S2_S4.csv",
+      "department_code": "ITTT",
+      "department_id": "77eacd1e-1577-4e39-84f2-d8e45da4f095",
+      "upload_as": "hod.ittt.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "258ccb4871a6f9f4cd2dc4a6ba0ec8e4933acdb85341d55f90cdd5ce1114c7ea"
+    },
+    {
+      "file": "MATTT_students_S2_S4.csv",
+      "department_code": "MATTT",
+      "department_id": "a3dd0c91-e402-40aa-84df-ef4ad9906964",
+      "upload_as": "hod.mattt.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "19f912bcd7f6fdb5671942e08194ef0a07e8d71f5896b9497b3b34bccb79a33c"
+    },
+    {
+      "file": "PESTT_students_S2_S4.csv",
+      "department_code": "PESTT",
+      "department_id": "57b1e81f-6b20-4900-87fb-82d49cd4a6ec",
+      "upload_as": "hod.pestt.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "4d139487ffa0bb6b8a6deaddb4b4c7855e792cf21ae854d78deb91dd21cb50a3"
+    },
+    {
+      "file": "SBSTT_students_S2_S4.csv",
+      "department_code": "SBSTT",
+      "department_id": "9d3e0366-5b7c-4fc4-8f7e-680967378927",
+      "upload_as": "hod.sbstt.mangattt.20261018@example.test",
+      "rows": 20,
+      "semester_2_rows": 10,
+      "semester_4_rows": 10,
+      "sha256": "a0dc3dad64318230bfb74b01fb189d47181ae2a5048f56c4a708a81ef3f8c22b"
+    }
+  ],
+  "independent_python_csv_validation": "PASS",
+  "exact_frontend_header_contract_matched": true,
+  "all_rows_have_five_fields": true,
+  "admission_year_and_semester_pairs_valid": true,
+  "all_six_previews_visually_checked": true,
+  "live_collision_check": {
+    "checked_at": "2026-10-18T07:07:00.937Z",
+    "existing_matching_auth_emails": 0,
+    "existing_matching_cap_numbers": 0,
+    "test_campus_student_count": 0
+  },
+  "upload_verified_at": "2026-10-18T07:58:59.802973+00:00",
+  "live_upload_verification_report": "../STUDENT_UPLOAD_VERIFICATION.json"
+}

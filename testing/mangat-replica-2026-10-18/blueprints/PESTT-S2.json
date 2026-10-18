@@ -1,0 +1,69 @@
+{
+  "id": "bc48e547-afcd-4ac7-9397-99cb5a5502e6",
+  "pathways": [
+    {
+      "id": "tt-pes-s2-1",
+      "name": "Default",
+      "slots": [
+        {
+          "name": "MAJOR 1",
+          "rule": "FIXED",
+          "slot": 1,
+          "target": "KU02DSCPES102TT"
+        },
+        {
+          "name": "MAJOR 2",
+          "rule": "FIXED",
+          "slot": 2,
+          "target": "KU02DSCPES103TT"
+        },
+        {
+          "name": "MINOR 1",
+          "rule": "EXCLUDE_DEPT",
+          "slot": 3,
+          "target": "PESTT"
+        },
+        {
+          "name": "MINOR 2",
+          "rule": "EXCLUDE_DEPT",
+          "slot": 4,
+          "target": "PESTT"
+        },
+        {
+          "name": "MDC",
+          "rule": "GLOBAL_BASKET",
+          "slot": 5,
+          "target": "MDC"
+        },
+        {
+          "name": "AEC",
+          "rule": "GLOBAL_BASKET",
+          "slot": 6,
+          "target": "AEC"
+        }
+      ]
+    }
+  ],
+  "semester": 2,
+  "max_credits": 22,
+  "min_credits": 20,
+  "slot_1_name": "MAJOR 1",
+  "slot_1_rule": "FIXED",
+  "slot_2_name": "MAJOR 2",
+  "slot_2_rule": "FIXED",
+  "slot_3_name": "MINOR 1",
+  "slot_3_rule": "EXCLUDE_DEPT",
+  "slot_4_name": "MINOR 2",
+  "slot_4_rule": "EXCLUDE_DEPT",
+  "slot_5_name": "MDC",
+  "slot_5_rule": "GLOBAL_BASKET",
+  "slot_6_name": "AEC",
+  "slot_6_rule": "GLOBAL_BASKET",
+  "department_id": "57b1e81f-6b20-4900-87fb-82d49cd4a6ec",
+  "slot_1_target": "KU02DSCPES102TT",
+  "slot_2_target": "KU02DSCPES103TT",
+  "slot_3_target": "PESTT",
+  "slot_4_target": "PESTT",
+  "slot_5_target": "MDC",
+  "slot_6_target": "AEC"
+}

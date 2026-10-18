@@ -24,9 +24,7 @@ const CreateTeacherSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
-const COURSE_CATEGORIES = [
-  'DSS', 'DSC', 'DSE', 'VAC', 'SEC', 'MDC', 'MOOC', 'AEC', 'INT', 'FWD', 'RPH', 'CIP'
-] as const
+import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
 
 const CreateCourseSchema = z.object({
   course_code: z.string().min(1, 'Course code is required').max(30),
@@ -35,10 +33,9 @@ const CreateCourseSchema = z.object({
   credits: z.coerce.number().int().min(1).max(10),
   theory_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   practical_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
-  category: z.enum(COURSE_CATEGORIES, {
+  category: z.enum(HOD_COURSE_CATEGORIES, {
     errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
-  tag: z.string().nullable().optional(),
   seat_limit: z.coerce.number().int().min(1).max(500).optional().default(60),
   prerequisite_course_ids: z.array(z.string()).optional().default([]),
   department_id: z.string().uuid().optional(),
@@ -51,10 +48,9 @@ const UpdateCourseSchema = z.object({
   credits: z.coerce.number().int().min(1).max(10),
   theory_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   practical_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
-  category: z.enum(COURSE_CATEGORIES, {
+  category: z.enum(HOD_COURSE_CATEGORIES, {
     errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
-  tag: z.string().nullable().optional(),
   seat_limit: z.coerce.number().int().min(1).max(500).optional(),
   prerequisite_course_ids: z.array(z.string()).optional(),
   department_id: z.string().uuid().optional(),
@@ -88,7 +84,16 @@ const BlueprintSchema = z.object({
   semester: z.coerce.number().int().min(1).max(10),
   min_credits: z.coerce.number().int().min(0).max(50),
   max_credits: z.coerce.number().int().min(0).max(50),
-  pathways: z.array(z.any()).optional().default([]),
+  pathways: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1),
+    slots: z.array(z.object({
+      rule: z.string().min(1),
+      target: z.string().nullable().optional(),
+      name: z.string().optional(),
+      slot: z.number().int().min(1).max(8).optional(),
+    })).min(1).max(8),
+  })).optional().default([]),
 })
 
 @Controller('api/hod')
@@ -136,10 +141,12 @@ export class HodController {
     @Query('own') own: string | undefined,
     @Query('max_semester') maxSemester: string | undefined,
     @CurrentUser() user: AuthUser,
+    @Query('scope') scope?: string,
   ) {
+    if (scope && scope !== 'global') throw new BadRequestException('Unsupported catalogue scope')
     const sem = semester ? Number(semester) : 1
     const maxSem = maxSemester ? Number(maxSemester) : undefined
-    return this.hodService.getCourses(isNaN(sem) ? 1 : sem, user, own === 'true', maxSem)
+    return this.hodService.getCourses(isNaN(sem) ? 1 : sem, user, own === 'true', maxSem, scope === 'global')
   }
 
   @Post('courses')

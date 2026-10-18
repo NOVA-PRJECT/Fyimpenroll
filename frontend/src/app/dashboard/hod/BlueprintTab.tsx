@@ -5,6 +5,7 @@ import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 import { BookOpen as UiBookOpen, Check as UiCheck, Info as UiInfo, Pencil as UiPencil, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
 
 import { useState, useEffect, useEffectEvent } from 'react'
+import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
 import { GripVertical, ChevronDown } from 'lucide-react'
 import styles from './hod-dashboard.module.css'
 
@@ -14,8 +15,8 @@ const RULES = [
   { value: 'AEC_ELECT', label: 'AEC ELECT — AEC course from all campuses' },
   { value: 'DEPT_RESTRICTED', label: 'DEPT_RESTRICTED — From specific dept (DSC/DSE)' },
   { value: 'EXCLUDE_DEPT', label: 'EXCLUDE_DEPT — Exclude specific dept (DSC/DSE)' },
-  { value: 'POOL_RESTRICTED', label: 'POOL_RESTRICTED — Own dept pool by tag' },
-  { value: 'GLOBAL_BASKET', label: 'GLOBAL_BASKET — Other depts pool by tag' },
+  { value: 'POOL_RESTRICTED', label: 'POOL_RESTRICTED — Own department DSE courses' },
+  { value: 'GLOBAL_BASKET', label: 'GLOBAL_BASKET — Courses by category across campuses' },
 ]
 
 interface SlotData {
@@ -30,7 +31,7 @@ interface PathwayData {
   slots: SlotData[]
 }
 
-interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; prerequisite_course_ids?: string[]; id: string; course_code: string; title: string; credits: number; category: string; tag: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
+interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; prerequisite_course_ids?: string[]; id: string; course_code: string; title: string; credits: number; category: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
 export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint' | 'courses' }) {
   const [semester, setSemester] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -68,7 +69,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
   const [courseTheoryHours, setCourseTheoryHours] = useState<number | '' | null>(null)
   const [coursePracticalHours, setCoursePracticalHours] = useState<number | '' | null>(null)
   const [courseCategory, setCourseCategory] = useState<string | null>(null)
-  const [courseTag, setCourseTag] = useState('')
   const [courseSeatLimit, setCourseSeatLimit] = useState<number | ''>(60)
   const [coursePrereqs, setCoursePrereqs] = useState<string[]>([])
 
@@ -145,8 +145,19 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     return JSON.stringify(cleanPws(pathways)) !== JSON.stringify(cleanPws(initialSnapshot.pathways))
   })()
 
+  function getBasketCourses(slot: SlotData, pathway?: PathwayData) {
+    const fixedTargets = new Set((pathway?.slots || [])
+      .filter(item => ['FIXED', 'AEC_ELECT', 'CAMPUS_FIXED'].includes(item.rule))
+      .map(item => item.target))
+    return courses.filter(course => course.semester === semester && !fixedTargets.has(course.course_code) && (
+      slot.rule === 'POOL_RESTRICTED'
+        ? course.category === 'DSE' && course.is_own_dept === true
+        : course.category === slot.target && (slot.target !== 'MDC' || course.is_own_dept === false)
+    ))
+  }
+
   // Helper to determine credit ranges for each slot
-  function getSlotCreditRange(slot: SlotData): { min: number; max: number } {
+  function getSlotCreditRange(slot: SlotData, pathway: PathwayData): { min: number; max: number } {
     if (!slot.rule) return { min: 0, max: 0 }
 
     if (slot.rule === 'FIXED' || slot.rule === 'AEC_ELECT' || slot.rule === 'CAMPUS_FIXED') {
@@ -158,9 +169,9 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     // Check if we have any matching courses in our department as a proxy
     let matchingCourses: CatalogueCourse[] = []
     if (slot.rule === 'POOL_RESTRICTED') {
-      matchingCourses = courses.filter(c => c.tag === slot.target)
+      matchingCourses = getBasketCourses(slot, pathway)
     } else if (slot.rule === 'GLOBAL_BASKET') {
-      matchingCourses = courses.filter(c => c.tag === slot.target)
+      matchingCourses = getBasketCourses(slot, pathway)
     } else if (slot.rule === 'DEPT_RESTRICTED' || slot.rule === 'EXCLUDE_DEPT') {
       matchingCourses = courses.filter(c => ['DSC', 'DSE'].includes(c.category))
     }
@@ -170,14 +181,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       return { min: Math.min(...credits), max: Math.max(...credits) }
     }
 
-    // Fallbacks based on standard NEP/FYIMP regulations
-    if (slot.rule === 'GLOBAL_BASKET') {
-      const tag = (slot.target ?? '').toUpperCase()
-      if (tag.includes('MDC')) return { min: 3, max: 3 }
-      if (tag.includes('VAC')) return { min: 2, max: 2 }
-      if (tag.includes('SEC')) return { min: 2, max: 2 }
-      if (tag.includes('AEC')) return { min: 3, max: 3 }
-    }
+    if (slot.rule === 'GLOBAL_BASKET' || slot.rule === 'POOL_RESTRICTED') return { min: 0, max: 0 }
 
     return { min: 4, max: 4 }
   }
@@ -187,7 +191,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     let totalMin = 0
     let totalMax = 0
     pw.slots.forEach(s => {
-      const { min, max } = getSlotCreditRange(s)
+      const { min, max } = getSlotCreditRange(s, pw)
       totalMin += min
       totalMax += max
     })
@@ -310,7 +314,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
             name: p.name,
             slots: (p.slots || []).map((s: SlotData) => ({
               rule: s.rule ?? '',
-              target: s.target ?? '',
+              target: s.rule === 'POOL_RESTRICTED' ? 'POOLED' : s.target ?? '',
               name: s.name ?? '',
             }))
           }))
@@ -319,7 +323,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
           const flatSlots: SlotData[] = []
           for (let i = 1; i <= 8; i++) {
             const rule = data[`slot_${i}_rule`] ?? ''
-            const target = data[`slot_${i}_target`] ?? ''
+            const target = rule === 'POOL_RESTRICTED' ? 'POOLED' : data[`slot_${i}_target`] ?? ''
             const name = data[`slot_${i}_name`] ?? ''
             if (rule) {
               flatSlots.push({ rule, target, name })
@@ -365,7 +369,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     try {
       const url = view === 'courses'
         ? `/api/hod/courses?semester=${sem}&own=true`
-        : `/api/hod/courses?semester=${sem}`
+        : `/api/hod/courses?semester=${sem}&scope=global`
       const res = await fetch(url)
       const data = await res.json().catch(() => [])
       if (res.ok && Array.isArray(data)) setCourses(data)
@@ -454,6 +458,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
         return
       }
       for (const s of validSlots) {
+        if (s.rule === 'GLOBAL_BASKET' && !(HOD_COURSE_CATEGORIES as readonly string[]).includes(s.target)) {
+          setError(`Select a category for ${s.name || 'the global basket'}`)
+          return
+        }
         if (!s.target.trim()) {
           setError(`All slots in pathway "${pw.name}" must have a target`)
           return
@@ -666,12 +674,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
     if (courseCredits === null || courseCredits === '') { setError('Credits are required'); return }
     if (!courseCategory) { setError('Category is required'); return }
 
-    const needTag = ['MDC', 'VAC', 'SEC', 'AEC'].includes(courseCategory)
-    if (needTag && !courseTag.trim()) {
-      setError(`Tag is required for category ${courseCategory}`)
-      return
-    }
-
     setSavingCourse(true)
     setError('')
 
@@ -686,7 +688,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       theory_hours_per_week: finalTheory,
       practical_hours_per_week: finalPractical,
       category: courseCategory,
-      tag: courseTag.trim(),
       seat_limit: courseSeatLimit !== '' ? Number(courseSeatLimit) : 60,
       prerequisite_course_ids: coursePrereqs,
     }
@@ -723,7 +724,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
       setTimeout(() => setSuccess(''), 1000)
       setShowAddCourse(false)
       setEditCourse(null)
-      setCourseCode(''); setCourseTitle(''); setCourseCredits(null); setCourseTheoryHours(null); setCoursePracticalHours(null); setCourseCategory(null); setCourseTag('')
+      setCourseCode(''); setCourseTitle(''); setCourseCredits(null); setCourseTheoryHours(null); setCoursePracticalHours(null); setCourseCategory(null)
       setCourseSeatLimit(60); setCoursePrereqs([]); setCourseRules([]); setNewRuleTarget('')
       setNewRuleType('DEPARTMENT'); setPriorCourseOpen(false); setPriorCourseSearch(''); setPriorCourseSemesterFilter(null)
       fetchCourses()
@@ -842,7 +843,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                 const newRule = e.target.value
                 let newTarget = ''
                 if (newRule === 'POOL_RESTRICTED') {
-                  newTarget = 'POOL-'
+                  newTarget = 'POOLED'
                 }
                 updateSlot(pathwayIdx, slotIdx, 'rule', newRule)
                 updateSlot(pathwayIdx, slotIdx, 'target', newTarget)
@@ -857,7 +858,7 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
               <label className={styles.label}>
                 Target {(slot.rule === 'FIXED' || slot.rule === 'AEC_ELECT' || slot.rule === 'CAMPUS_FIXED') ? '(Course Code)' :
                   slot.rule === 'DEPT_RESTRICTED' || slot.rule === 'EXCLUDE_DEPT' ? '(Departments)' :
-                    '(Tag e.g. POOL-A, MDC-1)'}
+                    slot.rule === 'GLOBAL_BASKET' ? '(Category)' : '(Automatic)'}
               </label>
               {slot.rule === 'DEPT_RESTRICTED' || slot.rule === 'EXCLUDE_DEPT' ? (
                 <div className={styles.checkboxGroup} style={{
@@ -1006,19 +1007,25 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                     </div>
                   )}
                 </div>
+              ) : slot.rule === 'GLOBAL_BASKET' ? (
+                <select className={styles.input} value={slot.target}
+                  onChange={e => updateSlot(pathwayIdx, slotIdx, 'target', e.target.value)}>
+                  <option value="">— Select Category —</option>
+                  {slot.target && !(HOD_COURSE_CATEGORIES as readonly string[]).includes(slot.target) && (
+                    <option value={slot.target} disabled>Choose a category (previous target: {slot.target})</option>
+                  )}
+                  {HOD_COURSE_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                </select>
               ) : (
-                <input type="text" className={styles.input}
-                  placeholder="e.g. POOL-A or MDC-1"
-                  value={slot.target}
-                  onChange={e => {
-                    let val = e.target.value
-                    if (slot.rule === 'POOL_RESTRICTED') {
-                      if (!val.startsWith('POOL-')) {
-                        val = 'POOL-'
-                      }
-                    }
-                    updateSlot(pathwayIdx, slotIdx, 'target', val)
-                  }} />
+                <>
+                  <input className={styles.input} value="POOLED" readOnly />
+                  <small>DSE courses from the student’s department and semester.</small>
+                </>
+              )}
+              {(slot.rule === 'GLOBAL_BASKET' || slot.rule === 'POOL_RESTRICTED') && slot.target && !loadingCourses && getBasketCourses(slot, pathways[pathwayIdx]).length === 0 && (
+                <p role="status" style={{ color: 'var(--portal-danger-text,#dc2626)', fontSize: '0.75rem' }}>
+                  No matching courses for this pool in Semester {semester}. Add courses or choose another category.
+                </p>
               )}
             </div>
           )}
@@ -1344,7 +1351,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                   setCourseTheoryHours(null)
                   setCoursePracticalHours(null)
                   setCourseCategory(null)
-                  setCourseTag('')
                   setCourseSeatLimit(60)
                   setCoursePrereqs([])
                   setCourseRules([])
@@ -1376,7 +1382,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                         <th>Theory Hrs</th>
                         <th>Practical Hrs</th>
                         <th>Cat</th>
-                        <th>Tag</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -1390,7 +1395,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                           <td>{course.theory_hours_per_week ?? course.credits}</td>
                           <td>{course.practical_hours_per_week ?? 0}</td>
                           <td><span className={styles.codeBadge}>{course.category}</span></td>
-                          <td style={{ fontSize: '0.68rem', color: "var(--portal-subtle,#9ba1ab)" }}>{course.tag ?? '—'}</td>
                           <td>
                             <div className={styles.actionBtns}>
                               <button
@@ -1405,7 +1409,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                                   setCourseTheoryHours(course.theory_hours_per_week ?? course.credits)
                                   setCoursePracticalHours(course.practical_hours_per_week ?? 0)
                                   setCourseCategory(course.category)
-                                  setCourseTag(course.tag ?? '')
                                   setCourseSeatLimit(course.seat_limit ?? 60)
                                   setCoursePrereqs(course.prerequisite_course_ids ?? [])
                                   loadCourseRules(course.id)
@@ -1458,7 +1461,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                       setCourseTheoryHours(null)
                       setCoursePracticalHours(null)
                       setCourseCategory(null)
-                      setCourseTag('')
                       setCourseSeatLimit(60)
                       setCoursePrereqs([])
                       setCourseRules([])
@@ -1546,20 +1548,10 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                             onChange={e => setCourseCategory(e.target.value || null)}
                           >
                             <option value="">— Select Category —</option>
-                            {['DSS', 'DSC', 'DSE', 'VAC', 'SEC', 'MDC', 'MOOC', 'AEC', 'INT', 'FWD', 'RPH', 'CIP'].map(c => (
+                            {HOD_COURSE_CATEGORIES.map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </select>
-                        </div>
-                        <div className={styles.field}>
-                          <label className={styles.label}>Tag (optional)</label>
-                          <input
-                            type="text"
-                            className={styles.input}
-                            placeholder="e.g. POOL-A or MDC-1"
-                            value={courseTag}
-                            onChange={e => setCourseTag(e.target.value.toUpperCase())}
-                          />
                         </div>
                       </div>
 
@@ -2098,7 +2090,6 @@ export default function BlueprintTab({ view = 'blueprint' }: { view?: 'blueprint
                       setCourseTheoryHours(null)
                       setCoursePracticalHours(null)
                       setCourseCategory(null)
-                      setCourseTag('')
                       setCourseSeatLimit(60)
                       setCoursePrereqs([])
                       setCourseRules([])

@@ -13,7 +13,7 @@ import { AuthUser } from '../../core/auth/types'
 import { fetchAllPaginated } from '../../core/database/pagination.util'
 import { ExportService } from '../credit-ledger/export.service'
 import { SEMESTERS } from '../../core/constants/semesters'
-import { validatePathwaySlots } from '../../core/utils/slotRules'
+import { normalizeSlotTarget, validatePathwaySlots } from '../../core/utils/slotRules'
 
 function generatePathwayId(name: string): string {
   const slug = name
@@ -203,6 +203,7 @@ export class HodService {
       slots: (p.slots || []).map((s: any, idx: number) => ({
         ...s,
         slot: s.slot ?? idx + 1,
+        target: normalizeSlotTarget(s.rule, s.target),
       })),
     }))
 
@@ -255,7 +256,7 @@ export class HodService {
   }
 
   // ──────────────── Courses ────────────────
-  async getCourses(semester: number, user: AuthUser, ownOnly?: boolean, maxSemester?: number) {
+  async getCourses(semester: number, user: AuthUser, ownOnly?: boolean, maxSemester?: number, globalScope = false) {
     if (ownOnly) {
       let query = this.supabase.admin
         .from('courses')
@@ -290,7 +291,8 @@ export class HodService {
     let query = this.supabase.admin
       .from('courses')
       .select('*, departments(name, code, campus_id)')
-      .or(`department_id.in.(${campusDeptIds.join(',')}),category.eq.AEC`)
+
+    if (!globalScope) query = query.or(`department_id.in.(${campusDeptIds.join(',')}),category.eq.AEC`)
 
     if (maxSemester !== undefined && !isNaN(maxSemester) && maxSemester > 0) {
       query = query.lt('semester', maxSemester)
@@ -298,8 +300,7 @@ export class HodService {
       query = query.eq('semester', semester)
     }
 
-    const { data, error } = await query.order('semester').order('category')
-    if (error) throw new InternalServerErrorException('Failed to fetch courses')
+    const data = await fetchAllPaginated<any>(query.order('semester').order('category').order('id'))
 
     return (data ?? []).map((c: any) => ({
       ...c,
@@ -319,7 +320,6 @@ export class HodService {
       theory_hours_per_week,
       practical_hours_per_week,
       category,
-      tag,
       seat_limit,
       prerequisite_course_ids,
     } = body
@@ -344,7 +344,6 @@ export class HodService {
         theory_hours_per_week: theory_hours_per_week ?? 0,
         practical_hours_per_week: practical_hours_per_week ?? 0,
         category,
-        tag: tag || null,
         department_id: targetDeptId,
         seat_limit: seat_limit ? Number(seat_limit) : 60,
         prerequisite_course_ids: Array.isArray(prerequisite_course_ids) ? prerequisite_course_ids : [],
@@ -390,7 +389,6 @@ export class HodService {
       theory_hours_per_week,
       practical_hours_per_week,
       category,
-      tag,
       seat_limit,
       prerequisite_course_ids,
     } = body
@@ -402,7 +400,6 @@ export class HodService {
       theory_hours_per_week: theory_hours_per_week ?? 0,
       practical_hours_per_week: practical_hours_per_week ?? 0,
       category,
-      tag: tag || null,
     }
 
     if (seat_limit !== undefined) {

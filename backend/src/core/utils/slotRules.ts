@@ -1,4 +1,37 @@
-import { SLOT_RULES } from '@/core/constants/courseCategories'
+import { SLOT_RULES } from '../constants/courseCategories'
+import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
+import type { Pathway } from '../types/course.types'
+
+export function getBlueprintPathways(blueprint: Record<string, any> | null | undefined): Pathway[] {
+  if (!blueprint) return []
+  if (Array.isArray(blueprint.pathways) && blueprint.pathways.length) return blueprint.pathways
+  const slots = Array.from({ length: 8 }, (_, i) => ({
+    rule: blueprint[`slot_${i + 1}_rule`] || '',
+    target: blueprint[`slot_${i + 1}_target`] || '',
+    name: blueprint[`slot_${i + 1}_name`] || `Paper ${i + 1}`,
+  }))
+  while (slots.length && !slots[slots.length - 1].rule) slots.pop()
+  return slots.length ? [{ id: 'legacy-default', name: 'Default', slots }] : []
+}
+
+export function isBasketCategory(target: string): boolean {
+  return (HOD_COURSE_CATEGORIES as readonly string[]).includes(target)
+}
+
+export function normalizeSlotTarget(rule: string, target?: string | null): string {
+  if (rule === SLOT_RULES.POOL_RESTRICTED) return 'POOLED'
+  if (rule === SLOT_RULES.GLOBAL_BASKET) return (target || '').trim().toUpperCase()
+  return (target || '').trim()
+}
+
+/** Resolve a configured slot first, including slots 7/8. Only absent minor slots get the legacy rule. */
+export function getStudentSlotDefinition(pathway: { slots?: any[] } | undefined, slot: number, departmentId: string) {
+  if (!pathway || !Array.isArray(pathway.slots) || slot < 1 || slot > 8) return undefined
+  const configured = pathway.slots[slot - 1]
+  if (configured?.rule) return configured
+  if (slot >= 7) return { rule: 'LEGACY_MINOR', target: departmentId, name: `Paper ${slot} (Minor Elective)` }
+  return undefined
+}
 
 export function normalizeCourseCode(code: string | null | undefined): string {
   if (!code) return ''
@@ -13,14 +46,19 @@ export function isCourseEligibleForSlot(
     course_code: string
     department_id: string
     category: string
-    tag: string | null
+    semester: number
   },
   rule: string,
   target: string,
   studentDepartmentId: string,
   deptMap: Map<string, string>,
+  studentSemester: number,
   slotName?: string
 ): boolean {
+  if (!Number.isInteger(studentSemester) || course.semester !== studentSemester) return false
+  if (rule === 'LEGACY_MINOR') {
+    return course.department_id !== studentDepartmentId && ['DSC', 'DSE', 'DSS', 'MDC'].includes(course.category)
+  }
   if (
     rule === SLOT_RULES.FIXED ||
     rule === SLOT_RULES.AEC_ELECT ||
@@ -57,16 +95,14 @@ export function isCourseEligibleForSlot(
   }
 
   if (rule === SLOT_RULES.POOL_RESTRICTED) {
-    return course.department_id === studentDepartmentId && (course.tag?.trim() === target.trim())
+    return course.department_id === studentDepartmentId && course.category === 'DSE'
   }
 
   if (rule === SLOT_RULES.GLOBAL_BASKET) {
     const trimmedTarget = (target || '').trim().toUpperCase()
-    const tagMatches = (course.tag || '').trim().toUpperCase() === trimmedTarget
-    const codeMatches = normalizeCourseCode(course.course_code) === normalizeCourseCode(trimmedTarget)
-    if (!tagMatches && !codeMatches) return false
+    if (!isBasketCategory(trimmedTarget) || course.category !== trimmedTarget) return false
 
-    if (trimmedTarget.includes('MDC') && course.department_id === studentDepartmentId) {
+    if (trimmedTarget === 'MDC' && course.department_id === studentDepartmentId) {
       return false
     }
     return true
@@ -125,6 +161,13 @@ export function validatePathwaySlots(
     if (!s.rule) {
       errors.push(`Slot ${idx + 1} is missing a rule configuration`)
       return
+    }
+
+    if (s.rule === SLOT_RULES.GLOBAL_BASKET && !isBasketCategory((s.target || '').trim().toUpperCase())) {
+      errors.push(`Slot ${idx + 1} (GLOBAL_BASKET) requires a supported course category`)
+    }
+    if (s.rule === SLOT_RULES.POOL_RESTRICTED && s.target !== 'POOLED') {
+      errors.push(`Slot ${idx + 1} (POOL_RESTRICTED) requires target POOLED`)
     }
 
     const isFixed =

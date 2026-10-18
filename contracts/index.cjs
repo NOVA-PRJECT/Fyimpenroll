@@ -1,6 +1,9 @@
 const ROLES = Object.freeze({ SUPER_ADMIN: 'superadmin', CAMPUS_DIRECTOR: 'campus_director', HOD: 'hod',
   TEACHING_STAFF: 'teaching_staff', TEACHER: 'teacher', STUDENT: 'student' })
 module.exports = { ROLES, ROLE_VALUES: Object.freeze(Object.values(ROLES)), ENROLLMENT_SLOT_COUNT: 8 }
+module.exports.HOD_COURSE_CATEGORIES = Object.freeze([
+  'DSS', 'DSC', 'DSE', 'VAC', 'SEC', 'MDC', 'MOOC', 'AEC', 'INT', 'FWD', 'RPH', 'CIP',
+])
 module.exports.campusSessionLabel = session => {
   if (!session) return 'Unavailable'
   if (session.state === 'completed') return ({ on_time: 'On time', late: 'Late', early_leave: 'Early leave' })[session.status] || 'Recorded'

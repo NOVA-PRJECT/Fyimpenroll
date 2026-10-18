@@ -1,3 +1,4 @@
+import { fetchAllPaginated } from '../../core/database/pagination.util'
 import {
   BadRequestException,
   ConflictException,
@@ -15,6 +16,8 @@ import { SLOT_RULES } from '../../core/constants/courseCategories'
 import { Pathway, PathwaySlot } from '../../core/types/course.types'
 import {
   isCourseEligibleForSlot,
+  getStudentSlotDefinition,
+  getBlueprintPathways,
   normalizeCourseCode,
   validatePathwaySlots,
   evaluateCoursePrerequisites,
@@ -73,7 +76,7 @@ export class RegistrationsService {
     if (fixedTargets.length > 0) {
       const { data: fixedCourses } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, department_id, semester, credits, category, tag')
+        .select('id, course_code, title, department_id, semester, credits, category')
         .in('course_code', fixedTargets)
 
       if (fixedCourses) {
@@ -109,7 +112,7 @@ export class RegistrationsService {
 
         let query = this.supabase.admin
           .from('courses')
-          .select('id, course_code, title, department_id, semester, credits, category, tag, seat_limit, prerequisite_course_ids')
+          .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisite_course_ids')
 
         if (fixedCourseIds.length > 0) {
           query = query.not('id', 'in', `(${fixedCourseIds.join(',')})`)
@@ -127,7 +130,7 @@ export class RegistrationsService {
             .in('category', ['DSC', 'DSE', 'DSS'])
 
           const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, name),
+            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
           )
           const mapped = filtered.map((c) => ({
             ...c,
@@ -158,7 +161,7 @@ export class RegistrationsService {
           const { data: options } = await queryEx
 
           const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, name),
+            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
           )
           const mapped = filtered.map((c) => ({
             ...c,
@@ -167,15 +170,15 @@ export class RegistrationsService {
           return { slot, rule, name, options: mapped }
         }
 
-        // POOL_RESTRICTED — own department by tag
+        // POOL_RESTRICTED — own department DSE courses
         if (rule === SLOT_RULES.POOL_RESTRICTED) {
-          const { data: options } = await query
+          const options = await fetchAllPaginated<any>(query
             .eq('department_id', user.department_id)
-            .eq('tag', target?.trim())
-            .eq('semester', user.current_semester)
+            .eq('category', 'DSE')
+            .eq('semester', user.current_semester).order('id'))
 
           const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, name),
+            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
           )
           const mapped = filtered.map((c) => ({
             ...c,
@@ -184,23 +187,15 @@ export class RegistrationsService {
           return { slot, rule, name, options: mapped }
         }
 
-        // GLOBAL_BASKET — other departments by tag
+        // GLOBAL_BASKET — category across all campuses, in the student's semester
         if (rule === SLOT_RULES.GLOBAL_BASKET) {
-          const trimmedTarget = ((target as string) ?? '').trim()
-          let q = query.eq('semester', user.current_semester)
+          const category = (target || '').trim().toUpperCase()
+          let q = query.eq('semester', user.current_semester).eq('category', category)
+          if (category === 'MDC') q = q.neq('department_id', user.department_id)
+          const options = await fetchAllPaginated<any>(q.order('id'))
 
-          if (trimmedTarget.includes('-')) {
-            q = q.eq('tag', trimmedTarget)
-          } else {
-            q = q.or(`tag.eq.${trimmedTarget},course_code.eq.${trimmedTarget}`)
-          }
-
-          if (trimmedTarget.toUpperCase().includes('MDC')) {
-            q = q.neq('department_id', user.department_id)
-          }
-          const { data: options } = await q
           const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, name),
+            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
           )
           const mapped = filtered.map((c) => ({
             ...c,
@@ -284,7 +279,7 @@ export class RegistrationsService {
     const deadline = settings.deadline ? new Date(settings.deadline) : null
     const windowOpen = deadline !== null && new Date() < deadline
 
-    const pathways = (blueprint.pathways as Pathway[]) || []
+    const pathways = getBlueprintPathways(blueprint)
     if (pathways.length === 0) {
       throw new BadRequestException('Blueprint has no pathways configured')
     }
@@ -363,7 +358,7 @@ export class RegistrationsService {
     // Fetch candidate minor courses for student (courses from other departments in same semester)
     const { data: minorCoursesRaw } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, department_id, semester, credits, category, tag')
+      .select('id, course_code, title, department_id, semester, credits, category')
       .eq('semester', semester)
       .neq('department_id', departmentId)
       .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
@@ -539,8 +534,8 @@ export class RegistrationsService {
       slotChangesNextReset,
       submittedAt: submittedAt,
       student: {
-        full_name: user.full_name || '',
-        current_semester: user.current_semester ?? 1,
+        full_name: studentRecord?.full_name || user.full_name || '',
+        current_semester: semester,
       },
       existingSlots: existingReg
         ? {
@@ -585,7 +580,7 @@ export class RegistrationsService {
 
     if (bpErr || !blueprint) throw new NotFoundException('Blueprint not found for this semester')
 
-    const pathways = blueprint.pathways as Pathway[] | null
+    const pathways = getBlueprintPathways(blueprint)
     const pathway = pathways?.find((p) => p.id === pathwayId)
     if (!pathway) throw new NotFoundException('Pathway not found')
 
@@ -606,7 +601,13 @@ export class RegistrationsService {
     }
     const deptIdToName = new Map<string, string>((departmentsData ?? []).map((d: any) => [d.id, d.name]))
 
-    const slots = await this.resolvePathwaySlots(pathway, user, deptMap, deptIdToName)
+    const effectiveUser: AuthUser = {
+      ...user,
+      campus_id: studentRecord?.campus_id || user.campus_id,
+      department_id: departmentId,
+      current_semester: semester,
+    }
+    const slots = await this.resolvePathwaySlots(pathway, effectiveUser, deptMap, deptIdToName)
 
     return {
       success: true,
@@ -709,7 +710,7 @@ export class RegistrationsService {
       )
     }
 
-    const pathways = (blueprint.pathways as Pathway[]) || []
+    const pathways = getBlueprintPathways(blueprint)
     const pathway = pathways.find((p) => p.id === pathway_id)
     if (!pathway) throw new BadRequestException('Invalid pathway selected')
 
@@ -871,7 +872,7 @@ export class RegistrationsService {
     }
 
     // Optional Slot 7 (Paper 7 - Additional Minor Elective)
-    if (preferences && preferences['slot_7'] && preferences['slot_7'].length > 0) {
+    if (!pathway.slots[6]?.rule && preferences && preferences['slot_7'] && preferences['slot_7'].length > 0) {
       if (preferences['slot_7'].length > 3) {
         throw new BadRequestException('Maximum 3 preferences allowed for slot_7')
       }
@@ -885,7 +886,7 @@ export class RegistrationsService {
     }
 
     // Optional Slot 8 (Paper 8 - Additional Minor Elective)
-    if (preferences && preferences['slot_8'] && preferences['slot_8'].length > 0) {
+    if (!pathway.slots[7]?.rule && preferences && preferences['slot_8'] && preferences['slot_8'].length > 0) {
       if (preferences['slot_8'].length > 3) {
         throw new BadRequestException('Maximum 3 preferences allowed for slot_8')
       }
@@ -909,7 +910,7 @@ export class RegistrationsService {
     if (allElectiveCourseIds.size > 0) {
       const { data: electiveCourses, error: elecErr } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, semester, category, tag, prerequisite_course_ids')
+        .select('id, course_code, title, credits, department_id, semester, category, prerequisite_course_ids')
         .in('id', Array.from(allElectiveCourseIds))
 
       if (elecErr || !electiveCourses) {
@@ -964,51 +965,13 @@ export class RegistrationsService {
       // Validate each elective choice against slot eligibility rules & prerequisites (F14, F19)
       for (const sItem of unifiedPreferences) {
         if (sItem.is_fixed) continue
-        const slotDef =
-          sItem.slot <= pathway.slots.length
-            ? pathway.slots[sItem.slot - 1]
-            : {
-                rule: SLOT_RULES.EXCLUDE_DEPT,
-                target: departmentId ?? '',
-                name: sItem.name || `Paper ${sItem.slot} (Minor Elective)`,
-              }
-
-        if (!slotDef) continue
-
+        const slotDef = getStudentSlotDefinition(pathway, sItem.slot, departmentId ?? '')
+        if (!slotDef) throw new BadRequestException('The selected pathway does not define this slot')
         for (const choice of sItem.choices) {
           const course = courseMap.get(choice.course_id)
-          if (!course) {
-            throw new BadRequestException(`Course ID ${choice.course_id} is invalid or does not exist`)
-          }
-
-          if (sItem.slot > 6) {
-            // Minor Rule for Paper 7 and Paper 8:
-            // Exclude student's own department; course must match current semester
-            if (course.department_id === departmentId) {
-              throw new BadRequestException(
-                `Course ${course.course_code} - ${course.title} is not eligible for Slot ${sItem.slot}. Minor papers cannot be from your own department.`,
-              )
-            }
-            if (course.semester !== currentSemester) {
-              throw new BadRequestException(
-                `Course ${course.course_code} - ${course.title} is for Semester ${course.semester}, but you are registering for Semester ${currentSemester}.`,
-              )
-            }
-          } else {
-            const isEligible = isCourseEligibleForSlot(
-              course,
-              slotDef.rule,
-              slotDef.target || '',
-              departmentId ?? '',
-              deptMap,
-              slotDef.name || sItem.name,
-            )
-
-            if (!isEligible) {
-              throw new BadRequestException(
-                `Course ${course.course_code} - ${course.title} is not eligible for Slot ${sItem.slot} (${slotDef.name || slotDef.rule})`,
-              )
-            }
+          if (!course) throw new BadRequestException(`Course ID ${choice.course_id} is invalid or does not exist`)
+          if (!isCourseEligibleForSlot(course, slotDef.rule, slotDef.target || '', departmentId ?? '', deptMap, currentSemester, slotDef.name)) {
+            throw new BadRequestException(`Course ${course.course_code} is not eligible for Slot ${sItem.slot} (${slotDef.name || slotDef.rule}) in Semester ${currentSemester}`)
           }
 
           // Strict prerequisite check (F19)
@@ -1212,7 +1175,8 @@ export class RegistrationsService {
       }
     }
 
-    const sem = semester || currentSem || 1
+    if (semester && semester !== currentSem) throw new BadRequestException('Courses must match your current semester')
+    const sem = currentSem || 1
 
     const { data: settings } = await this.supabase.admin
       .from('campus_settings')
@@ -1227,34 +1191,23 @@ export class RegistrationsService {
     let candidateCourses: any[] = []
     const slotNumber = parseInt(slotKey.replace('slot_', ''), 10)
 
-    if (slotNumber >= 7) {
-      const { data: minors } = await this.supabase.admin
-        .from('courses')
-        .select('id, course_code, title, department_id, semester, credits, category, tag, seat_limit')
-        .eq('semester', sem)
-        .neq('department_id', departmentId)
-        .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
-        .order('title', { ascending: true })
+    const { data: blueprint, error: blueprintError } = await this.supabase.admin
+      .from('semester_blueprints').select('*')
+      .eq('department_id', departmentId).eq('semester', sem).maybeSingle()
+    if (blueprintError) throw new InternalServerErrorException('Could not load semester blueprint')
+    if (!blueprint) throw new NotFoundException('Semester blueprint not found')
+    const pathways = getBlueprintPathways(blueprint)
+    const chosenPathway = pathways.find(p => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined)
+    if (!chosenPathway) throw new BadRequestException('Pathway not found')
+    const slotDef = getStudentSlotDefinition(chosenPathway, slotNumber, departmentId ?? '')
+    if (!slotDef) throw new BadRequestException('The selected pathway does not define this slot')
 
-      candidateCourses = minors ?? []
+    if (slotDef.rule === 'LEGACY_MINOR') {
+      candidateCourses = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
+        .select('id, course_code, title, department_id, semester, credits, category, seat_limit')
+        .eq('semester', sem).neq('department_id', departmentId)
+        .in('category', ['DSC', 'DSE', 'DSS', 'MDC']).order('id'))
     } else {
-      const { data: blueprint } = await this.supabase.admin
-        .from('semester_blueprints')
-        .select('*')
-        .eq('department_id', departmentId)
-        .eq('semester', sem)
-        .maybeSingle()
-
-      if (!blueprint) {
-        throw new NotFoundException('Semester blueprint not found')
-      }
-
-      const pathways = (blueprint.pathways as Pathway[]) || []
-      const chosenPathway = pathways.find((p) => p.id === pathwayId) || pathways[0]
-      if (!chosenPathway) {
-        throw new BadRequestException('Pathway not found')
-      }
-
       const { data: depts } = await this.supabase.admin.from('departments').select('id, name, code')
       const deptMap = new Map<string, string>()
       const deptIdToName = new Map<string, string>()
@@ -1489,7 +1442,7 @@ export class RegistrationsService {
     // Step 4: Verify the target course exists and belongs to current semester
     const { data: course, error: cErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, tag, prerequisite_course_ids')
+      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisite_course_ids')
       .eq('id', course_id)
       .single()
 
@@ -1503,55 +1456,22 @@ export class RegistrationsService {
       )
     }
 
-    // Step 4.2: Enforce blueprint pathway slot eligibility (R12)
+    // A configured pathway rule takes precedence over legacy minor behavior in every slot.
     const slotNum = parseInt(slot_key.replace('slot_', ''), 10)
+    const { data: blueprint, error: blueprintError } = await this.supabase.admin
+      .from('semester_blueprints').select('*')
+      .eq('department_id', departmentId).eq('semester', currentSemester).maybeSingle()
+    if (blueprintError) throw new InternalServerErrorException('Could not verify semester slot rules')
+    if (!blueprint) throw new NotFoundException('Semester blueprint not configured')
+    const pathways = getBlueprintPathways(blueprint)
     const pathwayId = reg.pathway_id
-
-    if (slotNum <= 6) {
-      const { data: blueprint, error: blueprintError } = await this.supabase.admin
-        .from('semester_blueprints')
-        .select('pathways')
-        .eq('department_id', departmentId)
-        .eq('semester', currentSemester)
-        .maybeSingle()
-
-      if (blueprintError) throw new InternalServerErrorException('Could not verify semester slot rules')
-      if (!blueprint) throw new NotFoundException('Semester blueprint not configured')
-      const pathways = Array.isArray(blueprint.pathways) ? blueprint.pathways : []
-      const pathway = pathways.find((p) => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined)
-      if (!pathway || !Array.isArray(pathway.slots) || !pathway.slots[slotNum - 1]?.rule) {
-        throw new BadRequestException('The selected pathway does not define this slot')
-      }
-      {
-        const slotDef = pathway.slots[slotNum - 1]
-        const { data: depts } = await this.supabase.admin.from('departments').select('id, code')
-        const deptMap = new Map((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
-        const isEligible = isCourseEligibleForSlot(
-          course,
-          slotDef.rule,
-          slotDef.target || '',
-          departmentId,
-          deptMap,
-          slotDef.name,
-        )
-        if (!isEligible) {
-          throw new BadRequestException(
-            `Course ${course.course_code} (${course.title}) is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`,
-          )
-        }
-      }
-    } else {
-      // Minor rule for Paper 7 and Paper 8
-      if (course.department_id === departmentId) {
-        throw new BadRequestException(
-          `Course ${course.course_code} - ${course.title} is not eligible for ${slot_key}. Minor papers cannot be from your own department.`,
-        )
-      }
-      if (course.semester !== currentSemester) {
-        throw new BadRequestException(
-          `Course ${course.course_code} - ${course.title} is for Semester ${course.semester}, but your current semester is ${currentSemester}.`,
-        )
-      }
+    const pathway = pathways.find(p => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined)
+    const slotDef = getStudentSlotDefinition(pathway, slotNum, departmentId)
+    if (!slotDef) throw new BadRequestException('The selected pathway does not define this slot')
+    const { data: depts } = await this.supabase.admin.from('departments').select('id, code')
+    const deptMap = new Map<string, string>((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
+    if (!isCourseEligibleForSlot(course, slotDef.rule, slotDef.target || '', departmentId, deptMap, currentSemester, slotDef.name)) {
+      throw new BadRequestException(`Course ${course.course_code} is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`)
     }
 
     // Step 4.5: Enforce strict prerequisite checks (F19)

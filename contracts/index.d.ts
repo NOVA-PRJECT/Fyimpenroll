@@ -24,3 +24,4 @@ export interface CampusAttendanceSession {
 }
 export function campusSessionLabel(session?: CampusAttendanceSession): string
 export function formatCampusTime(time: string): string
+export const HOD_COURSE_CATEGORIES: readonly ['DSS', 'DSC', 'DSE', 'VAC', 'SEC', 'MDC', 'MOOC', 'AEC', 'INT', 'FWD', 'RPH', 'CIP'];
