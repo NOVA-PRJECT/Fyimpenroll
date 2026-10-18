@@ -123,6 +123,8 @@ def solve_timetable(input_data: Dict[str, Any]) -> Dict[str, Any]:
         constraints.get("rules") or
         []
     )
+    rules_list = [rule for rule in rules_list
+                  if not rule.get("targetSemester") or rule["targetSemester"] == semester]
     schedule_config = constraints.get("schedule", {})
     rule_hash = compute_rule_hash(rules_list, schedule_config)
 

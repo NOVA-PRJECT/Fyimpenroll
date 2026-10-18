@@ -1,5 +1,5 @@
 {
-  "status": "CREATED_AND_PICKER_VERIFIED_MANUAL_ASSIGNMENT_PENDING",
+  "status": "CREATED_AND_HOD_MANUAL_ASSIGNMENT_VERIFIED",
   "approved_by_user": true,
   "scope": {
     "status": "PROPOSED_NOT_EXECUTED_AWAITING_USER_CONFIRMATION",
@@ -63,5 +63,6 @@
     "browser_fixture": "PASS: blocked AEC reasons and simulated shared-course assignment",
     "deployment": "Local source changes; frontend/backend deployment remains required for the general picker fix."
   },
-  "actual_student_assignment": "Not performed; the user will exercise HOD manual allocation."
+  "actual_student_assignment": "Completed by user HOD and verified against saved registration/metadata.",
+  "manual_allocation_verification": "MANUAL_ALLOCATION_VERIFICATION.json"
 }

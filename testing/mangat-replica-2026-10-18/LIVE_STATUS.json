@@ -1,5 +1,5 @@
 {
-  "status": "S2_S4_AUTOMATIC_ALLOCATION_VERIFIED_MANUAL_RESOLUTION_PENDING",
+  "status": "TEACHER_STAFFING_CREATED_ASSIGNED_VERIFIED_TIMETABLE_PENDING",
   "verified_at": "2026-10-18T06:24:10.000697+00:00",
   "project_ref": "lhnjlwtdphugjaluzrsp",
   "campus": {
@@ -70,23 +70,25 @@
     "campuses": 1,
     "departments": 8,
     "campus_settings": 1,
-    "auth_accounts": 130,
-    "faculty": 10,
+    "auth_accounts": 151,
+    "faculty": 31,
     "students": 120,
-    "teachers": 0,
+    "teachers": 21,
     "courses": 62,
     "blueprints": 12,
     "semester_2_courses": 24,
     "semester_4_courses": 38,
     "student_auth_accounts": 120,
-    "staff_auth_accounts": 10,
+    "staff_auth_accounts": 31,
+    "teacher_auth_accounts": 21,
     "registration_preferences": 120,
     "student_registrations": 120
   },
   "staff_roles": {
     "hod": 8,
     "teaching_staff": 1,
-    "campus_director": 1
+    "campus_director": 1,
+    "teacher": 21
   },
   "verification": {
     "invalid_staff_pairs": 0,
@@ -104,17 +106,27 @@
     "student_auth_checks_passed": true,
     "all_test_registrations_verified": true,
     "manual_registration_preserved": true,
-    "additional_test_aec_picker_verified": true
+    "additional_test_aec_picker_verified": true,
+    "hod_manual_allocation_verified": true,
+    "pilot_teacher_and_assignment_verified": true,
+    "pilot_teacher_login_verified": true,
+    "pilot_teacher_roster_ui_verified": true,
+    "pilot_teacher_workflow_evidence": "USER_CONFIRMED_UI_PASS_AND_AUTH_READBACK",
+    "all_teacher_auth_profiles_match_test_ownership": true,
+    "all_58_enrolled_courses_have_teacher_deliveries": true,
+    "all_58_service_roster_counts_verified": true,
+    "timetable_loader_teacher_coverage_verified": true,
+    "existing_records_preserved_after_teacher_setup": true
   },
   "pending": {
     "courses": 0,
     "blueprints": 0,
     "students": "USER_BULK_UPLOAD_COMPLETED_VERIFIED",
-    "teachers": "DEFERRED_BY_USER"
+    "teachers": "21_CREATED_VERIFIED_ALL_ENROLLED_COURSES_COVERED"
   },
   "private_credentials": "../../scratch/mangat-replica-2026-10-18/AUTH_CREDENTIALS.md",
   "private_auth_id_manifest": "../../scratch/mangat-replica-2026-10-18/auth-creation-state.json",
-  "note": "S2/S4 allocation verified with one pending S2 AEC. User-approved test AEC KU02AECHIN103TT is live under ECOTT with 60 seats and is selectable for Paper 6 in the corrected picker. Student assignment is left to the user HOD test. The general manual-picker fix is validated locally and still requires frontend/backend deployment. Real course capacities/prerequisites are unchanged. Teacher/timetable/attendance phases remain pending.",
+  "note": "All 120 students have six papers and 22 credits. The pilot teacher UI flow passed by user confirmation. Created 20 new teacher Auth/profile pairs, giving 21 teachers; all 58 enrolled papers now have test-campus deliveries (25 S2, 33 S4). All service rosters and timetable loader teacher mappings pass. Existing users, assignments, academic configuration and registrations are unchanged. New teacher first-login/consent UI checks, role boundaries, timetable generation/publication and attendance remain.",
   "academic_verified_at": "2026-10-18T06:34:15.580Z",
   "private_academic_id_manifest": "../../scratch/mangat-replica-2026-10-18/academic-verification.json",
   "prepared_student_upload": {
@@ -174,12 +186,12 @@
     "students_without_blueprint": 0,
     "registration_records": 120,
     "preference_records": 120,
-    "teachers": 0,
+    "teachers": 21,
     "password_changes_pending": 118,
     "s2_allocation_totals": {
       "students": 60,
-      "fully_allocated": 59,
-      "partially_allocated": 1,
+      "fully_allocated": 60,
+      "partially_allocated": 0,
       "unallocated": 0
     },
     "s4_allocation_totals": {
@@ -190,10 +202,18 @@
     },
     "combined_allocation_totals": {
       "students": 120,
-      "fully_allocated": 119,
+      "fully_allocated": 120,
+      "partially_allocated": 0,
+      "unallocated": 0
+    },
+    "s2_automatic_run_totals": {
+      "students": 60,
+      "fully_allocated": 59,
       "partially_allocated": 1,
       "unallocated": 0
-    }
+    },
+    "teacher_course_assignments": 58,
+    "new_teacher_password_changes_pending": 20
   },
   "next_steps_file": "NEXT_STEPS.md",
   "registrations_verified_at": "2026-10-18T10:57:12.115Z",
@@ -208,6 +228,33 @@
     "course_code": "KU02AECHIN103TT",
     "department_code": "ECOTT",
     "verification_report": "TEST_AEC_ADDITION_VERIFICATION.json",
-    "manual_assignment_pending": true
+    "manual_assignment_pending": false
+  },
+  "manual_allocation_verification": "MANUAL_ALLOCATION_VERIFICATION.json",
+  "teacher_pilot": "TEACHER_PILOT.md",
+  "teacher_assignment_verification": "TEACHER_ASSIGNMENT_VERIFICATION.json",
+  "teacher_assignment_verified_at": "2026-10-18T11:57:40Z",
+  "teacher_pilot_completed_at": "2026-10-18T12:02:41.222042+00:00",
+  "staffing_readiness": "STAFFING_READINESS.json",
+  "staffing_next_steps": "STAFFING_READINESS.md",
+  "staffing_coverage": {"enrolled_courses":58,"assigned_courses":58,"unassigned_courses":0},
+  "teacher_staffing_report": "TEACHER_STAFFING_VERIFICATION.json",
+  "teacher_staffing_invariants": "TEACHER_STAFFING_INVARIANTS.json",
+  "teacher_staffing_guide": "TEACHER_STAFFING.md",
+  "teacher_staffing_verified_at": "2026-10-18T12:23:45.845754+00:00",
+  "private_teacher_credentials": "../../scratch/mangat-replica-2026-10-18/TEACHER_CREDENTIALS.md",
+  "timetable_rule_editor_fix": {
+    "status": "LOCAL_VERIFIED_DEPLOYMENT_PENDING",
+    "report": "TIMETABLE_RULE_EDITOR_FIX.md",
+    "timetable_regression_tests_passed": 16,
+    "frontend_types_passed": true,
+    "backend_build_passed": true,
+    "local_ui_fixture_passed": true,
+    "production_rule_changes": false,
+    "modal_ui_polished": true,
+    "close_button_desktop_and_mobile_verified": true,
+    "escape_and_focus_return_verified": true,
+    "keyboard_focus_wrapping_verified": true,
+    "mobile_layout_verified": true
   }
 }

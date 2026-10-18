@@ -12,9 +12,9 @@ The completed upload was verified against all six CSVs on 18 October 2026. There
 | SBSTT | 10 | 10 | 20 |
 | Total | 60 | 60 | 120 |
 
-Current state: all 120 students have matching password-change flags in Auth and their profiles, all require a first-login password change, and none had signed in at verification time. The test campus has 61 courses and twelve blueprints. Every uploaded student has the correct semester blueprint. There are no preference submissions, registration records, allocation runs or timetable entries for the test campus. Teachers are still deferred.
+Historical upload-stage snapshot: all 120 students had matching password-change flags in Auth and their profiles, required a first-login password change, and none had signed in at that verification time. The test campus then had 61 courses and twelve blueprints. Every uploaded student had the correct semester blueprint. There were no preference submissions, registration records, allocation runs or timetable entries at that stage. Current progress is recorded in sections 4–6 and LIVE_STATUS.json.
 
-**The registration deadline is null, so submissions are currently closed.** Verification in this phase was read-only; passwords have not been tested by logging in and no registrations were submitted.
+At the upload-stage check, the registration deadline was null and submissions were closed. Verification in that phase was read-only. The user subsequently tested login and registration, and closed registration before allocation.
 
 ## 1. Test first login with twelve pilot students
 
@@ -78,13 +78,28 @@ Registration checks blueprint eligibility; course prerequisites are evaluated du
 - [x] Ran **2026-27 / Semester 4**: all 60 fully allocated, 22 credits each, zero partial/unallocated. Saved fixed majors, SEC/VAC categories, submitted elective choices, semester and capacities pass readback checks. See [ALLOCATION_S4_VERIFICATION.json](ALLOCATION_S4_VERIFICATION.json).
 - [x] Reconciled each run's status and totals: S2 is 59 fully allocated + one partial; S4 is 60 fully allocated. Each cohort totals 60.
 - [ ] Verify only MANGATTT students are included, prerequisites and capacities are respected, and fixed TT majors are retained.
-- [ ] Review unresolved students and remaining seats as the appropriate HOD; use the normal manual-resolution flow where required.
+- [x] User completed and verified HOD manual resolution. ECOTT S2 010 now has `KU02AECHIN103TT` in AEC, 22 credits and HOD allocation metadata. Final saved totals are 60 complete S2 + 60 complete S4; see [MANUAL_ALLOCATION_VERIFICATION.json](MANUAL_ALLOCATION_VERIFICATION.json).
 
-The pending S2 student is ECOTT S2 010, with 19 actual credits and no AEC. Original shared Hindi is globally full (60/60). The user approved a test-owned Hindi AEC `KU02AECHIN103TT` under ECOTT (3 credits, 60 available seats); the corrected picker verifies it as selectable. As ECOTT HOD, select S2, open this student's Paper 6 and manually allocate that TT course, then confirm the student has six papers and 22 credits and is removed from the unresolved list. [ALLOCATION_TEST_FINDINGS.md](ALLOCATION_TEST_FINDINGS.md) records the general picker code fix and its local validation; frontend/backend deployment and actual manual resolution remain unverified.
+The deliberately partial S2 case is now resolved through the user's HOD flow using the approved test-owned Hindi AEC. All 120 students have six assigned papers and 22 credits. The automatic S2 run's original 59-full/one-partial summary remains historical; current registration rows are authoritative after the manual change. [ALLOCATION_TEST_FINDINGS.md](ALLOCATION_TEST_FINDINGS.md) records the picker issue, fix and checks.
 - [ ] Compare final student registrations, HOD views and exports against the expected six-paper/22-credit combinations, allowing documented capacity failures until resolved.
 
 ## 6. Continue to timetable and attendance afterward
 
-Once registration/allocation are verified, prepare the teacher/class/course assignments needed for timetable generation. Teacher creation was deferred by the user and has not been performed. The later rehearsal should cover generation, conflicts, publication, student timetable visibility, post-publication registration locks, geofence/time rules, attendance marking and reports.
+Registration and both allocation cohorts are verified. The first teacher pilot passed by user confirmation. The requested bulk teacher setup is now complete: 21 teachers cover all 58 enrolled courses (25 S2 and 33 S4), with all service rosters and timetable-loader mappings verified. Timetable entries remain zero. See [TEACHER_STAFFING.md](TEACHER_STAFFING.md).
+
+- [x] User created `teacher.ecott.01.mangattt.20261018@example.test` through the ECOTT HOD flow and assigned `KU02DSCECO102TT`, S2 / 2026-27. Database readback confirms both records; see [TEACHER_ASSIGNMENT_VERIFICATION.json](TEACHER_ASSIGNMENT_VERIFICATION.json).
+- [x] User confirmed pilot teacher login, first-login password change, consent, assigned course and logout/login passed.
+- [x] User confirmed the assigned course roster contains **18 students**, including minors from other departments.
+- [ ] Check that the teacher cannot access unassigned courses or HOD administration.
+
+- [x] Created the authorized 20 additional teacher Auth/profile pairs in test departments; preserved the pilot and its password.
+- [x] All 58 enrolled papers have intended test-campus teacher coverage, including Statistics and shared Hindi. Course rosters and timetable loader teacher mappings pass readback.
+- [ ] New teachers complete first-login password change and policy acceptance when their UI workflows are tested; the fixture script does not assert these are passed.
+- [ ] Deploy the locally verified semester/category rules editor fix, then configure the required S2/S4 category windows. See [TIMETABLE_RULE_EDITOR_FIX.md](TIMETABLE_RULE_EDITOR_FIX.md).
+- [ ] As test campus director, review scheduling rules and generate S2 for 2026-27. Review unscheduled sessions, student/teacher clashes and practical blocks before publication.
+- [ ] Publish the verified S2 draft, then generate/review S4 with shared-teacher reservations accounted for. Verify published student/teacher views for both cohorts.
+- [ ] Test post-publication locks, geofence/time rules, attendance marking and reports.
+
+[STAFFING_READINESS.md](STAFFING_READINESS.md) records the historical gap before staffing. The current setup and evidence are in [TEACHER_STAFFING.md](TEACHER_STAFFING.md).
 
 Record observed results and defects as the UI tests run. A configuration/database verification is not an end-to-end pass for these remaining flows.

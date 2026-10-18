@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import type { SchedulingRule } from './BrowserRulesEditor';
+import { appliesToSemester, restoreBrowserRules, validateSchedulingRules } from '@/core/utils/schedulingRules';
 const BrowserRulesEditor = dynamic(() => import('./BrowserRulesEditor'));
 import { downloadBlob } from '@/core/utils/downloadFile';
 import { entriesForDepartment } from '@/core/utils/campusTimetable';
@@ -56,6 +57,7 @@ interface ConflictItem {
 interface BaseConstraintsData {
   campusId: string;
   rules: SchedulingRule[];
+  repositoryRuleIds: string[];
 }
 
 const DAYS_MAP: Record<number, string> = {
@@ -153,12 +155,10 @@ export default function CampusDirectorTimetablePage() {
         const data = await res.json();
         if (request !== constraintsRequest.current) return;
         const key = `fyimp:rules:${data.campusId}`;
-        const saved = localStorage.getItem(key);
-        let rules = data.rules;
-        if (saved) {
-          try { const parsed = JSON.parse(saved); if (Array.isArray(parsed)) rules = parsed; } catch { localStorage.removeItem(key); }
-        }
-        setBaseConstraints({ ...data, rules });
+        const repositoryRuleIds = data.rules.map((rule: SchedulingRule) => rule.id);
+        setBaseConstraints({ ...data, repositoryRuleIds });
+        const rules = restoreBrowserRules(data.rules, localStorage.getItem(key));
+        setBaseConstraints({ ...data, rules, repositoryRuleIds });
         setRulesReady(true);
       }
     } catch (error) {
@@ -173,7 +173,9 @@ export default function CampusDirectorTimetablePage() {
   }, [fetchBaseConstraints]);
 
   function saveBrowserRules(rules: SchedulingRule[]) {
-    if (!baseConstraints) return;
+    if (!baseConstraints || !rulesReady) return;
+    const validationError = validateSchedulingRules(rules);
+    if (validationError) { setErrorMsg(validationError); return; }
     try {
       localStorage.setItem(`fyimp:rules:${baseConstraints.campusId}`, JSON.stringify(rules));
       setBaseConstraints({ ...baseConstraints, rules });
@@ -722,7 +724,7 @@ export default function CampusDirectorTimetablePage() {
           <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
         </div>}
         {!rulesReady && !rulesError && <LoadingState layout="list" rows={2} compact message="Loading scheduling rules…" />}
-        {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button></div>}
+        {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button>{baseConstraints && <button onClick={resetBrowserRules}>Restore default rules</button>}</div>}
         {!settingsReady && !settingsError && <LoadingState layout="form" rows={2} compact message="Loading campus settings…" />}
         {settingsError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{settingsError}<button onClick={() => setSettingsRetry(value => value + 1)}>Try again</button></div>}
         {/* Registration Window Warning Banner */}
@@ -790,9 +792,10 @@ export default function CampusDirectorTimetablePage() {
                 className={styles.rulesTriggerBtn}
                 onClick={() => setShowRulesModal(true)}
                 title="Manage custom and base scheduling constraints"
+                disabled={!rulesReady || publishing}
               >
                 <span>Scheduling Rules</span>
-                <span className={styles.rulesBadge}>{baseConstraints?.rules.length ?? 0} Rules</span>
+                <span className={styles.rulesBadge}>{baseConstraints?.rules.filter(rule => appliesToSemester(rule, semester)).length ?? 0} Rules</span>
               </button>
             </div>
 
@@ -1302,7 +1305,7 @@ export default function CampusDirectorTimetablePage() {
         </div>
       )}
 
-      {showRulesModal && baseConstraints && <BrowserRulesEditor rules={baseConstraints.rules} onSave={saveBrowserRules} onReset={resetBrowserRules} onClose={() => setShowRulesModal(false)} />}
+      {showRulesModal && baseConstraints && rulesReady && <BrowserRulesEditor key={`${baseConstraints.campusId}:${semester}`} rules={baseConstraints.rules} semester={semester} repositoryRuleIds={baseConstraints.repositoryRuleIds} onSave={saveBrowserRules} onReset={resetBrowserRules} onClose={() => setShowRulesModal(false)} />}
 
       {/* Dedicated PDF Print Section */}
       <div className={styles.printArea}>

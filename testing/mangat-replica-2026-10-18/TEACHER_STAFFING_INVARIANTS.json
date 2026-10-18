@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "before_at": "2026-10-18T12:21:04.99187+00:00",
+  "after_at": "2026-10-18T12:23:01.487048+00:00",
+  "checks": {
+    "courses_unchanged": true,
+    "campuses_unchanged": true,
+    "blueprints_unchanged": true,
+    "departments_unchanged": true,
+    "preferences_unchanged": true,
+    "non_test_auth_unchanged": true,
+    "registrations_unchanged": true,
+    "campus_settings_unchanged": true,
+    "non_test_faculty_unchanged": true,
+    "timetable_entries_unchanged": true,
+    "test_students_auth_unchanged": true,
+    "existing_test_faculty_auth_unchanged": true,
+    "existing_assignments_preserved": true,
+    "new_assignment_rows": 57
+  },
+  "database_readback": {
+    "verified_at": "2026-10-18T12:23:45.845754+00:00",
+    "faculty_count": 31,
+    "student_count": 120,
+    "teacher_count": 21,
+    "test_auth_count": 151,
+    "teacher_auth_pairs": 21,
+    "shared_hindi_delivery": {
+      "semester": 2,
+      "course_code": "KU02AECHIN103",
+      "academic_year": "2026-27",
+      "teacher_email": "teacher.ecott.03.mangattt.20261018@example.test",
+      "teacher_campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+      "delivery_campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+      "teacher_department_id": "bf97ec6d-3b5f-4956-a885-69f153b6875e"
+    },
+    "assignments_by_semester": [
+      {
+        "courses": 25,
+        "semester": 2
+      },
+      {
+        "courses": 33,
+        "semester": 4
+      }
+    ],
+    "invalid_assignment_ownership": 0,
+    "new_teachers_password_change_required": 20
+  },
+  "before_snapshot": "../../scratch/mangat-replica-2026-10-18/teacher-invariants-before.json",
+  "after_snapshot": "../../scratch/mangat-replica-2026-10-18/teacher-invariants-after.json",
+  "note": "SQL fingerprints confirm pre-existing Auth rows, all registrations/preferences, courses, blueprints, campus configuration, existing assignments and timetable entries were preserved. New assignments all belong to the test campus. Independent backend service verification checks all 58 rosters and timetable loader teacher mappings."
+}

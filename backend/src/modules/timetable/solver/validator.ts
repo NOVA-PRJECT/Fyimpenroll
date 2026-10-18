@@ -35,6 +35,7 @@ export function validateTimetable(
       rulesList = options.effectiveRules.rules;
     }
   }
+  rulesList = rulesList.filter(rule => !rule.targetSemester || rule.targetSemester === semester);
 
   // F36: Complete coverage check — ensure every course with contact hours is scheduled
   for (const course of courses) {

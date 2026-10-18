@@ -5,6 +5,7 @@
   "scripts": {
     "test:blueprints": "node --test test/blueprint-rules.test.cjs",
     "test:timetable": "node --test test/timetable-publication.test.cjs",
+    "test:timetable-rules": "node --test test/timetable-rules.test.cjs",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
