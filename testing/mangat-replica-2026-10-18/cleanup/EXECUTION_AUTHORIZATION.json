@@ -1,0 +1,12 @@
+{
+  "status": "AUTHORIZED_FOR_EXECUTION_WITHOUT_FULL_BACKUP",
+  "recorded_at": "2026-10-18T15:24:47.001725+00:00",
+  "project_ref": "lhnjlwtdphugjaluzrsp",
+  "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+  "public_rows": 921,
+  "auth_users": 151,
+  "backup_requirement_waived_by_user": true,
+  "backup_created": false,
+  "user_instruction": "why backup need just delete the campus test campus and sequentially cascade delte yourself and then delte the stale auth acc",
+  "scope": "Exact MANGATTT records and their linked Auth IDs; preserve all non-test and shared real-course records"
+}

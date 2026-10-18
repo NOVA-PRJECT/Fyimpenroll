@@ -1,0 +1,141 @@
+{
+  "verified_at": "2026-10-18T15:42:23.029513+00:00",
+  "shared_hindi": {
+    "id": "998462b9-bfb7-470e-bed1-319c1fe182de",
+    "seat_limit": 60,
+    "course_code": "KU02AECHIN103"
+  },
+  "public_tables": {
+    "admins": {
+      "count": 1,
+      "fingerprint": "4d8eb5ff26ab83dd89d28160515e7d1e"
+    },
+    "courses": {
+      "count": 127,
+      "fingerprint": "69b052937316df59588acd0a080eec1b"
+    },
+    "faculty": {
+      "count": 17,
+      "fingerprint": "fd1c0a14188159d8c05adad2fb7be958"
+    },
+    "campuses": {
+      "count": 4,
+      "fingerprint": "286a45a1afbce986c73056657c3ed925"
+    },
+    "students": {
+      "count": 240,
+      "fingerprint": "41e88ddcc03683a3cda6fbf77c89ad2f"
+    },
+    "time_slots": {
+      "count": 30,
+      "fingerprint": "0f21103e4019772bb426d7d97a8ef69e"
+    },
+    "departments": {
+      "count": 13,
+      "fingerprint": "7d03dcac54e6a0cba6bfdcfb8d71c715"
+    },
+    "system_logs": {
+      "count": 1865,
+      "fingerprint": "a958f1475ad9946879ed33cb94a84446"
+    },
+    "campus_settings": {
+      "count": 4,
+      "fingerprint": "51fd3fcd4f7796e888072b40ae8d9fce"
+    },
+    "campus_sign_ins": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "consent_records": {
+      "count": 14,
+      "fingerprint": "f7b36dd62e68791793ade650af1d8706"
+    },
+    "retired_cohorts": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "period_attendance": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "schema_migrations": {
+      "count": 26,
+      "fingerprint": "e0acf4c9391e8e01159da500cd636c27"
+    },
+    "timetable_entries": {
+      "count": 121,
+      "fingerprint": "977da609875c610828a5867b41a98383"
+    },
+    "department_notices": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "promotion_receipts": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "semester_blueprints": {
+      "count": 25,
+      "fingerprint": "cd039a00fc0892b4744519a32615fcd8"
+    },
+    "timetable_conflicts": {
+      "count": 7,
+      "fingerprint": "096d093fb02e760780dc84740d0892cd"
+    },
+    "graduation_candidates": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "graduation_operations": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "student_registrations": {
+      "count": 190,
+      "fingerprint": "1b2c29fb31fa31924d3f413e4e44b9dc"
+    },
+    "period_unlock_requests": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "registration_preferences": {
+      "count": 2,
+      "fingerprint": "eb226fee2cbab5e1f28db3ea453acabe"
+    },
+    "course_prerequisite_rules": {
+      "count": 1,
+      "fingerprint": "cd8ac002528f3d2122c3ddca21ff7049"
+    },
+    "period_attendance_sessions": {
+      "count": 0,
+      "fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "teacher_course_assignments": {
+      "count": 3,
+      "fingerprint": "ab415c307713fc0c09fc7a63d9329ef7"
+    }
+  },
+  "preserved_auth": {
+    "count": 258,
+    "fingerprint": "deb791bba7b9f53d1eb2c0377f277600"
+  },
+  "published_guard": {
+    "enabled": "O",
+    "definition": "CREATE TRIGGER trg_timetable_entries_published_guard BEFORE INSERT OR DELETE OR UPDATE ON public.timetable_entries FOR EACH ROW EXECUTE FUNCTION trg_guard_published_timetable_entries()"
+  },
+  "storage_objects": 0,
+  "remaining_test_mfa": 0,
+  "remaining_test_campus": 0,
+  "remaining_test_auth_ids": 0,
+  "remaining_test_identities": 0,
+  "remaining_test_auth_markers": 0,
+  "remaining_test_auth_sessions": 0,
+  "remaining_test_refresh_tokens": 0,
+  "status": "COMPLETE_VERIFIED",
+  "public_rows_deleted": 921,
+  "auth_users_deleted": 151,
+  "backup_created": false,
+  "backup_requirement_waived_by_user": true,
+  "all_preserved_public_tables_unchanged": true,
+  "preserved_auth_metadata_unchanged": true
+}

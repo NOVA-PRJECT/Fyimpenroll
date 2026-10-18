@@ -1,0 +1,36 @@
+{
+  "project_ref": "lhnjlwtdphugjaluzrsp",
+  "history": {
+    "department_id": "e814d190-e1c2-4731-b2ec-d97d5dc897e0",
+    "campus_id": "5b5289d5-17eb-43ba-832e-19883e9eaada",
+    "course_ids": [
+      "e8140001-e1c2-4731-b2ec-d97d5dc89701",
+      "e8140002-e1c2-4731-b2ec-d97d5dc89702",
+      "e8140003-e1c2-4731-b2ec-d97d5dc89703",
+      "e8140004-e1c2-4731-b2ec-d97d5dc89704"
+    ],
+    "blueprint_ids": [
+      "ba0cd4e4-c95f-4056-bd2f-1b49e86d481f",
+      "d90d5cf3-fd22-47bb-9401-894f0565feb1"
+    ],
+    "hod_id": "d16aa6e6-bbdb-4156-81f1-31df5815a7db",
+    "payload_preservation_checked_inside_transaction": true
+  },
+  "faculty_campus_mismatches": 0,
+  "temporary_auth_fixtures_remaining": 0,
+  "deleted_test_campus_remaining": 0,
+  "live_rolled_back_probes": {
+    "duplicate_hod_rejected": true,
+    "duplicate_director_rejected": true,
+    "duplicate_teaching_staff_rejected": true,
+    "referenced_course_move_rejected": true,
+    "course_payload_unchanged": true
+  },
+  "guarded_course_rpc_access": {
+    "anon": false,
+    "authenticated": false,
+    "service_role": true
+  },
+  "faculty_campus_covering_index_exists": true,
+  "new_security_advisor_findings": 0
+}

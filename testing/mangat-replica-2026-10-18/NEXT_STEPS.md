@@ -1,5 +1,11 @@
 # Next test phase — first login and course registration
 
+**Cleanup complete and verified.** User explicitly instructed deletion without a full backup. All 921 selected public rows and 151 linked Auth users are removed; non-test data and 258 other Auth users are unchanged. See [cleanup/CLEANUP_VERIFICATION.json](cleanup/CLEANUP_VERIFICATION.json). Earlier setup details/credentials are historical; S2 timetable remained unresolved before fixture deletion.
+
+Current timetable status: S4 is published (110 course periods). S2 remains blocked by eight mutually conflicting DSC courses requiring 34 distinct periods in a 30-period week, despite the completed MDC hour correction. See [S2_POST_MDC_CAPACITY_CHECK.md](S2_POST_MDC_CAPACITY_CHECK.md). Prepare a compatible test minor selection plan before any authorized registration changes; preserve published S4 and respect its teacher reservations.
+
+Latest S4 update: all six test SEC and three test VAC courses now total 2 hours/week, with credits unchanged. See [S4_SEC_VAC_2H_UPDATE.md](S4_SEC_VAC_2H_UPDATE.md). Regenerate the S4 timetable; the old draft uses historical 3/4-hour requirements.
+
 The completed upload was verified against all six CSVs on 18 October 2026. There are **120 students and 120 linked, email-confirmed Auth accounts**, with no missing rows, unexpected rows, duplicate CAP numbers/emails, ownership errors or mismatched academic details. The initial check caught the upload in progress; the final refreshed comparison includes all twenty SBSTT students.
 
 | Department | S2 | S4 | Total |
@@ -85,7 +91,7 @@ The deliberately partial S2 case is now resolved through the user's HOD flow usi
 
 ## 6. Continue to timetable and attendance afterward
 
-Registration and both allocation cohorts are verified. The first teacher pilot passed by user confirmation. The requested bulk teacher setup is now complete: 21 teachers cover all 58 enrolled courses (25 S2 and 33 S4), with all service rosters and timetable-loader mappings verified. Timetable entries remain zero. See [TEACHER_STAFFING.md](TEACHER_STAFFING.md).
+Registration and both allocation cohorts are verified. The first teacher pilot passed by user confirmation. The requested bulk teacher setup is now complete: 21 teachers cover all 58 enrolled courses (25 S2 and 33 S4), with all service rosters and timetable-loader mappings verified. Timetable entries were zero at that staffing stage; S4 now has 110 published periods. See [TEACHER_STAFFING.md](TEACHER_STAFFING.md).
 
 - [x] User created `teacher.ecott.01.mangattt.20261018@example.test` through the ECOTT HOD flow and assigned `KU02DSCECO102TT`, S2 / 2026-27. Database readback confirms both records; see [TEACHER_ASSIGNMENT_VERIFICATION.json](TEACHER_ASSIGNMENT_VERIFICATION.json).
 - [x] User confirmed pilot teacher login, first-login password change, consent, assigned course and logout/login passed.
@@ -96,9 +102,15 @@ Registration and both allocation cohorts are verified. The first teacher pilot p
 - [x] All 58 enrolled papers have intended test-campus teacher coverage, including Statistics and shared Hindi. Course rosters and timetable loader teacher mappings pass readback.
 - [ ] New teachers complete first-login password change and policy acceptance when their UI workflows are tested; the fixture script does not assert these are passed.
 - [ ] Deploy the locally verified semester/category rules editor fix, then configure the required S2/S4 category windows. See [TIMETABLE_RULE_EDITOR_FIX.md](TIMETABLE_RULE_EDITOR_FIX.md).
-- [ ] As test campus director, review scheduling rules and generate S2 for 2026-27. Review unscheduled sessions, student/teacher clashes and practical blocks before publication.
-- [ ] Publish the verified S2 draft, then generate/review S4 with shared-teacher reservations accounted for. Verify published student/teacher views for both cohorts.
-- [ ] Test post-publication locks, geofence/time rules, attendance marking and reports.
+- [x] User generated S2 review drafts; the latest checked draft has 51 placed periods and 37 unscheduled sessions (43 periods) across 17 courses. Teacher coverage remains complete. See [TIMETABLE_S2_DIAGNOSIS.md](TIMETABLE_S2_DIAGNOSIS.md).
+- [x] User authorized all eight test S2 MDC papers to total two weekly contact hours. Database update/readback verified; all retain three credits, and student registrations/allocations and teacher assignments are unchanged. The diagnosed seven-course bound is now 29 periods. See [MDC_2H_UPDATE.md](MDC_2H_UPDATE.md).
+- [x] Generated a fresh S2 draft after the MDC correction. It remains infeasible: eight mutually conflicting DSC courses require 34 periods in a 30-period week. User requested leaving S2 aside.
+- [x] S4 was generated and published with 110 periods after SEC/VAC hours were corrected.
+- [ ] Resolve and publish S2 if required for rollout; this is still an open test item.
+- [x] User reports teacher attendance save/correction, practical copy, reports, role access and exports passed. Readback has 30 attendance marks in three sessions.
+- [ ] Independently verify successful campus sign-in persistence; the user reported checks passed, but there are zero saved campus sign-in rows at cleanup inventory time.
+- [x] Prepare cleanup plan/ID manifest and save test results, private fixture snapshots and checksums.
+- [x] User explicitly waived a full backup and authorized deletion; all reviewed public/Auth records were removed and verified.
 
 [STAFFING_READINESS.md](STAFFING_READINESS.md) records the historical gap before staffing. The current setup and evidence are in [TEACHER_STAFFING.md](TEACHER_STAFFING.md).
 

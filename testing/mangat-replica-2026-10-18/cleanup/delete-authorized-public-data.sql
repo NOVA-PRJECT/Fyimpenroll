@@ -1,0 +1,101 @@
+-- Exact-campus cleanup authorized without a full backup. All checks and deletes are atomic.
+begin;
+set local lock_timeout='10s';
+set local statement_timeout='55s';
+lock table public.admins,public.campus_settings,public.campus_sign_ins,public.campuses,public.consent_records,public.course_prerequisite_rules,public.courses,public.department_notices,public.departments,public.faculty,public.graduation_candidates,public.graduation_operations,public.period_attendance,public.period_attendance_sessions,public.period_unlock_requests,public.promotion_receipts,public.registration_preferences,public.retired_cohorts,public.schema_migrations,public.semester_blueprints,public.student_registrations,public.students,public.system_logs,public.teacher_course_assignments,public.time_slots,public.timetable_conflicts,public.timetable_entries in share row exclusive mode;
+lock table public.timetable_entries in access exclusive mode;
+lock table auth.users,auth.sessions,auth.refresh_tokens in share row exclusive mode;
+create temp table tt_cleanup_plan(table_name text primary key,expected_count integer,fingerprint text,pk text[],scope text,delete_order integer) on commit drop;
+insert into tt_cleanup_plan select * from jsonb_to_recordset('[{"table_name":"admins","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.id in(select id from tu)","delete_order":19},{"table_name":"campus_settings","expected_count":1,"fingerprint":"cd17264e1d46b3aed349d674d384ab8e","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":22},{"table_name":"campus_sign_ins","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'' and r.student_id in(select id from ts)","delete_order":3},{"table_name":"campuses","expected_count":1,"fingerprint":"59ebfe8740d6d7f98772a47095455215","pk":["id"],"scope":"r.id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":24},{"table_name":"consent_records","expected_count":13,"fingerprint":"af5ef8343649d49191cb51e01077ff53","pk":["id"],"scope":"r.user_id in(select id from tu)","delete_order":13},{"table_name":"course_prerequisite_rules","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.course_id in(select id from tc)","delete_order":10},{"table_name":"courses","expected_count":62,"fingerprint":"fa5f1f5c9adf79579f1c871e051e4ff1","pk":["id"],"scope":"r.id in(select id from tc)","delete_order":12},{"table_name":"department_notices","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":9},{"table_name":"departments","expected_count":8,"fingerprint":"b93e743e42a87f9f2b6c7569194854a1","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":23},{"table_name":"faculty","expected_count":31,"fingerprint":"fe16f3b436a25c95c7378f26de0a3a50","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":21},{"table_name":"graduation_candidates","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["student_id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":16},{"table_name":"graduation_operations","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":17},{"table_name":"period_attendance","expected_count":30,"fingerprint":"2590aebc247a913648cd445d80ce9b6b","pk":["id"],"scope":"r.timetable_slot_id in(select id from te) and r.student_id in(select id from ts)","delete_order":0},{"table_name":"period_attendance_sessions","expected_count":3,"fingerprint":"7c0bbf58a67c8277160b23f204229eeb","pk":["id"],"scope":"r.timetable_slot_id in(select id from te)","delete_order":1},{"table_name":"period_unlock_requests","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.timetable_slot_id in(select id from te)","delete_order":2},{"table_name":"promotion_receipts","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["campus_id","request_key"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":15},{"table_name":"registration_preferences","expected_count":120,"fingerprint":"8e221b32f63b4e166d5d655eba4f6213","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'' and r.student_id in(select id from ts)","delete_order":4},{"table_name":"retired_cohorts","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":18},{"table_name":"schema_migrations","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["version"],"scope":"false","delete_order":26},{"table_name":"semester_blueprints","expected_count":12,"fingerprint":"7ddf212dc9f113683ca2559285dc1746","pk":["id"],"scope":"r.department_id in(select id from td)","delete_order":11},{"table_name":"student_registrations","expected_count":120,"fingerprint":"47a35b368616f49ca2607c90909a51e0","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'' and r.student_id in(select id from ts)","delete_order":5},{"table_name":"students","expected_count":120,"fingerprint":"d07ba8a1af7aefaa311b8301f44c3fe6","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":20},{"table_name":"system_logs","expected_count":232,"fingerprint":"73db28804e603ad16cb8bb3cac5e69a3","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'' or (r.campus_id is null and r.user_id in(select id from tu))","delete_order":14},{"table_name":"teacher_course_assignments","expected_count":58,"fingerprint":"e542652e36b08786e0c9af8b7445db30","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":8},{"table_name":"time_slots","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"false","delete_order":25},{"table_name":"timetable_conflicts","expected_count":0,"fingerprint":"d41d8cd98f00b204e9800998ecf8427e","pk":["id"],"scope":"(r.course_id in(select id from tc) or r.blocking_course_id in(select id from tc))","delete_order":6},{"table_name":"timetable_entries","expected_count":110,"fingerprint":"b5b7c1eac915f2fd584270564185f0d1","pk":["id"],"scope":"r.campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''","delete_order":7}]'::jsonb)x(table_name text,expected_count integer,fingerprint text,pk text[],scope text,delete_order integer);
+create temp table tt_cleanup_ids(table_name text,id uuid,primary key(table_name,id)) on commit drop;
+create temp table tt_cleanup_auth(id uuid primary key) on commit drop;
+create temp table tt_cleanup_preserved(table_name text primary key,row_count bigint,fingerprint text) on commit drop;
+create temp table tt_cleanup_result(report jsonb) on commit preserve rows;
+do $cleanup$
+declare p record; fk record; count_now bigint; hash_now text; pk_sort text; schema_names text[]; actual_pk text[];
+join_sql text; parent_filter text; parent_pk text; child_pk text; outside_exists boolean; guard_definition text; guard_function text;
+deleted integer:=0; counts jsonb:='{}'; protected jsonb; auth_before jsonb; auth_after jsonb; sessions_removed integer; tokens_removed integer;
+begin
+ if not exists(select 1 from public.campuses where id='b72074e2-468e-4218-afb6-0f08f14cfe8f' and code='MANGATTT' and name='Test KUC Mangattuparamba TT') then raise exception 'Exact test campus changed'; end if;
+ select array_agg(c.relname::text order by c.relname) into schema_names from pg_class c where c.relnamespace='public'::regnamespace and c.relkind in('r','p');
+ if schema_names is distinct from array['admins','campus_settings','campus_sign_ins','campuses','consent_records','course_prerequisite_rules','courses','department_notices','departments','faculty','graduation_candidates','graduation_operations','period_attendance','period_attendance_sessions','period_unlock_requests','promotion_receipts','registration_preferences','retired_cohorts','schema_migrations','semester_blueprints','student_registrations','students','system_logs','teacher_course_assignments','time_slots','timetable_conflicts','timetable_entries']::text[] then raise exception 'Public table set changed'; end if;
+ if (select md5(string_agg(c.conrelid::regclass::text||':'||c.conname||':'||pg_get_constraintdef(c.oid),'' order by c.conrelid::regclass::text,c.conname)) from pg_constraint c where c.contype='f' and c.connamespace in('public'::regnamespace,'auth'::regnamespace)) is distinct from '7fa21fa361e2ca305f5b3706278b443e' then raise exception 'FK schema changed'; end if;
+ select pg_get_triggerdef(oid) into guard_definition from pg_trigger where tgrelid='public.timetable_entries'::regclass and tgname='trg_timetable_entries_published_guard' and tgenabled='O';
+ if guard_definition is distinct from 'CREATE TRIGGER trg_timetable_entries_published_guard BEFORE INSERT OR DELETE OR UPDATE ON public.timetable_entries FOR EACH ROW EXECUTE FUNCTION trg_guard_published_timetable_entries()' then raise exception 'Published guard changed'; end if;
+ select pg_get_functiondef('public.trg_guard_published_timetable_entries()'::regprocedure) into guard_function;
+ for p in select * from tt_cleanup_plan order by table_name loop
+  select array_agg(a.attname::text order by k.ord) into actual_pk from pg_constraint c cross join lateral unnest(c.conkey) with ordinality k(num,ord) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.num where c.conrelid=format('public.%I',p.table_name)::regclass and c.contype='p';
+  if actual_pk is distinct from p.pk then raise exception 'Primary key changed: %',p.table_name; end if;
+  select string_agg(format('r.%I',k),',') into pk_sort from unnest(p.pk)k;
+  execute 'with td as (select id from public.departments where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), ts as (select id from public.students where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), tf as (select id from public.faculty where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), tu as (select id from ts union select id from tf), tc as (select id from public.courses where department_id in (select id from td)), te as (select id from public.timetable_entries where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'') '||format('select count(*),md5(coalesce(string_agg(to_jsonb(r)::text, '''' order by %s),'''')) from public.%I r where coalesce((%s),false)',pk_sort,p.table_name,p.scope) into count_now,hash_now;
+  if count_now<>p.expected_count or hash_now is distinct from p.fingerprint then raise exception 'Selected data changed: %',p.table_name; end if;
+  if p.expected_count>0 then
+   if array_length(p.pk,1)<>1 or not exists(select 1 from pg_attribute where attrelid=format('public.%I',p.table_name)::regclass and attname=p.pk[1] and atttypid='uuid'::regtype) then raise exception 'Unsupported selected key'; end if;
+   execute 'with td as (select id from public.departments where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), ts as (select id from public.students where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), tf as (select id from public.faculty where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f''), tu as (select id from ts union select id from tf), tc as (select id from public.courses where department_id in (select id from td)), te as (select id from public.timetable_entries where campus_id=''b72074e2-468e-4218-afb6-0f08f14cfe8f'') '||format('insert into tt_cleanup_ids select $1,r.%I from public.%I r where coalesce((%s),false)',p.pk[1],p.table_name,p.scope) using p.table_name;
+  end if;
+  execute format('select count(*),md5(coalesce(string_agg(to_jsonb(r)::text, '''' order by %s),'''')) from public.%I r where not exists(select 1 from tt_cleanup_ids i where i.table_name=$1 and i.id::text=r.%I::text)',pk_sort,p.table_name,p.pk[1]) into count_now,hash_now using p.table_name;
+  insert into tt_cleanup_preserved values(p.table_name,count_now,hash_now);
+ end loop;
+ if (select count(*) from tt_cleanup_ids)<>921 then raise exception 'Unexpected selected count'; end if;
+ insert into tt_cleanup_auth select distinct id from tt_cleanup_ids where table_name in('students','faculty');
+ if (select count(*) from tt_cleanup_auth)<>151 or (select md5(string_agg(jsonb_build_object('id',u.id,'email',u.email,'app_metadata',u.raw_app_meta_data)::text,'' order by u.id)) from auth.users u join tt_cleanup_auth a on a.id=u.id) is distinct from 'b380d79f117294bfb5db98f8f5012750' then raise exception 'Auth inventory changed'; end if;
+ if exists(select 1 from public.system_logs where campus_id='b72074e2-468e-4218-afb6-0f08f14cfe8f' and log_type in('allocation_run','timetable_job') and status in('queued','running')) then raise exception 'Active fixture job'; end if;
+ if exists(select 1 from auth.users u where (u.email like '%.mangattt.20261018@example.test' or u.raw_app_meta_data->>'campus_id'='b72074e2-468e-4218-afb6-0f08f14cfe8f') and not exists(select 1 from tt_cleanup_auth a where a.id=u.id)) then raise exception 'Unreviewed fixture Auth account'; end if;
+ -- Repeat formal FK checks under the write locks.
+ for fk in select c.*,n.nspname as child_schema,cl.relname as child_table,pn.nspname as parent_schema,pc.relname as parent_table
+  from pg_constraint c join pg_class cl on cl.oid=c.conrelid join pg_namespace n on n.oid=cl.relnamespace
+  join pg_class pc on pc.oid=c.confrelid join pg_namespace pn on pn.oid=pc.relnamespace
+  where c.contype='f' and n.nspname='public' and (pn.nspname='public' or (pn.nspname='auth' and pc.relname='users')) loop
+  select string_agg(format('r.%I=p.%I',ca.attname,pa.attname),' and ') into join_sql
+  from unnest(fk.conkey,fk.confkey)k(childnum,parentnum) join pg_attribute ca on ca.attrelid=fk.conrelid and ca.attnum=k.childnum join pg_attribute pa on pa.attrelid=fk.confrelid and pa.attnum=k.parentnum;
+  select pk[1] into child_pk from tt_cleanup_plan where table_name=fk.child_table;
+  if fk.parent_schema='auth' then parent_filter:='exists(select 1 from tt_cleanup_auth a where a.id=p.id)';
+  else
+   select pk[1] into parent_pk from tt_cleanup_plan where table_name=fk.parent_table;
+   parent_filter:=format('exists(select 1 from tt_cleanup_ids i where i.table_name=%L and i.id::text=p.%I::text)',fk.parent_table,parent_pk);
+  end if;
+  execute format('select exists(select 1 from public.%I r join %I.%I p on %s where %s and not exists(select 1 from tt_cleanup_ids i where i.table_name=%L and i.id::text=r.%I::text))',fk.child_table,fk.parent_schema,fk.parent_table,join_sql,parent_filter,fk.child_table,child_pk) into outside_exists;
+  if outside_exists then raise exception 'Outside FK reference: %',fk.conname; end if;
+ end loop;
+ -- Repeat embedded UUID/code checks for all preserved public rows.
+ for p in select * from tt_cleanup_plan loop
+  execute format('select exists(select 1 from public.%I r where not exists(select 1 from tt_cleanup_ids i where i.table_name=$1 and i.id::text=r.%I::text) and (exists(select 1 from regexp_matches(to_jsonb(r)::text,''([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'',''g'')m join tt_cleanup_ids i on i.id::text=m[1]) or exists(select 1 from public.courses c join tt_cleanup_ids i on i.table_name=''courses'' and i.id=c.id where position(c.course_code in to_jsonb(r)::text)>0)))',p.table_name,p.pk[1]) into outside_exists using p.table_name;
+  if outside_exists then raise exception 'Outside embedded reference in %',p.table_name; end if;
+ end loop;
+ select jsonb_build_object(
+'users',(select md5(coalesce(string_agg(jsonb_build_object('id',u.id,'email',u.email,'app_metadata',u.raw_app_meta_data)::text,'' order by u.id),'')) from auth.users u where not exists(select 1 from tt_cleanup_auth a where a.id=u.id)),
+'sessions',(select md5(coalesce(string_agg(to_jsonb(s)::text,'' order by s.id),'')) from auth.sessions s where not exists(select 1 from tt_cleanup_auth a where a.id=s.user_id)),
+'refresh_tokens',(select md5(coalesce(string_agg(to_jsonb(s)::text,'' order by s.id),'')) from auth.refresh_tokens s where not exists(select 1 from tt_cleanup_auth a where a.id::text=s.user_id))) into auth_before;
+ delete from auth.refresh_tokens r using tt_cleanup_auth a where r.user_id=a.id::text; get diagnostics tokens_removed=row_count;
+ delete from auth.sessions s using tt_cleanup_auth a where s.user_id=a.id; get diagnostics sessions_removed=row_count;
+ for p in select * from tt_cleanup_plan order by delete_order loop
+  if p.expected_count>0 then
+   if p.table_name='timetable_entries' then alter table public.timetable_entries disable trigger trg_timetable_entries_published_guard; end if;
+   execute format('delete from public.%I r using tt_cleanup_ids i where i.table_name=$1 and r.%I=i.id',p.table_name,p.pk[1]) using p.table_name;
+   get diagnostics count_now=row_count;
+   if count_now<>p.expected_count then raise exception 'Delete count mismatch for %',p.table_name; end if;
+   if p.table_name='timetable_entries' then alter table public.timetable_entries enable trigger trg_timetable_entries_published_guard; end if;
+   deleted:=deleted+count_now;
+  else count_now:=0;
+  end if;
+  counts:=counts||jsonb_build_object(p.table_name,count_now);
+ end loop;
+ if deleted<>921 then raise exception 'Unexpected total removed'; end if;
+ for p in select * from tt_cleanup_plan loop
+  select string_agg(format('r.%I',k),',') into pk_sort from unnest(p.pk)k;
+  execute format('select exists(select 1 from public.%I r join tt_cleanup_ids i on i.table_name=$1 and i.id::text=r.%I::text)',p.table_name,p.pk[1]) into outside_exists using p.table_name;
+  if outside_exists then raise exception 'Selected rows remain: %',p.table_name; end if;
+  execute format('select count(*),md5(coalesce(string_agg(to_jsonb(r)::text, '''' order by %s),'''')) from public.%I r',pk_sort,p.table_name) into count_now,hash_now;
+  if not exists(select 1 from tt_cleanup_preserved b where b.table_name=p.table_name and b.row_count=count_now and b.fingerprint=hash_now) then raise exception 'Preserved rows changed: %',p.table_name; end if;
+ end loop;
+ select jsonb_build_object(
+'users',(select md5(coalesce(string_agg(jsonb_build_object('id',u.id,'email',u.email,'app_metadata',u.raw_app_meta_data)::text,'' order by u.id),'')) from auth.users u where not exists(select 1 from tt_cleanup_auth a where a.id=u.id)),
+'sessions',(select md5(coalesce(string_agg(to_jsonb(s)::text,'' order by s.id),'')) from auth.sessions s where not exists(select 1 from tt_cleanup_auth a where a.id=s.user_id)),
+'refresh_tokens',(select md5(coalesce(string_agg(to_jsonb(s)::text,'' order by s.id),'')) from auth.refresh_tokens s where not exists(select 1 from tt_cleanup_auth a where a.id::text=s.user_id))) into auth_after;
+ if auth_after is distinct from auth_before then raise exception 'Preserved Auth changed'; end if;
+ if not exists(select 1 from pg_trigger where tgrelid='public.timetable_entries'::regclass and tgname='trg_timetable_entries_published_guard' and tgenabled='O' and pg_get_triggerdef(oid)=guard_definition) or pg_get_functiondef('public.trg_guard_published_timetable_entries()'::regprocedure) is distinct from guard_function then raise exception 'Published guard not restored'; end if;
+ select jsonb_object_agg(table_name,jsonb_build_object('count',row_count,'fingerprint',fingerprint)) into protected from tt_cleanup_preserved;
+ insert into tt_cleanup_result values(jsonb_build_object('status','PUBLIC_CLEANUP_COMMITTED_AUTH_USERS_PENDING','completed_at',clock_timestamp(),'campus_id','b72074e2-468e-4218-afb6-0f08f14cfe8f','public_rows_deleted',deleted,'deleted_counts',counts,'test_sessions_revoked',sessions_removed,'test_refresh_tokens_removed',tokens_removed,'all_non_test_public_rows_unchanged',true,'non_test_auth_records_unchanged',true,'published_guard_restored',true,'guard_function_unchanged',true,'preserved',protected,'auth_users_pending',(select count(*) from auth.users u join tt_cleanup_auth a on a.id=u.id),'backup_waived_by_user',true));
+end $cleanup$;
+commit;
+select report as jsonb_build_object from tt_cleanup_result;

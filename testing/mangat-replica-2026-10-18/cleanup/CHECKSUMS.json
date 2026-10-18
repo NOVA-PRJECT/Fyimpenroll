@@ -1,0 +1,28 @@
+{
+  "algorithm": "SHA-256",
+  "sealed_at": "2026-10-18T15:46:06.980Z",
+  "files": {
+    "../../../scratch/mangat-replica-2026-10-18/cleanup/fixture-snapshot.json": "9ed2e28cdfcb967e91e86e08cbb0487524908fa1db2574d2f9c968f9296f875a",
+    "../../../scratch/mangat-replica-2026-10-18/cleanup/schema-and-guards.json": "e3fef15d7d286a2671d9ea2ad7b854b3df55767809e59df613572f69a5b585d3",
+    "AUTH_DELETION_REPORT.json": "e5e9f6e2cba5eb8bd117aaea5afbe8334a63bf1e3f1a695503a269b4359e1d8c",
+    "BACKUP_STATUS.json": "9746ca9339120d9a58878a2e12e86d8efebc9e426daf52dcc704e46b4e6060de",
+    "CLEANUP_MANIFEST.json": "df77e7de06cb8596ef715c3a17d20d1793af5e05d3e16eac24c3a191d1542250",
+    "CLEANUP_PLAN.md": "1263e03983344bfdff240db3082c7300b23d3979221fe1c80058b9eb196a1e8a",
+    "CLEANUP_VERIFICATION.json": "7c8ff246133e60134c8c2c6e3daaeb1d3adadfa288114110ec1ef581f7525897",
+    "EXECUTION_AUTHORIZATION.json": "849abf4f0f825246eb9cf6af943cc65fff1e9577f4b6e927da30f005c58e7c6d",
+    "MANUAL_BACKUP.md": "4c74a0d0f5fc6a08941d139069f22ade86cd44d57ba5ef9d18b74bd5eef2e22b",
+    "PUBLIC_DELETION_REPORT.json": "ba374dcfa2036706e075a27094680e4120009a8546e27178ff10ee0f2e98ef96",
+    "README.md": "2490fce3571bdd00b3345413e2d259ac0a739eed85a04a67d859d27c5b6bddc1",
+    "ROLLOUT_CHECKLIST.md": "7019275f14529c4021f93924be16915729b7f7a37fa27fc913a130c3b3e55bb7",
+    "TEST_RESULTS.json": "542a639799ff7745aceea04f9fcbb66d560daea40cf3bfca2c3e8034920931a3",
+    "check-cross-references.sql": "5f9bdf217ffd423aac5c925b181c0aca8082e482195870da8da4609585846b1e",
+    "check-embedded-references.sql": "d8132d4dd69113a17c302b4a0d7e0e550d8f9332f7391dac570021289c80647b",
+    "delete-authorized-public-data.sql": "6a99b96c68f0250d4f739b6f67fbf1fd8d062e2d87d03b1dda272dd8ec2ef496",
+    "delete-linked-auth.cjs": "adebf75aa5031b9d71add0bc49407085d5f5b51a80d6c44082f215cd0d9779e3",
+    "delete-linked-auth.test.cjs": "3131db215b9f68be10766326d9edfbf92c0941873758d899e46428c287d645aa",
+    "inventory.sql": "09ae2bc6eae2fa204fd8a7e978b34154271fabbe146d66e2ceee36cd9439693d",
+    "manual-backup.ps1": "78e582d12c43bab3bb126957786a92570152c6ca5832c68eb8774c3ee80af0bd",
+    "verify-executed-cleanup.sql": "817033b2495d3076de695bfcd17a96e0c4d13ccdeaf3523445c01cebaa43a82d",
+    "verify-package.cjs": "8fdf060a5146d5c03542550818243c7836d94d7b34d599f872a40726c65dcef8"
+  }
+}

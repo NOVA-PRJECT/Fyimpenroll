@@ -1,0 +1,405 @@
+{
+  "status": "INFEASIBLE_TEST_TIMETABLE_INPUTS",
+  "verified_at": "2026-10-18T13:34:22.640069+00:00",
+  "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+  "campus_code": "MANGATTT",
+  "academic_year": "2026-27",
+  "semester": 2,
+  "job": {
+    "id": "5df0989e-be87-4ef5-865a-6ea0d4093057",
+    "status": "completed",
+    "created_at": "2026-10-18T13:32:08.011186+00:00",
+    "completed_at": "2026-10-18T13:32:34.678+00:00",
+    "result_kind": "review_draft",
+    "total_courses": 25,
+    "required_course_periods": 94,
+    "placed_periods": 51,
+    "unscheduled_session_rows": 37,
+    "affected_courses": 17,
+    "unscheduled_periods": 43,
+    "diagnostics": [
+      "Insufficient weekly timetable capacity: mutually conflicting courses KU2DSCCSE102TT, KU2DSCCSE103TT, KU02DCSSTA103TT, KU02DSCMAT10 1TT, KU02DSCMAT10 2TT, KU02MDCSTA201TT, KU02AECHIN103 require 31 distinct periods, but only 30 periods are allowed. Every pair shares at least one student and cannot overlap. Review course registrations and contact hours, or obtain approval to increase timetable capacity. Increasing solver time cannot resolve this shortage.",
+      "Review draft only: unscheduled sessions must be resolved before publication."
+    ]
+  },
+  "teacher_coverage": {
+    "enrolled_courses": 58,
+    "with_exactly_one_assignment": 58,
+    "missing": 0
+  },
+  "capacity_evidence": {
+    "clique": [
+      {
+        "id": "998462b9-bfb7-470e-bed1-319c1fe182de",
+        "hours": 3,
+        "course_code": "KU02AECHIN103"
+      },
+      {
+        "id": "12c26f32-4f8f-421c-9cc4-32148529dd77",
+        "hours": 4,
+        "course_code": "KU02DCSSTA103TT"
+      },
+      {
+        "id": "d1c86dd0-4be5-4900-98ad-535fea097105",
+        "hours": 4,
+        "course_code": "KU02DSCMAT10 1TT"
+      },
+      {
+        "id": "b09952ee-42b0-484b-a36d-60dfd7d89c04",
+        "hours": 4,
+        "course_code": "KU02DSCMAT10 2TT"
+      },
+      {
+        "id": "b6318307-f3d5-4833-b456-51309d7c140d",
+        "hours": 4,
+        "course_code": "KU02MDCSTA201TT"
+      },
+      {
+        "id": "85b919cf-8a3c-4b80-9743-2b0184fb7bc1",
+        "hours": 6,
+        "course_code": "KU2DSCCSE102TT"
+      },
+      {
+        "id": "73de61b3-587f-451e-bce9-6acef58566a8",
+        "hours": 6,
+        "course_code": "KU2DSCCSE103TT"
+      }
+    ],
+    "time_slots": {
+      "days": 5,
+      "total": 30,
+      "periods_per_day": 6
+    },
+    "clique_pair_count": 21,
+    "registration_totals": [
+      {
+        "semester": 2,
+        "students": 60,
+        "max_credits": 22,
+        "min_credits": 22
+      },
+      {
+        "semester": 4,
+        "students": 60,
+        "max_credits": 22,
+        "min_credits": 22
+      }
+    ],
+    "student_hour_distribution": [
+      {
+        "students": 6,
+        "weekly_hours": 18
+      },
+      {
+        "students": 1,
+        "weekly_hours": 19
+      },
+      {
+        "students": 13,
+        "weekly_hours": 20
+      },
+      {
+        "students": 4,
+        "weekly_hours": 21
+      },
+      {
+        "students": 10,
+        "weekly_hours": 22
+      },
+      {
+        "students": 8,
+        "weekly_hours": 23
+      },
+      {
+        "students": 4,
+        "weekly_hours": 24
+      },
+      {
+        "students": 4,
+        "weekly_hours": 25
+      },
+      {
+        "students": 9,
+        "weekly_hours": 26
+      },
+      {
+        "students": 1,
+        "weekly_hours": 27
+      }
+    ],
+    "minimum_pair_shared_students": 1
+  },
+  "mdc_block_evidence": {
+    "rule": "Corresponding campus-wide MDC papers must occupy identical periods; each S2 student has one MDC paper.",
+    "source": "backend/src/modules/timetable/solver/campus-paper-groups.ts and current catalogue/enrolment readback",
+    "courses": [
+      {
+        "course_code": "KU02MDCECO104TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 6
+      },
+      {
+        "course_code": "KU02MDCECO105TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 7
+      },
+      {
+        "course_code": "KU02MDCECO106TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 7
+      },
+      {
+        "course_code": "KU02MDCECO107TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 6
+      },
+      {
+        "course_code": "KU02MDCMAT10 1TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 7
+      },
+      {
+        "course_code": "KU02MDCPSY102TT",
+        "theory": 3,
+        "practical": 0,
+        "contact_hours": 3,
+        "students": 9
+      },
+      {
+        "course_code": "KU02MDCSTA201TT",
+        "theory": 2,
+        "practical": 2,
+        "contact_hours": 4,
+        "students": 9
+      },
+      {
+        "course_code": "KU2MDCCSE201TT",
+        "theory": 2,
+        "practical": 2,
+        "contact_hours": 4,
+        "students": 9
+      }
+    ],
+    "conclusion": "A 3-period course and a 4-period course cannot both satisfy exact contact hours and identical occupancy."
+  },
+  "affected_course_summary": [
+    {
+      "id": "151b4fdc-5baa-47d0-9c92-58b2edaa60f0",
+      "course_code": "KU02DSCPES102TT",
+      "course_name": "PRINCIPLES AND SCIENTIFIC BASIS OF PHYSICAL EDUCATION AND SPORTS",
+      "sessions": 4,
+      "periods": 4,
+      "theory": 4,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "83b28c8e-c6ac-4125-b737-2ec22c1c9923",
+      "course_code": "KU02DSCPES103TT",
+      "course_name": "MAJOR GAMES – BADMINTON & VOLLEYBALL",
+      "sessions": 3,
+      "periods": 3,
+      "theory": 3,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "d1c86dd0-4be5-4900-98ad-535fea097105",
+      "course_code": "KU02DSCMAT10 1TT",
+      "course_name": "NTRODUCTION TO MATRIX THEORY , PARAMETRIC EQUATIONS AND POLAR CO - ORDINATES",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "68f5fc17-5fdd-4d67-a9b8-4b773d1ac43f",
+      "course_code": "KU02MDCPSY102TT",
+      "course_name": "SELF AND SOCIETY",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "85b919cf-8a3c-4b80-9743-2b0184fb7bc1",
+      "course_code": "KU2DSCCSE102TT",
+      "course_name": "Foundations of Computer Science",
+      "sessions": 4,
+      "periods": 6,
+      "theory": 2,
+      "practical": 4,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules.",
+        "2 practical period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "73de61b3-587f-451e-bce9-6acef58566a8",
+      "course_code": "KU2DSCCSE103TT",
+      "course_name": "Engineering Design and Prototyping",
+      "sessions": 4,
+      "periods": 6,
+      "theory": 2,
+      "practical": 4,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules.",
+        "2 practical period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "d463f564-2071-4409-a44c-247c5de4d4ec",
+      "course_code": "KU02DSCPSY103TT",
+      "course_name": "Cognitive Psychology",
+      "sessions": 3,
+      "periods": 3,
+      "theory": 3,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "5bc734c6-eb85-445c-a924-844e324263ce",
+      "course_code": "KU02MDCMAT10 1TT",
+      "course_name": "ELEMENTARY MATHEMATICS -2",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "b6318307-f3d5-4833-b456-51309d7c140d",
+      "course_code": "KU02MDCSTA201TT",
+      "course_name": "CORRELATION AND REGRESSION ANALYSIS",
+      "sessions": 2,
+      "periods": 2,
+      "theory": 2,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "b09952ee-42b0-484b-a36d-60dfd7d89c04",
+      "course_code": "KU02DSCMAT10 2TT",
+      "course_name": "CALCULUS I",
+      "sessions": 3,
+      "periods": 3,
+      "theory": 3,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "e53bd226-75d1-486f-a991-548b0f9a64ad",
+      "course_code": "KU2DSCCSE104TT",
+      "course_name": "Basic Science and Applications",
+      "sessions": 4,
+      "periods": 6,
+      "theory": 2,
+      "practical": 4,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules.",
+        "2 practical period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "02d890c4-fdd8-4d15-b6e0-2f78a0beb7e0",
+      "course_code": "KU02DSCECO102TT",
+      "course_name": "Fundamentals of Economic Development",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "26981be5-5db7-40cb-bc26-9abca0d862dc",
+      "course_code": "KU02MDCECO104TT",
+      "course_name": "Current Issues of Global Economy",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "b1ba5a4e-c5af-4a91-aad7-1aa0387ea1ae",
+      "course_code": "KU02MDCECO105TT",
+      "course_name": "Economic Journalism",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "3abb7244-4d8c-4ea7-a9ba-8907c1857224",
+      "course_code": "KU2MDCCSE201TT",
+      "course_name": "Foundations of Data Science",
+      "sessions": 2,
+      "periods": 2,
+      "theory": 2,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "403e6166-0275-497c-9e71-cf01017a0b37",
+      "course_code": "KU02MDCECO106TT",
+      "course_name": "Urban and Rural Economy",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    },
+    {
+      "id": "5e6d6216-1b63-4272-a4f7-3a1f667d41b0",
+      "course_code": "KU02MDCECO107TT",
+      "course_name": "Basic Mathematical and Statistical Methods",
+      "sessions": 1,
+      "periods": 1,
+      "theory": 1,
+      "practical": 0,
+      "reasons": [
+        "1 theory period(s) unscheduled. Not placed within the available periods and conflict-free scheduling rules."
+      ]
+    }
+  ],
+  "production_mutations": false
+}

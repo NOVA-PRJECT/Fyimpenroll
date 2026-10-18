@@ -1,0 +1,35 @@
+{
+  "status": "REHEARSAL_COMPLETED_WITH_OPEN_ITEMS",
+  "recorded_at": "2026-10-18T15:08:36.633277+00:00",
+  "verified": {
+    "test_campus": 1,
+    "departments": 8,
+    "students": 120,
+    "staff": 31,
+    "teachers": 21,
+    "enrolled_papers_with_teacher_assignments": 58,
+    "complete_registration_rows": 120,
+    "semester4_published_periods": 110,
+    "saved_period_attendance_marks": 30,
+    "saved_attendance_sessions": 3,
+    "consent_records": 13,
+    "successful_campus_sign_in_records": 0
+  },
+  "user_reported_passes": [
+    "Registration, HOD defaulters and edit/resubmit",
+    "S2 manual allocation resolution",
+    "Teacher login and assigned course roster",
+    "S4 timetable completion and publication",
+    "Attendance saving, correction, practical copy and report checks",
+    "Campus sign-in checks reported passed",
+    "Role/department access checks and exports reported passed"
+  ],
+  "evidence_limits": [
+    "UI passes are user-reported; they are not automated end-to-end passes for all 151 accounts.",
+    "No saved campus sign-in row is present in the inventory. A successful in-radius arrival/departure write is not independently proven; closed-window/rejection checks may explain this.",
+    "S2 timetable remains unresolved at the user's request: the latest reviewed registration mix has a 34-period conflict clique in a 30-period week.",
+    "Invalid-dashboard URL logout fix passes nine local regression tests and frontend type checking. Independent production deployment verification remains pending.",
+    "Recoverable database backup is not verified. Local fixture data/ID snapshots cannot restore Auth passwords or the full production database."
+  ],
+  "production_mutations_during_preparation": false
+}

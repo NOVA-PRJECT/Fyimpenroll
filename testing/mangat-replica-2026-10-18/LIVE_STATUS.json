@@ -1,5 +1,5 @@
 {
-  "status": "TEACHER_STAFFING_CREATED_ASSIGNED_VERIFIED_TIMETABLE_PENDING",
+  "status": "CLEANUP_COMPLETE_VERIFIED",
   "verified_at": "2026-10-18T06:24:10.000697+00:00",
   "project_ref": "lhnjlwtdphugjaluzrsp",
   "campus": {
@@ -12,7 +12,8 @@
     "center_longitude": 75.3687,
     "midday_split_time": "13:30:00",
     "evening_cutoff_time": "15:30:00",
-    "morning_cutoff_time": "09:30:00"
+    "morning_cutoff_time": "09:30:00",
+    "exists_in_production": false
   },
   "departments": [
     {
@@ -237,7 +238,11 @@
   "teacher_pilot_completed_at": "2026-10-18T12:02:41.222042+00:00",
   "staffing_readiness": "STAFFING_READINESS.json",
   "staffing_next_steps": "STAFFING_READINESS.md",
-  "staffing_coverage": {"enrolled_courses":58,"assigned_courses":58,"unassigned_courses":0},
+  "staffing_coverage": {
+    "enrolled_courses": 58,
+    "assigned_courses": 58,
+    "unassigned_courses": 0
+  },
   "teacher_staffing_report": "TEACHER_STAFFING_VERIFICATION.json",
   "teacher_staffing_invariants": "TEACHER_STAFFING_INVARIANTS.json",
   "teacher_staffing_guide": "TEACHER_STAFFING.md",
@@ -256,5 +261,120 @@
     "escape_and_focus_return_verified": true,
     "keyboard_focus_wrapping_verified": true,
     "mobile_layout_verified": true
+  },
+  "s2_timetable_diagnosis": {
+    "status": "HISTORICAL_BEFORE_MDC_2H_UPDATE",
+    "report": "TIMETABLE_S2_DIAGNOSIS.md",
+    "evidence": "TIMETABLE_S2_DIAGNOSIS.json",
+    "job_id": "5df0989e-be87-4ef5-865a-6ea0d4093057",
+    "placed_periods": 51,
+    "unscheduled_session_rows": 37,
+    "affected_courses": 17,
+    "unscheduled_periods": 43,
+    "missing_teacher_assignments": 0,
+    "production_mutations_during_check": false,
+    "frontend_diagnostics_display": "LOCAL_FIX_DEPLOYMENT_PENDING",
+    "superseded_by_mdc_hour_change": true
+  },
+  "mdc_2h_update": {
+    "status": "APPLIED_AND_VERIFIED",
+    "report": "MDC_2H_UPDATE_VERIFICATION.json",
+    "guide": "MDC_2H_UPDATE.md",
+    "updated_courses": 8,
+    "semester": 2,
+    "theory_only_courses": 6,
+    "practical_only_courses": 2,
+    "weekly_contact_hours_each": 2,
+    "credits_each": 3,
+    "synthetic_parallel_block_check": "OPTIMAL",
+    "full_campus_solver_checked": false,
+    "live_timetable_regeneration_pending": true
+  },
+  "s4_sec_vac_2h_update": {
+    "status": "APPLIED_AND_VERIFIED",
+    "verified_at": "2026-10-18 14:01:32.293894+00",
+    "report": "S4_SEC_VAC_2H_UPDATE_VERIFICATION.json",
+    "guide": "S4_SEC_VAC_2H_UPDATE.md",
+    "updated_courses": 9,
+    "sec_courses": 6,
+    "vac_courses": 3,
+    "semester": 4,
+    "weekly_contact_hours_each": 2,
+    "credits_each": 3,
+    "live_timetable_regeneration_pending": false
+  },
+  "s4_publication": {
+    "job_id": "15432776-bc77-4f62-9a20-9265f535601d",
+    "published_at": "2026-10-18T14:13:05.350652+00:00",
+    "published_count": 110,
+    "published_periods": 110
+  },
+  "s2_post_mdc_capacity_check": {
+    "report": "S2_POST_MDC_CAPACITY_CHECK.json",
+    "guide": "S2_POST_MDC_CAPACITY_CHECK.md",
+    "job_id": "9a06989d-0904-4b61-a6b1-66977fe8f2b6",
+    "created_at": "2026-10-18T13:47:40.787273+00:00",
+    "placed_periods": 51,
+    "unscheduled_periods": 33,
+    "unscheduled_session_rows": 27,
+    "affected_courses": 10,
+    "diagnostics": [
+      "Insufficient weekly timetable capacity: mutually conflicting courses KU2DSCCSE104TT, KU02DSCECO102TT, KU02DSCECO103TT, KU02DSCMAT10 1TT, KU02DSCMAT10 2TT, KU02DSCPES102TT, KU02DSCPES103TT, KU02DSCPSY102TT require 34 distinct periods, but only 30 periods are allowed. Every pair shares at least one student and cannot overlap. Review course registrations and contact hours, or obtain approval to increase timetable capacity. Increasing solver time cannot resolve this shortage.",
+      "Review draft only: unscheduled sessions must be resolved before publication."
+    ],
+    "required_conflicting_periods": 34,
+    "available_periods": 30,
+    "registration_changes_applied": false
+  },
+  "cleanup_preparation": {
+    "status": "EXECUTED_COMPLETE_VERIFIED",
+    "verified_at": "2026-10-18T15:08:36.633277+00:00",
+    "plan": "cleanup/CLEANUP_PLAN.md",
+    "manifest": "cleanup/CLEANUP_MANIFEST.json",
+    "backup_status": "cleanup/BACKUP_STATUS.json",
+    "test_results": "cleanup/TEST_RESULTS.json",
+    "rollout_checklist": "cleanup/ROLLOUT_CHECKLIST.md",
+    "public_rows": 921,
+    "auth_users": 151,
+    "preserved_auth_users": 258,
+    "outside_foreign_key_references": 0,
+    "outside_embedded_references": 0,
+    "storage_objects": 0,
+    "backup_verified": false,
+    "production_deletion_authorized": true,
+    "production_changes_during_preparation": false,
+    "local_package_verified": true,
+    "managed_backup_availability": "USER_CONFIRMED_NONE_ON_FREE_TIER",
+    "manual_backup_guide": "cleanup/MANUAL_BACKUP.md",
+    "manual_backup_status": "PREPARED_NOT_RUN_MISSING_TOOLS_AND_DATABASE_CONNECTION",
+    "backup_requirement_waived_by_user": true,
+    "verification_report": "cleanup/CLEANUP_VERIFICATION.json",
+    "completed_at": "2026-10-18T15:42:23.029513+00:00"
+  },
+  "user_reported_final_checks": {
+    "teacher_attendance_save_correction_practical_copy_reports": "REPORTED_PASSED",
+    "campus_sign_in": "REPORTED_PASSED_NO_PERSISTED_SIGN_IN_ROW_IN_INVENTORY",
+    "role_department_access_and_exports": "REPORTED_PASSED",
+    "independent_campus_sign_in_rows": 0,
+    "independent_period_attendance_rows": 30,
+    "independent_period_attendance_sessions": 3
+  },
+  "test_accounts_active": false,
+  "fixture_state_note": "Earlier fixture counts, accounts and credentials are historical. The test campus, 921 public rows and 151 linked Auth users have been removed.",
+  "cleanup_verification": {
+    "status": "COMPLETE_VERIFIED",
+    "verified_at": "2026-10-18T15:42:23.029513+00:00",
+    "public_rows_deleted": 921,
+    "auth_users_deleted": 151,
+    "remaining_test_campus": 0,
+    "remaining_test_auth_users": 0,
+    "remaining_test_sessions": 0,
+    "remaining_test_refresh_tokens": 0,
+    "remaining_test_identities": 0,
+    "preserved_auth_users": 258,
+    "non_test_public_tables_unchanged": true,
+    "non_test_auth_metadata_unchanged": true,
+    "shared_hindi_preserved": true,
+    "published_timetable_guard_restored": true
   }
 }

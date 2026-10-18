@@ -116,6 +116,7 @@ export default function CampusDirectorTimetablePage() {
   const [allConflicts, setAllConflicts] = useState<ConflictItem[]>([]);
   const [reviewDraft, setReviewDraft] = useState(false);
   const [unscheduledPeriods, setUnscheduledPeriods] = useState(0);
+  const [timetableDiagnostics, setTimetableDiagnostics] = useState<string[]>([]);
   const [publication, setPublication] = useState<{ published: boolean; publishedAt: string | null; publishedCount: number } | null>(null);
   const entriesRequest = useRef(0);
   const cohortRef = useRef('');
@@ -223,6 +224,7 @@ export default function CampusDirectorTimetablePage() {
         setAllConflicts(conflictsList);
         setReviewDraft(data.reviewDraft === true);
         setUnscheduledPeriods(data.unscheduledPeriods || 0);
+        setTimetableDiagnostics(Array.isArray(data.diagnostics) ? data.diagnostics.filter((value: unknown): value is string => typeof value === 'string') : []);
         setDepartments(deptList);
       } catch (err: unknown) {
         if (request === entriesRequest.current && cohort === cohortRef.current) {
@@ -253,6 +255,7 @@ export default function CampusDirectorTimetablePage() {
     setStepMessage(null);
     setShowGenerationOverlay(false);
     setPublication(null);
+    setTimetableDiagnostics([]);
     setShowPublishModal(false);
 
     if (!academicYear || !semester) return;
@@ -684,6 +687,7 @@ export default function CampusDirectorTimetablePage() {
   const totalConflictingStudents = allConflicts.reduce((sum, c) => sum + (c.conflictingStudentCount || 0), 0);
   const impactedDeptIds = new Set(departments.filter(d => entriesForDepartment(allConflicts, d.id).length).map(d => d.id));
   const unassignedCourses = new Set(allEntries.filter(entry => !entry.teacherId).map(entry => entry.courseId)).size;
+  const affectedCourseCount = new Set(allConflicts.map(conflict => conflict.courseId)).size;
 
   return (
     <div className={styles.pageWrapper}>
@@ -719,8 +723,14 @@ export default function CampusDirectorTimetablePage() {
             : `Assign teachers for ${academicYear}, Semester ${semester}, then generate again before publishing to include them in teacher schedules and clash checks.`}</p>
         </div>}
         {reviewDraft && <div role="status" className={styles.bannerWarning}>
-          <strong>Incomplete review draft — {unscheduledPeriods} course periods remain unscheduled.</strong>
+          <strong>Incomplete review draft — {unscheduledPeriods} periods across {affectedCourseCount} courses remain unscheduled.</strong>
           <p>The displayed sessions satisfy the scheduling rules. Review the unscheduled sessions, adjust the catalogue or rules as appropriate, then generate again. This draft cannot be published.</p>
+          {timetableDiagnostics.length > 0 && <details open style={{ margin: '0.75rem 0' }}>
+            <summary style={{ fontWeight: 700 }}>Why this draft is incomplete</summary>
+            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', lineHeight: 1.6 }}>
+              {timetableDiagnostics.map((message, index) => <li key={index}>{message}</li>)}
+            </ul>
+          </details>}
           <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
         </div>}
         {!rulesReady && !rulesError && <LoadingState layout="list" rows={2} compact message="Loading scheduling rules…" />}
@@ -883,7 +893,7 @@ export default function CampusDirectorTimetablePage() {
           <div className={styles.bannerWarning} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <p style={{ fontWeight: 700, margin: '0 0 0.25rem 0', fontSize: '0.95rem' }}>
-                <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {allConflicts.length} Course Scheduling Conflict(s) Require Attention
+                <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {reviewDraft ? `${allConflicts.length} Unscheduled Sessions Across ${affectedCourseCount} Courses` : `${allConflicts.length} Course Scheduling Conflict(s) Require Attention`}
               </p>
               <p style={{ margin: 0, fontSize: '0.82rem', color: "var(--portal-warning-text,#78350f)" }}>
                 Required sessions remain unscheduled under the current hours, available periods and scheduling rules.
@@ -903,7 +913,7 @@ export default function CampusDirectorTimetablePage() {
               }}
               onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}
             >
-              View All {allConflicts.length} Conflicts →
+              {reviewDraft ? `View ${allConflicts.length} unscheduled sessions →` : `View All ${allConflicts.length} Conflicts →`}
             </button>
           </div>
         )}
@@ -928,7 +938,7 @@ export default function CampusDirectorTimetablePage() {
               onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}
               title="View all scheduling conflicts across campus"
             >
-              Unresolved Conflicts ({allConflicts.length})
+              {reviewDraft ? 'Unscheduled Sessions' : 'Unresolved Conflicts'} ({allConflicts.length})
             </button>
           )}
         </div>
@@ -939,7 +949,7 @@ export default function CampusDirectorTimetablePage() {
             <div className={styles.conflictsSectionHeader}>
               <div>
                 <h3 className={styles.conflictsSectionTitle}>
-                  Campus Scheduling Conflicts ({allConflicts.length})
+                  {reviewDraft ? 'Unscheduled Sessions' : 'Campus Scheduling Conflicts'} ({allConflicts.length})
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: "var(--portal-muted,#64748b)" }}>
                   These required sessions remain unscheduled. Partially scheduled courses may still appear in the timetable grid.

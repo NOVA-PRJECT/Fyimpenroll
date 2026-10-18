@@ -1,0 +1,45 @@
+{
+  "status": "S2_CAPACITY_BLOCKED_S4_PUBLISHED",
+  "checked_at": "2026-10-18T14:14:02.626234+00:00",
+  "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+  "academic_year": "2026-27",
+  "s4": {
+    "job_id": "15432776-bc77-4f62-9a20-9265f535601d",
+    "published_at": "2026-10-18T14:13:05.350652+00:00",
+    "published_count": 110,
+    "published_periods": 110
+  },
+  "s2": {
+    "job_id": "9a06989d-0904-4b61-a6b1-66977fe8f2b6",
+    "created_at": "2026-10-18T13:47:40.787273+00:00",
+    "placed_periods": 51,
+    "unscheduled_periods": 33,
+    "unscheduled_session_rows": 27,
+    "affected_courses": 10,
+    "diagnostics": [
+      "Insufficient weekly timetable capacity: mutually conflicting courses KU2DSCCSE104TT, KU02DSCECO102TT, KU02DSCECO103TT, KU02DSCMAT10 1TT, KU02DSCMAT10 2TT, KU02DSCPES102TT, KU02DSCPES103TT, KU02DSCPSY102TT require 34 distinct periods, but only 30 periods are allowed. Every pair shares at least one student and cannot overlap. Review course registrations and contact hours, or obtain approval to increase timetable capacity. Increasing solver time cannot resolve this shortage.",
+      "Review draft only: unscheduled sessions must be resolved before publication."
+    ]
+  },
+  "independent_capacity_check": {
+    "courses": [
+      "KU2DSCCSE104TT",
+      "KU02DSCECO102TT",
+      "KU02DSCECO103TT",
+      "KU02DSCMAT10 1TT",
+      "KU02DSCMAT10 2TT",
+      "KU02DSCPES102TT",
+      "KU02DSCPES103TT",
+      "KU02DSCPSY102TT"
+    ],
+    "required_periods": 34,
+    "available_periods_in_run": 30,
+    "pairs_checked": 28,
+    "pairs_without_shared_students": 0,
+    "minimum_shared_students_per_pair": 1,
+    "all_eight_mdc_courses_two_hours": true
+  },
+  "interpretation": "The seeded varied S2 minor combinations create a conflict clique larger than the weekly calendar. The latest S2 run predates S4 publication; new S2 runs must additionally respect published S4 teacher reservations.",
+  "recommended_next_step": "Prepare and check a timetable-compatible S2 test minor selection plan before changing registrations. Retain two minor supplier departments, blueprint rules, capacities and course contact hours. Obtain user authorization before applying the revised registrations. Preserve the published S4 timetable.",
+  "production_mutations_during_investigation": false
+}
