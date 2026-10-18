@@ -38,6 +38,11 @@ interface RemainingCourse {
   remaining_seats: number
 }
 
+interface PlacementCourse extends RemainingCourse {
+  can_allocate: boolean
+  unavailable_reason: string | null
+}
+
 export default function ManualAllocationTab() {
   const [selectedSemester, setSelectedSemester] = useState<number>(1)
   const [unresolvedStudents, setUnresolvedStudents] = useState<UnresolvedStudent[]>([])
@@ -53,10 +58,55 @@ export default function ManualAllocationTab() {
   } | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string>('')
   const [submitting, setSubmitting] = useState<boolean>(false)
+  const [placementCourses, setPlacementCourses] = useState<PlacementCourse[]>([])
+  const [placementLoading, setPlacementLoading] = useState(false)
+  const [placementError, setPlacementError] = useState('')
+  const [placementSlotName, setPlacementSlotName] = useState('')
+
+  useEffect(() => {
+    if (!allocatingTarget) return
+    const controller = new AbortController()
+    setPlacementLoading(true)
+    setPlacementCourses([])
+    setSelectedCourseId('')
+    setPlacementError('')
+    setPlacementSlotName('')
+    setError('')
+    const parameters = new URLSearchParams({
+      semesterId: String(allocatingTarget.student.current_semester),
+      student_id: allocatingTarget.student.student_id,
+      slot_key: allocatingTarget.slot.slot_key,
+    })
+    async function loadPlacementCourses() {
+      try {
+        const response = await fetch(`/api/allocation/remaining-seats?${parameters}`, {
+          cache: 'no-store', signal: controller.signal,
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.message || data.error || 'Failed to load courses for this paper')
+        if (data.student_id !== allocatingTarget!.student.student_id || data.slot_key !== allocatingTarget!.slot.slot_key) {
+          throw new Error('The course list could not be loaded. Refresh and try again.')
+        }
+        if (!controller.signal.aborted) {
+          setPlacementCourses(data.courses || [])
+          setPlacementSlotName(data.slot_name || '')
+        }
+      } catch (err: unknown) {
+        if (!controller.signal.aborted) setPlacementError(err instanceof Error ? err.message : 'Failed to load courses for this paper')
+      } finally {
+        if (!controller.signal.aborted) setPlacementLoading(false)
+      }
+    }
+    void loadPlacementCourses()
+    return () => controller.abort()
+  }, [allocatingTarget])
 
   useEffect(() => {
     fetchData(selectedSemester)
   }, [selectedSemester])
+
+  const canConfirmAllocation = !submitting && !placementLoading && !placementError
+    && placementCourses.some(course => course.id === selectedCourseId && course.can_allocate)
 
   async function fetchData(semester: number) {
     setLoading(true)
@@ -87,7 +137,7 @@ export default function ManualAllocationTab() {
   }
 
   async function handleConfirmAllocation() {
-    if (!allocatingTarget || !selectedCourseId) return
+    if (!allocatingTarget || !canConfirmAllocation) return
 
     setSubmitting(true)
     setError('')
@@ -104,7 +154,7 @@ export default function ManualAllocationTab() {
 
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to manually allocate course')
+        throw new Error(data.message || data.error || 'Failed to manually allocate course')
       }
 
       setSuccess(data.message || 'Course allocated successfully')
@@ -141,7 +191,7 @@ export default function ManualAllocationTab() {
             Reactive Manual Allocation
           </h2>
           <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#64748b)", margin: '0.25rem 0 0 0' }}>
-            Resolve unplaced elective slots upon student contact with remaining departmental seats.
+            Resolve unplaced papers using courses allowed by each student&apos;s curriculum and available seats.
           </p>
         </div>
 
@@ -524,7 +574,7 @@ export default function ManualAllocationTab() {
                 Manual Course Placement
               </h3>
               <p style={{ fontSize: '0.8rem', color: "var(--portal-muted,#64748b)", margin: '0.25rem 0 0 0' }}>
-                Assign an available departmental course to resolve this student&apos;s paper slot.
+                Choose a course allowed for this paper in the student&apos;s curriculum.
               </p>
             </div>
 
@@ -553,7 +603,7 @@ export default function ManualAllocationTab() {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: "var(--portal-muted,#64748b)" }}>Target Paper:</span>
                 <strong style={{ color: "var(--portal-info-text,#1e40af)" }}>
-                  Paper {allocatingTarget.slot.slot_number} ({allocatingTarget.slot.slot_key})
+                  Paper {allocatingTarget.slot.slot_number} ({placementSlotName || allocatingTarget.slot.slot_key})
                 </strong>
               </div>
             </div>
@@ -561,11 +611,14 @@ export default function ManualAllocationTab() {
             {/* Course Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.82rem', fontWeight: 600, color: "var(--portal-info-text,#475569)" }}>
-                Select Course with Remaining Seats:
+                Select Course:
               </label>
               <select
                 value={selectedCourseId}
                 onChange={(e) => setSelectedCourseId(e.target.value)}
+                disabled={placementLoading || !!placementError || submitting}
+                aria-label="Course for this paper"
+                aria-describedby="placement-course-status"
                 style={{
                   padding: '0.65rem 0.85rem',
                   borderRadius: '8px',
@@ -575,15 +628,20 @@ export default function ManualAllocationTab() {
                   fontSize: '0.85rem',
                 }}
               >
-                <option value="">— Select an available course —</option>
-                {remainingCourses
-                  .filter((c) => c.remaining_seats > 0)
+                <option value="">{placementLoading ? 'Loading courses…' : '— Select an available course —'}</option>
+                {placementCourses
                   .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.course_code} — {c.title} ({c.remaining_seats} seats remaining)
+                    <option key={c.id} value={c.id} disabled={!c.can_allocate}>
+                      {c.course_code} — {c.title} ({c.can_allocate ? `${c.remaining_seats} seats remaining` : c.unavailable_reason})
                     </option>
                   ))}
               </select>
+              <div id="placement-course-status" role={placementError ? 'alert' : 'status'} style={{ fontSize: '0.8rem', color: 'var(--portal-muted,#64748b)' }}>
+                {placementError || (placementLoading ? 'Checking courses, prerequisites and available seats…'
+                  : placementCourses.length === 0 ? 'No courses are configured for this paper in the student’s curriculum.'
+                  : !placementCourses.some(c => c.can_allocate) ? 'No course can currently be assigned to this paper. The listed courses show unmet prerequisites or full capacity.'
+                  : 'Courses with unmet prerequisites or no remaining seats are shown but cannot be selected.')}
+              </div>
             </div>
 
             {error && (
@@ -622,7 +680,7 @@ export default function ManualAllocationTab() {
               <button
                 type="button"
                 onClick={handleConfirmAllocation}
-                disabled={submitting || !selectedCourseId}
+                disabled={!canConfirmAllocation}
                 style={{
                   padding: '0.5rem 1.25rem',
                   borderRadius: '8px',
@@ -631,8 +689,8 @@ export default function ManualAllocationTab() {
                   color: '#ffffff',
                   fontSize: '0.82rem',
                   fontWeight: 600,
-                  cursor: submitting || !selectedCourseId ? 'not-allowed' : 'pointer',
-                  opacity: submitting || !selectedCourseId ? 0.6 : 1,
+                  cursor: canConfirmAllocation ? 'pointer' : 'not-allowed',
+                  opacity: canConfirmAllocation ? 1 : 0.6,
                 }}
               >
                 {submitting ? <LoadingIndicator message="Allocating…" /> : 'Confirm Allocation →'}

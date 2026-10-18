@@ -25,6 +25,7 @@ function database(tables, rpc) {
     neq(key, value) { this.filters.push(row => row[key] !== value); return this }
     lt(key, value) { this.filters.push(row => row[key] < value); return this }
     in(key, values) { this.filters.push(row => values.includes(row[key])); return this }
+    or(expression) { const terms = expression.split(',').map(term => term.split('.eq.')); this.filters.push(row => terms.some(([key, value]) => row[key] === value)); return this }
     not(key, operator, value) { assert.equal(operator, 'in'); const ids = value.slice(1, -1).split(','); this.filters.push(row => !ids.includes(row[key])); return this }
     order() { return this }
     limit(n) { this.end = n - 1; return this }
@@ -216,6 +217,110 @@ test('submission rejects wrong-semester and wrong-category courses before persis
   c.semester = 2
   await assert.rejects(submit(), /not eligible/)
   assert.equal(db.writes.length, 0)
+})
+
+function manualPickerTables() {
+  return {
+    students: [{ id: user.userId, ...user }],
+    campus_settings: [{ campus_id: 'campus', academic_year: '2026-27' }],
+    departments: [{ id: 'home', code: 'ITTT', name: 'Home' }, { id: 'away', code: 'HIN', name: 'Shared languages' }],
+    semester_blueprints: [{ department_id: 'home', semester: 2, pathways: [{ id: 'p', slots: [
+      slot('FIXED', 'major-1'), slot('FIXED', 'major-2'), slot('DEPT_RESTRICTED', 'HIN'),
+      slot('EXCLUDE_DEPT', 'ITTT'), slot('GLOBAL_BASKET', 'MDC'), slot('GLOBAL_BASKET', 'AEC'), slot('POOL_RESTRICTED', 'POOLED'),
+    ] }] }],
+    courses: [course('hindi', 'AEC'), course('malayalam', 'AEC'), course('available-aec', 'AEC', 'home'),
+      { ...course('closed-aec', 'AEC'), seat_limit: 0 }, course('old-aec', 'AEC', 'away', 4),
+      course('mdc-away'), course('mdc-home', 'MDC', 'home'), course('minor', 'DSC'),
+      course('own-dse', 'DSE', 'home'), course('other-dse', 'DSE')],
+    course_prerequisite_rules: [{ id: 'mal-rule', course_id: 'malayalam', rule: 'DEPARTMENT', target: 'HIN,MAL' }],
+    student_registrations: [{ id: 'reg', student_id: user.userId, campus_id: 'campus', semester: 2, academic_year: '2026-27', pathway_id: 'p' },
+      ...Array.from({ length: 10 }, (_, i) => ({ id: `other-${i}`, student_id: `other-${i}`, campus_id: 'other-campus', semester: 2, academic_year: '2026-27', slot_8_course_id: 'hindi' }))],
+  }
+}
+
+test('HOD placement lists shared AEC options for slot 6 and explains full, prerequisite and zero-capacity blockers', async () => {
+  const db = database(manualPickerTables())
+  const result = await new AllocationService({ admin: db }, logger, logger).getRemainingSeats(2, { ...user, role: 'hod' }, user.userId, 'slot_6')
+  assert.equal(result.slot_key, 'slot_6')
+  assert.equal(result.slot_name, 'AEC')
+  assert.deepEqual(result.courses.map(c => c.id), ['hindi', 'malayalam', 'available-aec', 'closed-aec'])
+  assert.equal(result.courses.find(c => c.id === 'available-aec').can_allocate, true)
+  const hindi = result.courses.find(c => c.id === 'hindi')
+  assert.equal(hindi.total_allocated, 10)
+  assert.equal(hindi.remaining_seats, 0)
+  assert.equal(hindi.can_allocate, false)
+  assert.match(hindi.unavailable_reason, /10\/10.*globally/)
+  assert.match(result.courses.find(c => c.id === 'malayalam').unavailable_reason, /restricted to departments/)
+  const closed = result.courses.find(c => c.id === 'closed-aec')
+  assert.equal(closed.seat_limit, 0)
+  assert.equal(closed.can_allocate, false)
+  assert.equal(db.calls.length, 0)
+  assert.equal(db.writes.length, 0)
+})
+
+test('HOD placement obeys each slot rule, including minors, MDC, explicit slot 7 pools and S4 VAC', async () => {
+  const tables = manualPickerTables(), service = new AllocationService({ admin: database(tables) }, logger, logger)
+  const actor = { ...user, role: 'hod' }
+  for (const [key, expected] of [
+    ['slot_3', ['minor', 'other-dse']], ['slot_4', ['minor', 'other-dse']],
+    ['slot_5', ['mdc-away']], ['slot_7', ['own-dse']],
+  ]) {
+    const result = await service.getRemainingSeats(2, actor, user.userId, key)
+    assert.deepEqual(result.courses.map(c => c.id), expected)
+  }
+  tables.students[0].current_semester = 4
+  tables.student_registrations[0].semester = 4
+  tables.semester_blueprints[0].semester = 4
+  tables.semester_blueprints[0].pathways[0].slots[5] = slot('GLOBAL_BASKET', 'VAC')
+  tables.courses.push(course('vac-shared', 'VAC', 'away', 4), course('wrong-sec', 'SEC', 'away', 4))
+  const result = await service.getRemainingSeats(4, actor, user.userId, 'slot_6')
+  assert.deepEqual(result.courses.map(c => c.id), ['vac-shared'])
+})
+
+test('HOD placement checks completed course IDs/codes and disables a course already assigned in another slot', async () => {
+  const tables = manualPickerTables()
+  tables.courses.find(c => c.id === 'available-aec').prerequisite_course_ids = ['prerequisite']
+  tables.course_prerequisite_rules.push({ course_id: 'available-aec', rule: 'COMPLETED_COURSE', target: 'KU01AEC101' })
+  tables.courses.push({ ...course('prerequisite', 'AEC', 'away', 1), course_code: 'KU1AEC101' })
+  const service = new AllocationService({ admin: database(tables) }, logger, logger), actor = { ...user, role: 'hod' }
+  let result = await service.getRemainingSeats(2, actor, user.userId, 'slot_6')
+  assert.equal(result.courses.find(c => c.id === 'available-aec').can_allocate, false)
+  tables.student_registrations.push({ id: 'history', student_id: user.userId, semester: 1, slot_8_course_id: 'prerequisite' })
+  result = await service.getRemainingSeats(2, actor, user.userId, 'slot_6')
+  assert.equal(result.courses.find(c => c.id === 'available-aec').can_allocate, true)
+  tables.student_registrations[0].slot_7_course_id = 'available-aec'
+  result = await service.getRemainingSeats(2, actor, user.userId, 'slot_6')
+  assert.match(result.courses.find(c => c.id === 'available-aec').unavailable_reason, /another paper/)
+})
+
+test('HOD placement denies foreign students, stale semesters, missing context/pathways and fixed slots', async () => {
+  const actor = { ...user, role: 'hod' }
+  for (const change of [
+    tables => { tables.students[0].department_id = 'away' },
+    tables => { tables.students[0].campus_id = 'other' },
+    tables => { tables.students[0].current_semester = 4 },
+    tables => { tables.student_registrations[0].pathway_id = 'deleted-pathway' },
+  ]) {
+    const tables = manualPickerTables()
+    change(tables)
+    await assert.rejects(new AllocationService({ admin: database(tables) }, logger, logger).getRemainingSeats(2, actor, user.userId, 'slot_6'))
+  }
+  const db = database(manualPickerTables()), service = new AllocationService({ admin: db }, logger, logger)
+  await assert.rejects(service.getRemainingSeats(2, actor, user.userId, 'slot_1'), /fixed slot/)
+  for (const args of [[2, actor, user.userId], [2, actor, undefined, 'slot_6'], [2, actor, user.userId, 'slot_9'], [2.5, actor, user.userId, 'slot_6']]) {
+    await assert.rejects(service.getRemainingSeats(...args))
+  }
+  assert.equal(db.calls.length, 0)
+})
+
+test('HOD capacity overview retains its department scope; placement cannot assign a full or zero-capacity AEC', async () => {
+  const db = database(manualPickerTables()), service = new AllocationService({ admin: db }, logger, logger), actor = { ...user, role: 'hod' }
+  const overview = await service.getRemainingSeats(2, actor)
+  assert.deepEqual(overview.courses.map(c => c.id), ['available-aec', 'mdc-home', 'own-dse'])
+  for (const id of ['hindi', 'closed-aec']) {
+    await assert.rejects(service.manualAllocate({ student_id: user.userId, slot_key: 'slot_6', course_id: id }, actor), /no remaining seats/)
+  }
+  assert.equal(db.calls.length, 0)
 })
 
 test('configured pool in slot 7 supplies own-department DSE options instead of legacy minors', async () => {

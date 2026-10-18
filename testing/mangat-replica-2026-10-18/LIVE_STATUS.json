@@ -1,5 +1,5 @@
 {
-  "status": "ACADEMIC_REPLICA_STAFF_AND_UPLOADED_STUDENTS_VERIFIED",
+  "status": "S2_S4_AUTOMATIC_ALLOCATION_VERIFIED_MANUAL_RESOLUTION_PENDING",
   "verified_at": "2026-10-18T06:24:10.000697+00:00",
   "project_ref": "lhnjlwtdphugjaluzrsp",
   "campus": {
@@ -58,11 +58,11 @@
   ],
   "campus_settings": {
     "id": "70986f40-2662-46d0-b429-c68f5fa80d15",
-    "deadline": null,
     "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
-    "max_credits": 26,
-    "min_credits": 18,
+    "deadline": "2026-10-18T10:59:43.199+00:00",
     "academic_year": "2026-27",
+    "min_credits": 18,
+    "max_credits": 26,
     "last_promoted_at": null,
     "timetable_constraints": null
   },
@@ -74,12 +74,14 @@
     "faculty": 10,
     "students": 120,
     "teachers": 0,
-    "courses": 61,
+    "courses": 62,
     "blueprints": 12,
-    "semester_2_courses": 23,
+    "semester_2_courses": 24,
     "semester_4_courses": 38,
     "student_auth_accounts": 120,
-    "staff_auth_accounts": 10
+    "staff_auth_accounts": 10,
+    "registration_preferences": 120,
+    "student_registrations": 120
   },
   "staff_roles": {
     "hod": 8,
@@ -99,7 +101,10 @@
     "slots_verified": 72,
     "each_pathway_attainable_credits": 22,
     "uploaded_students_match_all_csv_rows": true,
-    "student_auth_checks_passed": true
+    "student_auth_checks_passed": true,
+    "all_test_registrations_verified": true,
+    "manual_registration_preserved": true,
+    "additional_test_aec_picker_verified": true
   },
   "pending": {
     "courses": 0,
@@ -109,7 +114,7 @@
   },
   "private_credentials": "../../scratch/mangat-replica-2026-10-18/AUTH_CREDENTIALS.md",
   "private_auth_id_manifest": "../../scratch/mangat-replica-2026-10-18/auth-creation-state.json",
-  "note": "Academic setup, staff and all 120 user-uploaded students are verified. First-login password changes and the normal registration rehearsal are next. Registration remains closed; teachers remain deferred.",
+  "note": "S2/S4 allocation verified with one pending S2 AEC. User-approved test AEC KU02AECHIN103TT is live under ECOTT with 60 seats and is selectable for Paper 6 in the corrected picker. Student assignment is left to the user HOD test. The general manual-picker fix is validated locally and still requires frontend/backend deployment. Real course capacities/prerequisites are unchanged. Teacher/timetable/attendance phases remain pending.",
   "academic_verified_at": "2026-10-18T06:34:15.580Z",
   "private_academic_id_manifest": "../../scratch/mangat-replica-2026-10-18/academic-verification.json",
   "prepared_student_upload": {
@@ -127,18 +132,82 @@
   "students_verified_at": "2026-10-18T07:58:59.802973+00:00",
   "private_student_auth_id_manifest": "../../scratch/mangat-replica-2026-10-18/student-upload-verification.json",
   "workflow_state": {
-    "preferences": 0,
-    "verified_at": "2026-10-18T07:58:30.764363+00:00",
-    "test_courses": 61,
+    "preferences": 120,
+    "verified_at": "2026-10-18T10:57:12.115Z",
+    "test_courses": 62,
     "test_students": 120,
-    "allocation_runs": [],
+    "allocation_runs": [
+      {
+        "id": "10d5c38e-6c8d-4a8f-b378-0e1195b7670e",
+        "status": "completed",
+        "summary": {
+          "skipped_choices": [],
+          "allocated_slots_count": 239,
+          "skipped_choices_count": 0,
+          "unresolved_core_slots": 1,
+          "unallocated_slots_count": 1,
+          "skipped_choices_truncated": false,
+          "unresolved_optional_slots": 0
+        },
+        "semester": 2,
+        "completed_at": "2026-10-18T11:00:02.074519+00:00"
+      },
+      {
+        "id": "afd849af-f24b-4c18-8107-ed540e55e958",
+        "status": "completed",
+        "summary": {
+          "skipped_choices": [],
+          "allocated_slots_count": 120,
+          "skipped_choices_count": 0,
+          "unresolved_core_slots": 0,
+          "unallocated_slots_count": 0,
+          "skipped_choices_truncated": false,
+          "unresolved_optional_slots": 0
+        },
+        "semester": 4,
+        "completed_at": "2026-10-18T11:05:42.533975+00:00"
+      }
+    ],
     "test_blueprints": 12,
     "timetable_entries": 0,
-    "registration_deadline": null,
+    "registration_deadline": "2026-10-18T10:59:43.199+00:00",
     "students_without_blueprint": 0,
-    "registration_records": 0,
-    "preference_records": 0,
-    "teachers": 0
+    "registration_records": 120,
+    "preference_records": 120,
+    "teachers": 0,
+    "password_changes_pending": 118,
+    "s2_allocation_totals": {
+      "students": 60,
+      "fully_allocated": 59,
+      "partially_allocated": 1,
+      "unallocated": 0
+    },
+    "s4_allocation_totals": {
+      "students": 60,
+      "fully_allocated": 60,
+      "partially_allocated": 0,
+      "unallocated": 0
+    },
+    "combined_allocation_totals": {
+      "students": 120,
+      "fully_allocated": 119,
+      "partially_allocated": 1,
+      "unallocated": 0
+    }
   },
-  "next_steps_file": "NEXT_STEPS.md"
+  "next_steps_file": "NEXT_STEPS.md",
+  "registrations_verified_at": "2026-10-18T10:57:12.115Z",
+  "registration_seed_report": "REGISTRATION_SEED_REPORT.json",
+  "private_registration_plan": "../../scratch/mangat-replica-2026-10-18/registration-plan.json",
+  "private_registration_snapshot": "../../scratch/mangat-replica-2026-10-18/registration-after.json",
+  "s2_allocation_verification": "ALLOCATION_S2_VERIFICATION.json",
+  "allocation_test_findings": "ALLOCATION_TEST_FINDINGS.md",
+  "s4_allocation_verification": "ALLOCATION_S4_VERIFICATION.json",
+  "additional_test_aec": {
+    "id": "3cfa07eb-4bd2-4ec3-be56-1b6ccbd395e9",
+    "course_code": "KU02AECHIN103TT",
+    "department_code": "ECOTT",
+    "verification_report": "TEST_AEC_ADDITION_VERIFICATION.json",
+    "manual_assignment_pending": true
+  }
 }

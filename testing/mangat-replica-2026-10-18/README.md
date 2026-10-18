@@ -1,4 +1,4 @@
-# KUC Mangattuparamba replica — academic setup and staff ready
+# KUC Mangattuparamba replica — registrations ready for allocation
 
 **Created and verified on 18 October 2026:** one test campus, eight test departments, its settings row, ten staff Auth accounts with matching faculty profiles, 61 TT courses, twelve S2/S4 blueprints and all 120 user-uploaded students with linked Auth accounts. [LIVE_STATUS.json](LIVE_STATUS.json) records the executed scope. [STUDENT_UPLOAD_VERIFICATION.json](STUDENT_UPLOAD_VERIFICATION.json) records the complete CSV/Auth comparison. [NEXT_STEPS.md](NEXT_STEPS.md) covers first login, registration, allocation and the later timetable/attendance phase. Teachers remain deferred.
 
@@ -8,6 +8,10 @@ Source: KUC Mangattuparamba (MANGAT), 5b5289d5-17eb-43ba-832e-19883e9eaada.
 ## Student bulk-upload files
 
 [All six department CSVs](bulk-upload/README.md) were uploaded by the user and verified: ECOTT, EVSTT, ITTT, MATTT, PESTT and SBSTT each have 20 students, split ten S2 (`2026-27`) and ten S4 (`2025-26`). Every name, CAP number, email, admission year, semester, department and campus matches the CSVs. All 120 have confirmed, correctly linked Auth accounts, with no duplicates, orphan accounts or field/claim mismatches. All still required first-login password changes at verification time. The upload guide records an existing UI/API mismatch in summary count fields; verification used the database and each saved CSV row.
+
+## Automated registration rehearsal
+
+After the manual student registration, edit/resubmit and HOD defaulter checks, the user authorized automatic submissions for the remaining test students. [REGISTRATION_SEED.md](REGISTRATION_SEED.md) documents the scoped script and [REGISTRATION_SEED_REPORT.json](REGISTRATION_SEED_REPORT.json) records its current prepared/executed status. The original manual submission is preserved; this seed uses backend business validation and does not count as testing login, password change or consent for each seeded student.
 
 ## Staff login credentials
 
@@ -24,8 +28,8 @@ Source: KUC Mangattuparamba (MANGAT), 5b5289d5-17eb-43ba-832e-19883e9eaada.
 | campuses | 1 | 1 |
 | departments | 8 | 8 |
 | campus_settings | 1 | 1 |
-| courses | 61 | 61 |
-| semester_2_courses | 23 | 23 |
+| courses | 62 | 62 |
+| semester_2_courses | 24 | 24 |
 | semester_4_courses | 38 | 38 |
 | blueprints | 12 | 12 |
 | students | 120 | 120 |
@@ -37,7 +41,7 @@ Staff seeding created ten Auth users: one director, eight HODs and one teaching-
 
 | Source department | Test department | Created S2 courses | Created S4 courses | Created blueprints |
 |---|---|---:|---:|---|
-| ECO | ECOTT | 6 | 8 | S2, S4 |
+| ECO | ECOTT | 7 | 8 | S2, S4 |
 | EVS | EVSTT | 2 | 4 | S2, S4 |
 | IT | ITTT | 4 | 5 | S2, S4 |
 | MAT | MATTT | 3 | 5 | S2, S4 |
@@ -47,6 +51,8 @@ Staff seeding created ten Auth users: one director, eight HODs and one teaching-
 | SWT | SWTTT | 0 | 0 | None saved |
 
 ECOTT, EVSTT, ITTT, MATTT, PESTT and SBSTT each have twenty verified students, ten per semester, meeting the 15–28-per-department rehearsal target. S2 admission is 2026–27; S4 admission is 2025–26. Statistics supplies courses because its S2/S4 source blueprints are absent. Wood Science is mirrored as an empty department; no missing courses or blueprints were invented.
+
+After allocation, the user approved one additional ECOTT S2 AEC (`KU02AECHIN103TT`, 3 credits, 60 seats) to enable the pending HOD manual-allocation test. The base academic replica remains 61 copied courses; the current live total is 62 including this additional paper. [TEST_AEC_ADDITION_VERIFICATION.json](TEST_AEC_ADDITION_VERIFICATION.json) records the extra ID and verification. The original shared language papers and capacities are unchanged.
 
 ## Copy and reset rules
 

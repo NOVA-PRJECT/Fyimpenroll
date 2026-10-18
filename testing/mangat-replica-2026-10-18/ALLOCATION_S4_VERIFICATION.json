@@ -1,0 +1,45 @@
+{
+  "status": "PASS_S4_SAVED_ALLOCATION_CHECKS",
+  "campus": "MANGATTT",
+  "academic_year": "2026-27",
+  "semester": 4,
+  "run": {
+    "id": "afd849af-f24b-4c18-8107-ed540e55e958",
+    "status": "completed",
+    "summary": {
+      "skipped_choices": [],
+      "allocated_slots_count": 120,
+      "skipped_choices_count": 0,
+      "unresolved_core_slots": 0,
+      "unallocated_slots_count": 0,
+      "skipped_choices_truncated": false,
+      "unresolved_optional_slots": 0
+    },
+    "semester": 4,
+    "completed_at": "2026-10-18T11:05:42.533975+00:00"
+  },
+  "totals": {
+    "students": 60,
+    "fully_allocated": 60,
+    "partially_allocated": 0,
+    "unallocated": 0
+  },
+  "checks": {
+    "s4_complete": 60,
+    "s4_students": 60,
+    "credit_totals": [
+      {
+        "students": 60,
+        "total_credits": 22
+      }
+    ],
+    "remaining_s2_partial": 1,
+    "over_capacity_courses": 0,
+    "fixed_major_mismatches": 0,
+    "wrong_sec_vac_category": 0,
+    "wrong_semester_courses": 0,
+    "fixed_majors_outside_test_campus": 0,
+    "elective_not_in_submitted_choices": 0
+  },
+  "pending": "Student/HOD UI reconciliation, closed-window behavior, S2 manual resolution, and teacher/timetable/attendance tests remain separate checks."
+}

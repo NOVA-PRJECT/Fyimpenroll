@@ -64,20 +64,23 @@ Registration checks blueprint eligibility; course prerequisites are evaluated du
 
 ## 4. Expand the rehearsal to all 120 students
 
-- [ ] Complete first-login/password/consent flows and valid submissions for the remaining 108 students.
-- [ ] Vary elective preference rankings so allocation has useful first-, second- and third-choice cases to process.
+- The user tested initial login, submission, editing/resubmission and the HOD defaulter list manually, then authorized automated registration of the remaining test students. See [REGISTRATION_SEED.md](REGISTRATION_SEED.md) and [REGISTRATION_SEED_REPORT.json](REGISTRATION_SEED_REPORT.json) for execution/verification status. This seeds the backend registration workflow; remaining first-login/password/consent flows are not asserted to have been tested by the script.
+- [x] The seed report verifies all 120 submissions: 60 S2 and 60 S4, with the original manual submission unchanged. Review its varied rankings and the deliberate no-fallback Malayalam AEC scenario.
 - [ ] Use each HOD's student/defaulter views to verify the expected ten students per semester and track missing submissions.
-- [ ] Before allocation, reconcile 60 S2 and 60 S4 student submissions. Keep records of any deliberately withheld negative-test submissions.
+- [x] Before allocation, reconciled 60 S2 and 60 S4 student submissions; no students were withheld. One ECOTT S2 submission intentionally has an unmet AEC prerequisite without a fallback.
 - [ ] Plan any capacity stress scenario using test-owned courses before running allocation. Existing real-course capacities and enrolments are shared and should remain intact.
 
 ## 5. Close registration and test allocation
 
-- [ ] After the submission checks, set the test deadline to a real timestamp in the past. Keep a non-null expired deadline: the allocation guard does not treat a null deadline as ready for allocation.
+- [x] After submission checks, the user set a non-null past test deadline and S2 allocation completed.
 - [ ] Confirm that a student cannot submit new/revised preferences after the deadline.
-- [ ] As the test director, run allocation for **2026-27 / Semester 2**, then separately for **2026-27 / Semester 4**.
-- [ ] Check each run's status and totals. With all students included, fully allocated + partially allocated + unallocated must equal 60 per semester.
+- [x] Ran **2026-27 / Semester 2**: 60 students, 59 fully allocated, one planned partial AEC, zero unallocated. See [ALLOCATION_S2_VERIFICATION.json](ALLOCATION_S2_VERIFICATION.json).
+- [x] Ran **2026-27 / Semester 4**: all 60 fully allocated, 22 credits each, zero partial/unallocated. Saved fixed majors, SEC/VAC categories, submitted elective choices, semester and capacities pass readback checks. See [ALLOCATION_S4_VERIFICATION.json](ALLOCATION_S4_VERIFICATION.json).
+- [x] Reconciled each run's status and totals: S2 is 59 fully allocated + one partial; S4 is 60 fully allocated. Each cohort totals 60.
 - [ ] Verify only MANGATTT students are included, prerequisites and capacities are respected, and fixed TT majors are retained.
 - [ ] Review unresolved students and remaining seats as the appropriate HOD; use the normal manual-resolution flow where required.
+
+The pending S2 student is ECOTT S2 010, with 19 actual credits and no AEC. Original shared Hindi is globally full (60/60). The user approved a test-owned Hindi AEC `KU02AECHIN103TT` under ECOTT (3 credits, 60 available seats); the corrected picker verifies it as selectable. As ECOTT HOD, select S2, open this student's Paper 6 and manually allocate that TT course, then confirm the student has six papers and 22 credits and is removed from the unresolved list. [ALLOCATION_TEST_FINDINGS.md](ALLOCATION_TEST_FINDINGS.md) records the general picker code fix and its local validation; frontend/backend deployment and actual manual resolution remain unverified.
 - [ ] Compare final student registrations, HOD views and exports against the expected six-paper/22-credit combinations, allowing documented capacity failures until resolved.
 
 ## 6. Continue to timetable and attendance afterward

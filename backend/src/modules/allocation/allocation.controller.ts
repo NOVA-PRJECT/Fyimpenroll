@@ -97,8 +97,10 @@ export class AllocationController {
   async getRemainingSeats(
     @Query('semesterId') semesterId: string,
     @CurrentUser() user: AuthUser,
+    @Query('student_id') studentId?: string,
+    @Query('slot_key') slotKey?: string,
   ) {
-    return this.allocationService.getRemainingSeats(semesterId, user)
+    return this.allocationService.getRemainingSeats(semesterId, user, studentId, slotKey)
   }
 
   // ──────────────── Manual Allocation (HOD / Assigned Class Teacher) ────────────────

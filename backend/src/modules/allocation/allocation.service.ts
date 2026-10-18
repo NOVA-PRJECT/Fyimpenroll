@@ -1225,14 +1225,17 @@ export class AllocationService {
   }
 
   // ──────────────── HOD: Remaining Course Seats ────────────────
-  async getRemainingSeats(semesterId: string | number, user: AuthUser) {
+  async getRemainingSeats(semesterId: string | number, user: AuthUser, studentId?: string, slotKey?: string) {
     const departmentId = user.department_id
     if (!departmentId) {
       throw new ForbiddenException('Department affiliation required')
     }
 
     const sem = Number(semesterId)
-    if (isNaN(sem)) throw new BadRequestException('Invalid semester')
+    if (!Number.isInteger(sem) || sem < 1 || sem > 10) throw new BadRequestException('Invalid semester')
+    if ((studentId || slotKey) && (!studentId || !slotKey || !/^slot_[1-8]$/.test(slotKey))) {
+      throw new BadRequestException('A student and valid slot_key are required together')
+    }
 
     const campusId = user.campus_id
     if (!campusId) {
@@ -1250,16 +1253,87 @@ export class AllocationService {
     }
     const academicYear = settings.academic_year
 
-    // Fetch courses owned by HOD's department for this semester
-    const { data: courses, error: courseErr } = await this.supabase.admin
-      .from('courses')
-      .select('id, course_code, title, credits, category, seat_limit')
-      .eq('department_id', departmentId)
-      .eq('semester', sem)
-
-    if (courseErr) throw new InternalServerErrorException('Failed to fetch courses')
-
-    const courseList = courses ?? []
+    let courseList: any[]
+    let registration: any
+    let slotName: string | undefined
+    const departments = new Map<string, { code: string; name: string }>()
+    const prerequisiteResults = new Map<string, { eligible: boolean; reason?: string }>()
+    if (studentId && slotKey) {
+      // A placement is governed by the student's pathway, not the course-owning department.
+      const [studentRes, registrationRes, blueprintRes] = await Promise.all([
+        this.supabase.admin.from('students').select('id, campus_id, department_id, current_semester')
+          .eq('id', studentId).eq('department_id', departmentId).eq('campus_id', campusId).maybeSingle(),
+        this.supabase.admin.from('student_registrations').select('*')
+          .eq('student_id', studentId).eq('campus_id', campusId).eq('semester', sem).eq('academic_year', academicYear).maybeSingle(),
+        this.supabase.admin.from('semester_blueprints').select('*')
+          .eq('department_id', departmentId).eq('semester', sem).maybeSingle(),
+      ])
+      if (studentRes.error || registrationRes.error || blueprintRes.error) {
+        throw new InternalServerErrorException('Could not load manual allocation rules')
+      }
+      const student = studentRes.data
+      if (!student) throw new ForbiddenException('You may only view allocation options for students in your department and campus')
+      if (student.current_semester !== sem) throw new BadRequestException('Semester must match the student’s current semester')
+      registration = registrationRes.data
+      if (!registration) throw new NotFoundException('Student registration not found for this semester')
+      if (!blueprintRes.data) throw new NotFoundException('Semester blueprint not configured')
+      const pathways = getBlueprintPathways(blueprintRes.data)
+      const pathwayId = registration.pathway_id
+      const pathway = pathways.find(p => p.id === pathwayId) || (!pathwayId && pathways.length === 1 ? pathways[0] : undefined)
+      const slotNumber = Number(slotKey.replace('slot_', ''))
+      const definition = getStudentSlotDefinition(pathway, slotNumber, departmentId)
+      if (!definition) throw new BadRequestException('The selected pathway does not define this slot')
+      if ([SLOT_RULES.FIXED, SLOT_RULES.CAMPUS_FIXED, SLOT_RULES.AEC_ELECT].includes(definition.rule)
+        || registration.allocation_metadata?.[slotKey]?.allocated_by === 'fixed') {
+        throw new BadRequestException('Cannot manually override a fixed slot assignment')
+      }
+      slotName = definition.name || `Paper ${slotNumber}`
+      const [departmentRows, semesterCourses] = await Promise.all([
+        fetchAllPaginated<any>(this.supabase.admin.from('departments').select('id, code, name').order('id')),
+        fetchAllPaginated<any>(this.supabase.admin.from('courses')
+          .select('id, course_code, title, credits, department_id, semester, category, seat_limit, prerequisite_course_ids')
+          .eq('semester', sem).order('id')),
+      ])
+      const deptMap = new Map<string, string>()
+      for (const department of departmentRows) {
+        if (department.code) deptMap.set(department.code.toUpperCase(), department.id)
+        deptMap.set(department.id, department.id)
+        departments.set(department.id, department)
+      }
+      courseList = semesterCourses.filter(course => isCourseEligibleForSlot(
+        course, definition.rule, definition.target || '', departmentId, deptMap, sem, definition.name,
+      ))
+      const [rules, priorRegistrations] = await Promise.all([
+        fetchByIdChunks<any>(courseList.map(course => course.id), ids => this.supabase.admin.from('course_prerequisite_rules')
+          .select('id, course_id, rule, target').in('course_id', ids).order('id')),
+        fetchAllPaginated<any>(this.supabase.admin.from('student_registrations')
+          .select('id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
+          .eq('student_id', studentId).lt('semester', sem).order('id')),
+      ])
+      const completedIds = new Set<string>()
+      for (const prior of priorRegistrations) for (let slot = 1; slot <= 8; slot++) {
+        if (prior[`slot_${slot}_course_id`]) completedIds.add(prior[`slot_${slot}_course_id`])
+      }
+      const priorCourses = await fetchByIdChunks<any>([...completedIds], ids => this.supabase.admin.from('courses')
+        .select('id, course_code').in('id', ids).order('id'))
+      const completedCodes = new Set(priorCourses.map(course => normalizeCourseCode(course.course_code)))
+      const rulesByCourse = new Map<string, PrerequisiteRule[]>()
+      for (const rule of rules) {
+        if (!rulesByCourse.has(rule.course_id)) rulesByCourse.set(rule.course_id, [])
+        rulesByCourse.get(rule.course_id)!.push(rule)
+      }
+      for (const course of courseList) prerequisiteResults.set(course.id, evaluateCoursePrerequisites(
+        course, rulesByCourse.get(course.id) || [],
+        { department_code: departments.get(departmentId)?.code, current_semester: sem }, completedCodes, completedIds,
+      ))
+    } else {
+      // Keep the department-capacity overview separate from a particular placement.
+      const { data: courses, error: courseErr } = await this.supabase.admin.from('courses')
+        .select('id, course_code, title, credits, category, seat_limit')
+        .eq('department_id', departmentId).eq('semester', sem)
+      if (courseErr) throw new InternalServerErrorException('Failed to fetch courses')
+      courseList = courses ?? []
+    }
     const results: any[] = []
 
     // Fetch registrations across all campuses for this academic_year and semester (F21 global capacity across 8 slots)
@@ -1281,9 +1355,18 @@ export class AllocationService {
     }
 
     for (const course of courseList) {
-      const seatLimit = course.seat_limit ? Number(course.seat_limit) : 60
+      const seatLimit = course.seat_limit == null ? 60 : Number(course.seat_limit)
       const totalAllocated = allocationCounts.get(course.id) || 0
       const remaining = Math.max(0, seatLimit - totalAllocated)
+      let unavailableReason: string | null = null
+      if (studentId && slotKey) {
+        const alreadyAssignedElsewhere = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}`)
+          .some(key => key !== slotKey && registration[`${key}_course_id`] === course.id)
+        const prerequisite = prerequisiteResults.get(course.id)!
+        unavailableReason = alreadyAssignedElsewhere ? 'Already assigned to another paper'
+          : !prerequisite.eligible ? prerequisite.reason || 'Prerequisite requirements not met'
+          : remaining === 0 && registration[`${slotKey}_course_id`] !== course.id ? `No remaining seats (${totalAllocated}/${seatLimit} allocated globally)` : null
+      }
 
       results.push({
         id: course.id,
@@ -1294,12 +1377,18 @@ export class AllocationService {
         seat_limit: seatLimit,
         total_allocated: totalAllocated,
         remaining_seats: remaining,
+        ...(studentId && slotKey ? {
+          department_name: departments.get(course.department_id)?.name || 'General',
+          can_allocate: unavailableReason === null,
+          unavailable_reason: unavailableReason,
+        } : {}),
       })
     }
 
     return {
       success: true,
       courses: results,
+      ...(studentId && slotKey ? { student_id: studentId, slot_key: slotKey, slot_name: slotName } : {}),
     }
   }
 
@@ -1469,7 +1558,7 @@ export class AllocationService {
         .select('course_code')
         .in('id', Array.from(priorCourseIds))
 
-      priorCodes = new Set((codeData ?? []).map((c) => c.course_code.toUpperCase()))
+      priorCodes = new Set((codeData ?? []).map((c) => normalizeCourseCode(c.course_code)))
     }
 
     const studentDeptCode = (student.departments as any)?.code || ''
@@ -1491,7 +1580,7 @@ export class AllocationService {
     }
 
     // F21: Global capacity check across all campuses for this course (academic_year & semester, across all 8 slots)
-    const seatLimit = course.seat_limit ? Number(course.seat_limit) : 60
+    const seatLimit = course.seat_limit == null ? 60 : Number(course.seat_limit)
     const { count: allocatedCount } = await this.supabase.admin
       .from('student_registrations')
       .select('*', { count: 'exact', head: true })

@@ -1,0 +1,26 @@
+{
+  "status": "USER_APPROVED_CREATED_AND_VERIFIED",
+  "purpose": "Enable the HOD manual-allocation test for the one unresolved S2 AEC without changing real courses or capacities.",
+  "course": {
+    "id": "3cfa07eb-4bd2-4ec3-be56-1b6ccbd395e9",
+    "tag": "AEC-2",
+    "title": "COMMUNICATIVE HINDI",
+    "credits": 3,
+    "category": "AEC",
+    "semester": 2,
+    "seat_limit": 60,
+    "course_code": "KU02AECHIN103TT",
+    "department_id": "bf97ec6d-3b5f-4956-a885-69f153b6875e",
+    "academic_level": null,
+    "theory_hours_per_week": 3,
+    "prerequisite_course_ids": [],
+    "practical_hours_per_week": 0
+  },
+  "campus_id": "b72074e2-468e-4218-afb6-0f08f14cfe8f",
+  "department_code": "ECOTT",
+  "source_course_code": "KU02AECHIN103",
+  "new_prerequisite_rules": [],
+  "visibility": "GLOBAL_BASKET AEC remains shared across campuses as previously approved.",
+  "existing_records_to_modify": [],
+  "verification_report": "TEST_AEC_ADDITION_VERIFICATION.json"
+}
