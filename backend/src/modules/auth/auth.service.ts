@@ -1,3 +1,4 @@
+import { withDeadline } from '../../core/security/deadline'
 import {
   BadRequestException,
   ForbiddenException,
@@ -129,6 +130,7 @@ export class AuthService {
   // In-flight refresh promises and short-lived rotation cache for concurrency handling (F11)
   private refreshInFlight = new Map<string, Promise<any>>()
   private recentRefreshes = new Map<string, { result: any; expiresAt: number }>()
+  private blockedRefreshes = new Map<string, number>()
   private refreshGeneration = 0
   private logoutGenerations = new Map<string, { generation: number; expiresAt: number }>()
 
@@ -156,6 +158,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token missing')
     }
 
+    this.assertRefreshAllowed(refreshToken)
     const now = Date.now()
     this.pruneRefreshes(now)
     const key = this.refreshKey(refreshToken)
@@ -215,6 +218,7 @@ export class AuthService {
           must_change_password: mustChange,
         }
 
+        this.assertRefreshAllowed(refreshToken)
         // Cache result for 10 seconds to handle concurrent requests using the same token
         if ((this.logoutGenerations.get(user.id)?.generation ?? 0) > generation) {
           throw new UnauthorizedException('Session changed during refresh. Please retry.')
@@ -356,75 +360,75 @@ export class AuthService {
     return { role: null, redirectTo: null }
   }
 
-  /** Refresh only to revoke: no profile lookup, metadata write or credential cache. */
-  async refreshForLogout(refreshToken: string): Promise<AuthUser | undefined> {
-    const { data, error } = await authProviderCall(this.supabase.createAuthClient().auth.refreshSession({ refresh_token: refreshToken }))
-    assertAuthProviderAvailable(error)
+  assertRefreshAllowed(token: string) {
+    for (const [key, expiry] of this.blockedRefreshes) if (expiry <= Date.now()) this.blockedRefreshes.delete(key)
+    if (this.blockedRefreshes.has(this.refreshKey(token))) throw new UnauthorizedException('Session has been signed out')
+  }
+
+  /** No profile lookup or credential cache: renew only to revoke an expired JWT. */
+  async refreshForLogout(refreshToken: string, signal?: AbortSignal): Promise<AuthUser | undefined> {
+    const cached = this.recentRefreshes.get(this.refreshKey(refreshToken))
+    if (cached && cached.expiresAt > Date.now()) return { userId: cached.result.userId, role: cached.result.role, email: '', token: cached.result.token }
+    const request = this.supabase.createAuthClient(signal).auth.refreshSession({ refresh_token: refreshToken })
+    const { data, error } = await (signal ? withDeadline(request, signal) : request)
     if (error || !data?.user || !data?.session) return undefined
     this.invalidateUserRefreshes(data.user.id)
     return { userId: data.user.id, email: data.user.email || '', role: data.user.app_metadata?.role as Role, token: data.session.access_token }
   }
 
-  async logout(userOrToken: AuthUser | string | undefined, ip: string) {
-    let resolvedUser: AuthUser | undefined = typeof userOrToken === 'object' ? userOrToken : undefined
-    const jwt = typeof userOrToken === 'string' ? userOrToken : userOrToken?.token
-    if (!resolvedUser && jwt) {
-      const cached = [...this.recentRefreshes.values()].find(entry => entry.result.token === jwt)
-      if (cached) resolvedUser = { userId: cached.result.userId, role: cached.result.role, email: '', token: jwt }
-    }
+  async logout(userOrToken: AuthUser | string | undefined, ip: string, options?: { startedAt: number; refreshToken?: string }) {
+    const startedAt = options?.startedAt ?? performance.now()
+    const providerSignal = AbortSignal.timeout(Math.max(1, Math.floor(3000 - (performance.now() - startedAt))))
+    let resolvedUser = typeof userOrToken === 'object' ? userOrToken : undefined
+    let jwt = typeof userOrToken === 'string' ? userOrToken : userOrToken?.token
+    const refreshToken = options?.refreshToken
+    // Fence an in-flight refresh before making any provider call.
+    if (refreshToken) this.blockedRefreshes.set(this.refreshKey(refreshToken), Date.now() + 7 * 86400000)
     if (resolvedUser?.userId) this.invalidateUserRefreshes(resolvedUser.userId)
-
-    if (!resolvedUser && jwt) {
-      try {
-        const { data } = await this.supabase.admin.auth.getUser(jwt)
-        if (data?.user) {
-          const role = data.user.app_metadata?.role as Role | undefined
-          if (role) {
-            resolvedUser = {
-              userId: data.user.id,
-              email: data.user.email || '',
-              role,
-              token: jwt,
-            }
-          }
-        }
-      } catch {
-        // session may already be expired/invalid
+    const timings = { authentication: 0, revocation: 0, audit: 0 }
+    let revoked = false
+    let revocationError = 'Provider revocation could not be confirmed'
+    let stageStart = performance.now()
+    try {
+      const client = this.supabase.createLogoutClient(providerSignal)
+      if (jwt && !resolvedUser) {
+        const { data } = await withDeadline(client.auth.getUser(jwt), providerSignal)
+        if (data?.user) resolvedUser = { userId: data.user.id, email: data.user.email || '', role: data.user.app_metadata?.role as Role, token: jwt }
+        else jwt = undefined
       }
-    }
-
-    if (resolvedUser?.userId) this.invalidateUserRefreshes(resolvedUser.userId)
-    let revocationError: string | null = null
-    if (jwt) {
-      // R31: Pass actual access JWT to Supabase Auth admin signOut and inspect returned error
-      try {
-        const { error: signOutError } = await this.supabase.admin.auth.admin.signOut(jwt, 'global')
-        if (signOutError) {
-          revocationError = signOutError.message
-          this.serverLogger.warn(`Supabase session revocation error on logout for user ${resolvedUser?.userId || 'unknown'}: ${signOutError.message}`)
-        }
-      } catch (err: any) {
-        revocationError = err?.message || String(err)
-        this.serverLogger.warn(`Supabase session revocation error on logout: ${revocationError}`)
+      if (!jwt && refreshToken && !providerSignal.aborted) {
+        resolvedUser = await this.refreshForLogout(refreshToken, providerSignal)
+        jwt = resolvedUser?.token
       }
+      timings.authentication = performance.now() - stageStart
+      if (resolvedUser?.userId) this.invalidateUserRefreshes(resolvedUser.userId)
+      stageStart = performance.now()
+      if (jwt) {
+        const { error } = await withDeadline(client.auth.admin.signOut(jwt, 'global'), providerSignal)
+        revoked = !error
+        if (error) revocationError = error.message
+      }
+      timings.revocation = performance.now() - stageStart
+    } catch {
+      if (!timings.authentication) timings.authentication = performance.now() - stageStart
+      else timings.revocation = performance.now() - stageStart
     }
-
+    if (!revoked) this.serverLogger.warn('Logout provider revocation could not be confirmed within its deadline')
+    const auditStart = performance.now()
     if (resolvedUser?.userId) {
-      await this.auditLogger.log({
-        eventType: AuditEvents.USER_LOGOUT,
-        userId: resolvedUser.userId,
-        userRole: resolvedUser.role,
-        action: 'user logged out',
-        resourceType: 'user',
-        resourceId: resolvedUser.userId,
-        status: revocationError ? 'failure' : 'success',
-        ipAddress: ip,
-        metadata: revocationError ? { error: revocationError } : undefined,
-      })
+      this.invalidateUserRefreshes(resolvedUser.userId)
+      const auditSignal = AbortSignal.timeout(Math.max(1, Math.floor(5000 - (performance.now() - startedAt))))
+      try {
+        await withDeadline(this.auditLogger.log({
+          eventType: AuditEvents.USER_LOGOUT, userId: resolvedUser.userId, userRole: resolvedUser.role,
+          action: 'user logged out', resourceType: 'user', resourceId: resolvedUser.userId,
+          status: revoked ? 'success' : 'failure', ipAddress: ip,
+          metadata: revoked ? undefined : { error: revocationError },
+        }, { signal: auditSignal }), auditSignal)
+      } catch { this.serverLogger.warn('Logout audit delivery exceeded its deadline') }
     }
-    if (resolvedUser?.userId) this.invalidateUserRefreshes(resolvedUser.userId)
-    else this.recentRefreshes.clear()
-    return { success: true, revoked: !!jwt && !revocationError }
+    timings.audit = performance.now() - auditStart
+    return { success: true, revoked, timings }
   }
 
   async getProfile(user: AuthUser) {

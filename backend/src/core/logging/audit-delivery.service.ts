@@ -16,21 +16,24 @@ export class AuditDeliveryService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuditDeliveryService.name)
   private readonly redis: Redis | null
   private readonly key: string
+  private readonly connection?: { url: string; token: string }
   private timer?: ReturnType<typeof setInterval>
   private pending?: Promise<void>
 
   constructor(private readonly supabase: SupabaseService, config: ConfigService) {
     const url = config.get<string>('UPSTASH_REDIS_REST_URL')
     const token = config.get<string>('UPSTASH_REDIS_REST_TOKEN')
+    if (url && token && !url.includes('dummy')) this.connection = { url, token }
     this.key = `audit:delivery:${config.get<string>('SUPABASE_URL') || 'local'}`
     this.redis = url && token && !url.includes('dummy')
       ? new Redis({ url, token, automaticDeserialization: false, retry: false, signal: () => AbortSignal.timeout(2000) }) : null
   }
 
-  async enqueue(payload: Record<string, unknown>): Promise<boolean> {
+  async enqueue(payload: Record<string, unknown>, signal?: AbortSignal): Promise<boolean> {
     if (!this.redis) return false
     try {
-      await this.redis.zadd(this.key, { nx: true }, { score: Date.now(), member: JSON.stringify(payload) })
+      const client = signal && this.connection ? new Redis({ ...this.connection, automaticDeserialization: false, retry: false, signal: () => AbortSignal.any([signal, AbortSignal.timeout(1000)]) }) : this.redis
+      await client.zadd(this.key, { nx: true }, { score: Date.now(), member: JSON.stringify(payload) })
       setImmediate(() => { void this.flush() })
       return true
     } catch {

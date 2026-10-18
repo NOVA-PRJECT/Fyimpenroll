@@ -44,6 +44,7 @@ const CreateCourseSchema = z.object({
 const UpdateCourseSchema = z.object({
   id: z.string().min(1, 'Course ID is required'),
   course_code: z.string().min(1, 'Course code is required').max(30),
+  semester: z.coerce.number().int().min(1).max(10).optional(),
   title: z.string().min(1, 'Course title is required').max(200),
   credits: z.coerce.number().int().min(1).max(10),
   theory_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),

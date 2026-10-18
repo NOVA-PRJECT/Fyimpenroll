@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { Request, Response } from 'express'
 import { AuthService } from './auth.service'
@@ -60,6 +61,7 @@ export class AuthController {
       path: '/',
     }
 
+    res.clearCookie('session_ended', { path: '/' })
     // Access token cookie (expires according to Supabase JWT expiresIn or 1 hr)
     res.cookie('auth_token', result.token, {
       ...cookieBase,
@@ -114,12 +116,14 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if ((req as any).cookies?.session_ended) throw new UnauthorizedException('Session has been signed out')
     const token = (req as any).cookies?.refresh_token || body?.refreshToken || body?.refresh_token
     if (typeof token !== 'string' || !token || token.length > 8192) {
       throw new BadRequestException('Refresh token is required')
     }
 
     const result = await this.authService.refreshSession(token)
+    this.authService.assertRefreshAllowed(token)
 
     const cookieBase = {
       httpOnly: true,
@@ -160,27 +164,19 @@ export class AuthController {
     let token = (req as any).cookies?.auth_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined)
     let user = (req as any).user as AuthUser | undefined
 
-    // An expired access cookie must not prevent logout from revoking the
-    // remaining refresh session. Renew internally without issuing new cookies.
     const refreshToken = (req as any).cookies?.refresh_token
-    if (!token && typeof refreshToken === 'string' && refreshToken && refreshToken.length <= 8192) {
-      try {
-        user = await this.authService.refreshForLogout(refreshToken)
-        token = user?.token
-      } catch {
-        // Even an invalid/unavailable provider must allow local cookie cleanup.
-      }
-    }
-
     const userWithToken = user ? { ...user, token: user.token || token } : token
-    const result = await this.authService.logout(userWithToken, ip)
+    const result = await this.authService.logout(userWithToken, ip, { startedAt,
+      refreshToken: typeof refreshToken === 'string' && refreshToken.length <= 8192 ? refreshToken : undefined })
 
+    // This fence survives a delayed response from an older refresh request.
+    res.cookie('session_ended', '1', { path: '/', sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7 * 86400000 })
     res.clearCookie('auth_token', { path: '/' })
     res.clearCookie('refresh_token', { path: '/' })
     res.clearCookie('user_role', { path: '/' })
-    res.setHeader?.('Server-Timing', `logout;dur=${(performance.now() - startedAt).toFixed(1)}`)
+    res.setHeader?.('Server-Timing', `authentication;dur=${result.timings.authentication.toFixed(1)}, revocation;dur=${result.timings.revocation.toFixed(1)}, audit;dur=${result.timings.audit.toFixed(1)}, logout;dur=${(performance.now() - startedAt).toFixed(1)}`)
 
-    return result
+    return { success: result.success, revoked: result.revoked }
   }
 
   @Get('profile')

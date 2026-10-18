@@ -402,6 +402,7 @@ export class HodService {
       category,
     }
 
+    if (body.semester !== undefined) updatePayload.semester = body.semester
     if (seat_limit !== undefined) {
       updatePayload.seat_limit = seat_limit ? Number(seat_limit) : 60
     }
@@ -432,14 +433,18 @@ export class HodService {
       throw new ForbiddenException('Course department ownership cannot be transferred via update')
     }
 
-    const { error } = await this.supabase.admin
-      .from('courses')
-      .update(updatePayload)
-      .eq('id', id)
-      .eq('department_id', user.department_id)
+    const { data: updated, error } = await this.supabase.admin.rpc('update_hod_course_guarded', {
+      p_id: id, p_department_id: user.department_id, p_patch: updatePayload,
+    })
 
     if (error) {
       this.serverLogger.error(`Failed to update course: ${JSON.stringify(error)}`, 'HodService')
+      if (error.code === 'P4090') {
+        let references: string[] = []
+        try { references = JSON.parse(error.details || '[]') } catch { /* Provider detail may be omitted. */ }
+        throw new ConflictException({ message: error.message, blocking_references: references })
+      }
+      if (error.code === 'P4040') throw new NotFoundException(error.message)
       if (error.code === '23505') throw new ConflictException('Course code already exists')
       if (error.code === '23514') throw new BadRequestException(`Course constraint violation: ${error.message || 'Check category or credit values'}`)
       throw new BadRequestException(error.message || 'Failed to update course')
@@ -455,7 +460,7 @@ export class HodService {
       status: 'success',
     })
 
-    return { success: true, message: 'Course updated successfully' }
+    return { success: true, message: `Course updated successfully (Semester ${updated?.semester})`, semester: updated?.semester }
   }
 
   async deleteCourse(courseId: string, user: AuthUser) {

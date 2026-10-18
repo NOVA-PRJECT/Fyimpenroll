@@ -3,6 +3,7 @@ import { SupabaseService } from '../database/supabase.service'
 import { Optional } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
 import { AuditDeliveryService } from './audit-delivery.service'
+import { withDeadline } from '../security/deadline'
 
 export interface AuditLogEntry {
   eventType: string
@@ -82,7 +83,7 @@ export class AuditLoggerService {
     return { sanitizedIp: null, rawAttempted: trimmed }
   }
 
-  async log(entry: AuditLogEntry): Promise<void> {
+  async log(entry: AuditLogEntry, options?: { signal: AbortSignal }): Promise<void> {
     try {
       const isValidUuid = entry.userId && AuditLoggerService.UUID_REGEX.test(entry.userId)
       const validUserId = isValidUuid ? entry.userId : null
@@ -116,12 +117,15 @@ export class AuditLoggerService {
       }
 
       const isSessionEvent = [AuditEvents.USER_LOGIN, AuditEvents.USER_LOGOUT, 'login_failed'].includes(entry.eventType)
-      if (isSessionEvent && await this.delivery?.enqueue(logPayload)) return
+      if (options?.signal.aborted) return
+      const queued = isSessionEvent && this.delivery ? this.delivery.enqueue(logPayload, options?.signal) : Promise.resolve(false)
+      if (await (options ? withDeadline(queued, options.signal) : queued)) return
 
       // An ambiguous queue acknowledgement can produce a later redelivery.
-      const { error } = isSessionEvent && this.delivery
-        ? await this.supabase.admin.from('system_logs').upsert(logPayload, { onConflict: 'id', ignoreDuplicates: true })
-        : await this.supabase.admin.from('system_logs').insert(logPayload)
+      const query = isSessionEvent && this.delivery
+        ? this.supabase.admin.from('system_logs').upsert(logPayload, { onConflict: 'id', ignoreDuplicates: true })
+        : this.supabase.admin.from('system_logs').insert(logPayload)
+      const { error } = await (options ? withDeadline(query.abortSignal(options.signal), options.signal) : query)
 
       if (error) this.logger.warn(`Failed to persist audit log in system_logs: ${error.message}`)
     } catch (err: any) {

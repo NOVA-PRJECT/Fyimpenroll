@@ -18,6 +18,7 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
+    if (request.cookies?.session_ended) throw new UnauthorizedException('Session has been signed out')
     const token = this.extractToken(request)
 
     if (!token) {

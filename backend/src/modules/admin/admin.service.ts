@@ -2,6 +2,7 @@ import { fetchAllPaginated } from '../../core/database/pagination.util'
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -19,7 +20,7 @@ export class AdminService {
     private readonly serverLogger: ServerLoggerService,
   ) {}
 
-  // ──────────────── Campuses ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Campuses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async getCampuses() {
     const { data, error } = await this.supabase.admin
       .from('campuses')
@@ -172,7 +173,7 @@ export class AdminService {
     return { success: true, message: 'Campus deleted successfully' }
   }
 
-  // ──────────────── Departments ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async getDepartments() {
     const { data, error } = await this.supabase.admin
       .from('departments')
@@ -276,7 +277,39 @@ export class AdminService {
     return { success: true, message: 'Department deleted successfully' }
   }
 
-  // ──────────────── Faculty ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Faculty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  private async checkAdministrativeFaculty(role: string, campusId: string, departmentId?: string | null, excludeId?: string) {
+    if (role === 'teacher') throw new ForbiddenException('Teachers are managed by their HOD and are read-only here')
+    if (!['hod', 'campus_director', 'teaching_staff'].includes(role)) throw new BadRequestException('Invalid administrative faculty role')
+    const { data: campus, error: campusError } = await this.supabase.admin.from('campuses').select('id').eq('id', campusId).maybeSingle()
+    if (campusError) throw new InternalServerErrorException('Unable to verify campus')
+    if (!campus) throw new BadRequestException('Invalid campus selected')
+    if (role === 'hod') {
+      if (!departmentId) throw new BadRequestException('HOD must be assigned to a department')
+      const { data: dept, error } = await this.supabase.admin.from('departments').select('campus_id').eq('id', departmentId).maybeSingle()
+      if (error) throw new InternalServerErrorException('Unable to verify department')
+      if (!dept || dept.campus_id !== campusId) throw new BadRequestException('Department must belong to the selected campus')
+    } else if (departmentId) throw new BadRequestException('Directors and Teaching Staff cannot have a department assignment')
+    let query = this.supabase.admin.from('faculty').select('id').eq('role', role)
+    query = role === 'hod' ? query.eq('department_id', departmentId!) : query.eq('campus_id', campusId)
+    if (excludeId) query = query.neq('id', excludeId)
+    const { data: occupied, error } = await query.limit(1)
+    if (error) throw new InternalServerErrorException('Unable to verify role availability')
+    if (occupied?.length) throw new ConflictException(this.occupiedRoleMessage(role))
+  }
+
+  private occupiedRoleMessage(role: string) {
+    return role === 'hod' ? 'This department already has an HOD' : `This campus already has a ${role === 'campus_director' ? 'Director' : 'Teaching Staff'} account`
+  }
+
+  private async editableFaculty(id: string) {
+    const { data, error } = await this.supabase.admin.from('faculty').select('id, role').eq('id', id).maybeSingle()
+    if (error) throw new InternalServerErrorException('Unable to verify faculty account')
+    if (!data) throw new NotFoundException('Faculty account not found')
+    if (data.role === 'teacher') throw new ForbiddenException('Teachers are managed by their HOD and are read-only here')
+    return data
+  }
+
   async getFacultyList() {
     const { data, error } = await this.supabase.admin
       .from('faculty')
@@ -296,37 +329,8 @@ export class AdminService {
   }, user: AuthUser) {
     const { full_name, email, password, role, department_id, campus_id } = body
 
-    const ALLOWED_ROLES = ['campus_director', 'hod', 'teacher', 'teaching_staff']
-    if (!ALLOWED_ROLES.includes(role)) {
-      throw new BadRequestException(`Invalid role "${role}". Allowed roles are: ${ALLOWED_ROLES.join(', ')}`)
-    }
-
-    if (!campus_id) {
-      throw new BadRequestException('Campus ID is required for faculty account creation')
-    }
-
-    if ((role === 'hod' || role === 'teacher') && !department_id) {
-      throw new BadRequestException(`${role === 'hod' ? 'HOD' : 'Teacher'} must be assigned to a department`)
-    }
-
-    if (role === 'campus_director' && department_id) {
-      throw new BadRequestException('Campus Director cannot be assigned to a department')
-    }
-
-    if (role === 'teaching_staff') {
-      const { data: existingStaff } = await this.supabase.admin
-        .from('faculty')
-        .select('id')
-        .eq('campus_id', campus_id)
-        .eq('role', 'teaching_staff')
-        .maybeSingle()
-
-      if (existingStaff) {
-        throw new BadRequestException('This campus already has an assigned Teaching Staff account. Only one Teaching Staff account is permitted per campus.')
-      }
-    }
-
-    const assignedDeptId = (role === 'campus_director' || role === 'teaching_staff') ? null : (department_id ?? null)
+    await this.checkAdministrativeFaculty(role, campus_id, department_id)
+    const assignedDeptId = role === 'hod' ? department_id! : null
 
     const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({
       email,
@@ -346,7 +350,9 @@ export class AdminService {
 
     const authUserId = authData.user.id
 
-    const { error: facultyError } = await this.supabase.admin
+    let facultyError: any
+    try {
+      const result = await this.supabase.admin
       .from('faculty')
       .insert({
         id: authUserId,
@@ -357,19 +363,21 @@ export class AdminService {
         campus_id,
       })
 
-    if (facultyError) {
-      await this.supabase.admin.auth.admin.deleteUser(authUserId)
-      throw new BadRequestException(facultyError.code === '23503' ? 'Invalid department or campus selected' : 'Failed to create faculty record')
-    }
+      facultyError = result.error
+    } catch { facultyError = { code: 'network' } }
 
-    // Sync app_metadata
-    await this.supabase.admin.auth.admin.updateUserById(authUserId, {
-      app_metadata: {
-        role,
-        campus_id,
-        department_id: assignedDeptId,
-      },
-    })
+    if (facultyError) {
+      let cleanupFailed = false
+      try {
+        const cleanup = await this.supabase.admin.auth.admin.deleteUser(authUserId)
+        cleanupFailed = !!cleanup.error
+      } catch { cleanupFailed = true }
+      const message = facultyError.code === '23505' ? this.occupiedRoleMessage(role)
+        : facultyError.code === '23503' || facultyError.code === '23514' ? 'Invalid department or campus selected' : 'Failed to create faculty record'
+      const detail = cleanupFailed ? `${message}. Cleanup failed for newly created Auth account ${authUserId}; administrator action is required.` : message
+      if (facultyError.code === '23505') throw new ConflictException(detail)
+      throw new BadRequestException(detail)
+    }
 
     await this.auditLogger.log({
       eventType: AuditEvents.FACULTY_CREATED,
@@ -397,26 +405,9 @@ export class AdminService {
   }, user: AuthUser) {
     const { full_name, role, department_id, campus_id } = body
 
-    const ALLOWED_ROLES = ['campus_director', 'hod', 'teacher', 'teaching_staff']
-    if (!ALLOWED_ROLES.includes(role)) {
-      throw new BadRequestException(`Invalid role "${role}". Allowed roles are: ${ALLOWED_ROLES.join(', ')}`)
-    }
-
-    if (role === 'teaching_staff') {
-      const { data: existingStaff } = await this.supabase.admin
-        .from('faculty')
-        .select('id')
-        .eq('campus_id', campus_id)
-        .eq('role', 'teaching_staff')
-        .neq('id', id)
-        .maybeSingle()
-
-      if (existingStaff) {
-        throw new BadRequestException('This campus already has an assigned Teaching Staff account. Only one Teaching Staff account is permitted per campus.')
-      }
-    }
-
-    const assignedDeptId = (role === 'campus_director' || role === 'teaching_staff') ? null : (department_id ?? null)
+    const existing = await this.editableFaculty(id)
+    await this.checkAdministrativeFaculty(role, campus_id, department_id, id)
+    const assignedDeptId = role === 'hod' ? department_id! : null
 
     const { error } = await this.supabase.admin
       .from('faculty')
@@ -427,7 +418,12 @@ export class AdminService {
         campus_id,
       })
       .eq('id', id)
+      .eq('role', existing.role)
+      .select('id')
+      .single()
 
+    if (error?.code === '23505') throw new ConflictException(this.occupiedRoleMessage(role))
+    if (error?.code === '23514' || error?.code === '23503') throw new BadRequestException('Department must belong to the selected campus')
     if (error) throw new InternalServerErrorException('Failed to update faculty record')
 
     await this.supabase.admin.auth.admin.updateUserById(id, {
@@ -452,10 +448,14 @@ export class AdminService {
   }
 
   async deleteFaculty(facultyId: string, user: AuthUser) {
+    const existing = await this.editableFaculty(facultyId)
     const { error } = await this.supabase.admin
       .from('faculty')
       .delete()
       .eq('id', facultyId)
+      .eq('role', existing.role)
+      .select('id')
+      .single()
 
     if (error) throw new InternalServerErrorException('Failed to delete faculty record')
 
@@ -474,7 +474,7 @@ export class AdminService {
     return { success: true, message: 'Faculty deleted successfully' }
   }
 
-  // ──────────────── Promote Students ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Promote Students â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async promoteStudents(director: AuthUser, idempotencyKey?: string) {
     const campusId = director.campus_id
     if (!campusId) throw new BadRequestException('Campus assignment missing for director')
@@ -554,7 +554,7 @@ export class AdminService {
     }
   }
 
-  // ──────────────── Graduate Students (R27 Staged & Recoverable) ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Graduate Students (R27 Staged & Recoverable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async graduateStudents(campusId: string, studentIds: string[], user: AuthUser) {
     if (user.role !== 'superadmin' && (user.role !== 'campus_director' || !user.campus_id || user.campus_id !== campusId)) {
       throw new BadRequestException('Directors can only graduate students for their own campus')
@@ -607,7 +607,7 @@ export class AdminService {
     return { candidates: rows, failed_student_ids: rows.map(r => r.student_id) }
   }
 
-  // ──────────────── Concluded-Semester Attendance Retention Purge ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Concluded-Semester Attendance Retention Purge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async cleanupConcludedSemesterAttendance(
     campusId: string,
     academicYear: string,
@@ -649,7 +649,7 @@ export class AdminService {
     }
   }
 
-  // ──────────────── System Logs ────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ System Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async getSystemLogs(query: {
     page?: number
     limit?: number

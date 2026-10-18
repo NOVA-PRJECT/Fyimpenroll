@@ -49,6 +49,15 @@ const DeleteDepartmentSchema = z.object({
   department_id: z.string().min(1, 'Department ID is required'),
 })
 
+const FacultyFields = z.object({
+  full_name: z.string().trim().min(1).max(150),
+  role: z.enum(['hod', 'campus_director', 'teaching_staff', 'teacher']),
+  campus_id: z.string().uuid(),
+  department_id: z.string().uuid().nullable().optional(),
+})
+const CreateFacultySchema = FacultyFields.extend({ email: z.string().email(), password: z.string().min(8) })
+const UpdateFacultySchema = FacultyFields.extend({ id: z.string().uuid() })
+
 @Controller('api/admin')
 @UseGuards(AuthGuard, RolesGuard)
 export class AdminController {
@@ -154,7 +163,9 @@ export class AdminController {
     },
     @CurrentUser() user: AuthUser,
   ) {
-    return this.adminService.createFaculty(body, user)
+    const parsed = CreateFacultySchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.adminService.createFaculty(parsed.data as Parameters<AdminService['createFaculty']>[0], user)
   }
 
   @Put('faculty-list')
@@ -169,12 +180,15 @@ export class AdminController {
     },
     @CurrentUser() user: AuthUser,
   ) {
-    return this.adminService.updateFaculty(body.id, body, user)
+    const parsed = UpdateFacultySchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.adminService.updateFaculty(parsed.data.id, parsed.data as Parameters<AdminService['updateFaculty']>[1], user)
   }
 
   @Delete('faculty-list')
   @Roles('superadmin')
   async deleteFaculty(@Body() body: { faculty_id: string }, @CurrentUser() user: AuthUser) {
+    if (!z.string().uuid().safeParse(body?.faculty_id).success) throw new BadRequestException('Valid faculty ID is required')
     return this.adminService.deleteFaculty(body.faculty_id, user)
   }
 

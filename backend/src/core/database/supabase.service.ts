@@ -44,13 +44,20 @@ export class SupabaseService {
     return this.adminClientInstance
   }
 
-  createAuthClient(): SupabaseClient {
+  createAuthClient(signal?: AbortSignal): SupabaseClient {
     return createClient(this.supabaseUrl, this.supabaseAnonKey, {
-      global: { fetch: boundedFetch },
+      global: { fetch: signal ? (input, init) => boundedFetch(input, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal }) : boundedFetch },
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
+    })
+  }
+
+  createLogoutClient(signal: AbortSignal): SupabaseClient {
+    return createClient(this.supabaseUrl, this.supabaseServiceRoleKey, {
+      global: { fetch: (input, init) => boundedFetch(input, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal }) },
+      auth: { autoRefreshToken: false, persistSession: false },
     })
   }
 
