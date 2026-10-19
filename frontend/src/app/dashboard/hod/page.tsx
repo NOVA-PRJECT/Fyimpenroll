@@ -145,16 +145,21 @@ export default function HodDashboard() {
 
   async function handleExportExcel(sem?: number | 'all') {
     const targetSem = sem ?? (activeTab === 'students' ? studentSemester : defaulterSemester)
+    const setExportError = activeTab === 'students' ? setStudentError : setDefaulterError
+    setExportError('')
     setExportingExcel(true)
     try {
       const params = new URLSearchParams({ format: 'xlsx' })
       if (targetSem !== 'all') params.set('semester', String(targetSem))
       if (deptData?.academic_year) params.set('academic_year', deptData.academic_year)
       const response = await fetch(`/api/export/registrations?${params}`)
-      if (!response.ok) throw new Error('Export failed')
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.message || 'Failed to export Excel file')
+      }
       await downloadBlob(await response.blob(), `Registrations_${targetSem}.xlsx`)
-    } catch {
-      setStudentError('Failed to export Excel file')
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Failed to export Excel file')
     } finally {
       setExportingExcel(false)
     }
@@ -778,6 +783,9 @@ export default function HodDashboard() {
         {/* ══ STUDENTS CRUD TAB ══ */}
         {activeTab === 'students' && (
           <>
+            {studentError && !showAddModal && !editStudent && !deleteStudent && (
+              <div className={styles.errorBanner}>{studentError}</div>
+            )}
 
             <div className={styles.semesterRow}>
               <span className={styles.semesterLabel}>Semester:</span>

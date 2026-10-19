@@ -48,7 +48,7 @@ export class ExportService {
     }
     const buildQuery = () => {
       let q = this.supabase.admin.from('student_registrations')
-        .select('*,students!inner(id,full_name,cap_application_number,campus_id,department_id,departments(id,name,code),campuses(id,name))')
+        .select('*,students!student_registrations_student_id_fkey!inner(id,full_name,cap_application_number,campus_id,department_id,departments(id,name,code),campuses(id,name))')
       if (user.role === 'student') q = q.eq('student_id',user.userId)
       if (['hod','campus_director','teaching_staff'].includes(user.role)) q = q.eq('students.campus_id',user.campus_id)
       if (user.role === 'hod') q = q.eq('students.department_id',user.department_id)
