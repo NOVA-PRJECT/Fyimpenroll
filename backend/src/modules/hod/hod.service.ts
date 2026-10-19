@@ -269,7 +269,7 @@ export class HodService {
         query = query.eq('semester', semester)
       }
 
-      const { data, error } = await query.order('semester').order('category')
+      const { data, error } = await query.order('course_code').order('id')
       if (error) throw new InternalServerErrorException('Failed to fetch courses')
 
       return (data ?? []).map((c: any) => ({
@@ -300,7 +300,7 @@ export class HodService {
       query = query.eq('semester', semester)
     }
 
-    const data = await fetchAllPaginated<any>(query.order('semester').order('category').order('id'))
+    const data = await fetchAllPaginated<any>(query.order('course_code').order('id'))
 
     return (data ?? []).map((c: any) => ({
       ...c,

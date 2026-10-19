@@ -183,7 +183,37 @@ export class AdminService {
     return data ?? []
   }
 
+  private async validateDepartment(name: string, code: string, excludeId?: string) {
+    if (!name || !code) throw new BadRequestException('Department name and code are required')
+    const rows = await fetchAllPaginated<{ id: string; name: string; code: string }>(
+      this.supabase.admin.from('departments').select('id, name, code').order('id'),
+    )
+    if (rows.some(row => row.id !== excludeId && row.code.trim().toUpperCase() === code)) {
+      throw new ConflictException(`Department code '${code}' is already in use. Choose another code.`)
+    }
+    if (rows.some(row => row.id !== excludeId && row.name.trim().toLowerCase() === name.toLowerCase())) {
+      throw new ConflictException(`A department named '${name}' already exists. Choose another name.`)
+    }
+  }
+
+  private departmentWriteError(error: { code?: string; message?: string }, name: string, code: string): never {
+    if (error.code === '23505') {
+      if (error.message?.includes('name')) throw new ConflictException(`A department named '${name}' already exists. Choose another name.`)
+      if (error.message?.includes('code')) throw new ConflictException(`Department code '${code}' is already in use. Choose another code.`)
+      throw new ConflictException('This department name or code is already in use. Choose a different value.')
+    }
+    if (error.code === '23503') throw new BadRequestException('The selected campus is no longer available. Choose a valid campus.')
+    if (error.code === 'PGRST116') throw new NotFoundException('Department no longer exists. Refresh the list and retry.')
+    throw new InternalServerErrorException('Unable to save the department. Please retry.')
+  }
+
   async createDepartment(name: string, code: string, campus_id: string, user: AuthUser) {
+    name = name.trim()
+    code = code.trim().toUpperCase()
+    await this.validateDepartment(name, code)
+    const { data: campus, error: campusError } = await this.supabase.admin.from('campuses').select('id').eq('id', campus_id).maybeSingle()
+    if (campusError) throw new InternalServerErrorException('Unable to verify the selected campus. Please retry.')
+    if (!campus) throw new BadRequestException('The selected campus is no longer available. Choose a valid campus.')
     const { data: createdDept, error } = await this.supabase.admin
       .from('departments')
       .insert({
@@ -194,12 +224,7 @@ export class AdminService {
       .select('id')
       .single()
 
-    if (error) {
-      if (error.code === '23505') {
-        throw new ConflictException('Department name or code already exists')
-      }
-      throw new InternalServerErrorException('Failed to add department')
-    }
+    if (error) this.departmentWriteError(error, name, code)
 
     await this.auditLogger.log({
       eventType: AuditEvents.DEPARTMENT_CREATED,
@@ -216,12 +241,20 @@ export class AdminService {
   }
 
   async updateDepartment(id: string, name: string, code: string, user: AuthUser) {
+    name = name.trim()
+    code = code.trim().toUpperCase()
+    const { data: existing, error: lookupError } = await this.supabase.admin.from('departments').select('id').eq('id', id).maybeSingle()
+    if (lookupError) throw new InternalServerErrorException('Unable to load the department. Please retry.')
+    if (!existing) throw new NotFoundException('Department no longer exists. Refresh the list and retry.')
+    await this.validateDepartment(name, code, id)
     const { error } = await this.supabase.admin
       .from('departments')
-      .update({ name, code: code.toUpperCase() })
+      .update({ name, code })
       .eq('id', id)
+      .select('id')
+      .single()
 
-    if (error) throw new InternalServerErrorException('Failed to update department')
+    if (error) this.departmentWriteError(error, name, code)
 
     await this.auditLogger.log({
       eventType: AuditEvents.DEPARTMENT_UPDATED,

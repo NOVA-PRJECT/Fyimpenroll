@@ -35,14 +35,14 @@ const DeleteCampusSchema = z.object({
 
 const CreateDepartmentSchema = z.object({
   name: z.string().trim().min(1, 'Department name is required').max(100, 'Department name too long'),
-  code: z.string().trim().min(1, 'Department code is required').max(20, 'Department code too long'),
-  campus_id: z.string().min(1, 'Campus ID is required'),
+  code: z.string().trim().min(1, 'Department code is required').max(20, 'Department code too long').transform(code => code.toUpperCase()),
+  campus_id: z.string().uuid('Choose a valid campus for the department'),
 })
 
 const UpdateDepartmentSchema = z.object({
-  id: z.string().min(1, 'Department ID is required'),
+  id: z.string().uuid('Department ID is invalid. Refresh the department list and retry.'),
   name: z.string().trim().min(1, 'Department name is required').max(100, 'Department name too long'),
-  code: z.string().trim().min(1, 'Department code is required').max(20, 'Department code too long'),
+  code: z.string().trim().min(1, 'Department code is required').max(20, 'Department code too long').transform(code => code.toUpperCase()),
 })
 
 const DeleteDepartmentSchema = z.object({
