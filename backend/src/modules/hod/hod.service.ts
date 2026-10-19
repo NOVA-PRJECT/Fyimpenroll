@@ -802,6 +802,8 @@ export class HodService {
       }
     }
 
+    const inserted_count = results.filter((row) => row.status === 'success').length
+    const error_count = results.filter((row) => row.status === 'error').length
     await this.auditLogger.log({
       eventType: AuditEvents.STUDENT_BULK_CREATED,
       userId: user.userId,
@@ -809,10 +811,10 @@ export class HodService {
       action: `bulk created students in department ${user.department_id}`,
       resourceType: 'student',
       status: 'success',
-      metadata: { count: results.filter((r) => r.status === 'success').length },
+      metadata: { count: inserted_count, error_count },
     })
 
-    return { success: true, results }
+    return { success: true, inserted_count, error_count, results }
   }
 
   async exportStudentsExcel(semester: number | undefined, user: AuthUser) {

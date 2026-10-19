@@ -1,5 +1,8 @@
 'use client'
 
+import { bulkUploadResult, type BulkUploadResult } from '@/core/bulk-upload-result'
+import { apiErrorMessage } from '@/core/api-error'
+import BulkUploadResults from './BulkUploadResults'
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
 import { Check as UiCheck, FolderOpen as UiFolderOpen, Pencil as UiPencil, Trash2 as UiTrash2, Users as UiUsers, X as UiX } from 'lucide-react'
@@ -53,11 +56,7 @@ interface DeptData {
   students: DeptStudent[]
 }
 
-interface UploadResult {
-  inserted_count: number
-  error_count: number
-  results?: { row: number; email: string; status: string; issues?: string[] }[]
-}
+
 
 type Tab = 'defaulters' | 'upload' | 'students' | 'blueprint' | 'courses' | 'assignments' | 'period-marking' | 'campus-attendance' | 'manual-allocation'
 
@@ -100,7 +99,7 @@ export default function HodDashboard() {
   const [batchPassword, setBatchPassword] = useState('')
   const [showBatchPassword, setShowBatchPassword] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
+  const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null)
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState('')
 
@@ -321,8 +320,8 @@ export default function HodDashboard() {
           setUploading(false)
           return
         }
-        if (rows.length > 120) {
-          setUploadError('Maximum 120 students per upload. Please split larger files.')
+        if (rows.length > 100) {
+          setUploadError('Maximum 100 students per upload. Please split larger files.')
           setUploading(false)
           return
         }
@@ -332,20 +331,25 @@ export default function HodDashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rows, batch_default_password: batchPassword }),
           })
-          const result = await response.json()
+          const result = await response.json().catch(() => null)
           if (!response.ok) {
-            setUploadError(result.error ?? 'Upload failed')
+            setUploadError(apiErrorMessage(result, 'Upload failed. Please try again.', response.status))
             setUploading(false)
             return
           }
-           setUploadResult(result)
-          setUploadSuccess(`Upload complete — ${result.inserted_count} students created.`)
-          setTimeout(() => setUploadSuccess(''), 1000)
+          const summary = bulkUploadResult(result)
+          setUploadResult(summary)
+          if (summary.error_count > 0) {
+            setUploadError(`Upload finished: ${summary.inserted_count} created, ${summary.error_count} failed. See the row errors below.`)
+          } else {
+            setUploadSuccess(`Upload complete — ${summary.inserted_count} students created.`)
+            setTimeout(() => setUploadSuccess(''), 1000)
+          }
           setSelectedFile(null)
           setBatchPassword('')
           if (fileInputRef.current) fileInputRef.current.value = ''
-        } catch {
-          setUploadError('Something went wrong. Please try again.')
+        } catch (error) {
+          setUploadError(error instanceof TypeError ? 'The upload could not be confirmed. Check your connection and refresh the student list before retrying.' : error instanceof Error ? error.message : 'Upload results could not be confirmed. Refresh the student list before retrying.')
         }
         setUploading(false)
       },
@@ -767,33 +771,7 @@ export default function HodDashboard() {
               </button>
             </div>
 
-            {uploadResult && (
-              <>
-                <p className={styles.sectionTitle}>Upload Results</p>
-                <div className={styles.uploadCard}>
-                  <div className={styles.resultsGrid}>
-                    <div className={`${styles.resultStat} ${styles.success}`}>
-                      <p className={styles.resultValue}>{uploadResult.inserted_count}</p>
-                      <p className={styles.resultLabel}>Created</p>
-                    </div>
-                    <div className={`${styles.resultStat} ${uploadResult.error_count > 0 ? styles.danger : styles.success}`}>
-                      <p className={styles.resultValue}>{uploadResult.error_count}</p>
-                      <p className={styles.resultLabel}>Errors</p>
-                    </div>
-                  </div>
-                  {uploadResult.results && uploadResult.results.filter(r => r.status === 'error').length > 0 && (
-                    <div className={styles.errorList}>
-                      <p className={styles.errorListTitle}>Row Errors</p>
-                      {uploadResult.results.filter(r => r.status === 'error').map((err, i) => (
-                        <div key={i} className={styles.errorItem}>
-                          Row {err.row} ({err.email}): {err.issues?.join(', ')}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+            {uploadResult && <BulkUploadResults result={uploadResult} />}
           </>
         )}
 

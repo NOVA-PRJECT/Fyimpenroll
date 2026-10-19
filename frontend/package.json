@@ -10,7 +10,8 @@
     "test:testing-fixes": "node --test test/logout.test.cjs test/middleware.test.cjs",
     "test:course-loading": "node --test test/course-loading.test.cjs",
     "test:blueprint-password": "node --test test/blueprint-password.test.cjs",
-    "test:registration-attendance": "node --test test/registration-attendance.test.cjs"
+    "test:registration-attendance": "node --test test/registration-attendance.test.cjs",
+    "test:bulk-upload": "node --test test/bulk-upload-result.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

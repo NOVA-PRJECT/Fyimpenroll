@@ -12,7 +12,8 @@
     "start:prod": "node dist/main",
     "test:testing-fixes": "node --test test/testing-fixes.test.cjs",
     "test:departments": "node --test test/department-metadata.test.cjs",
-    "test:password-change": "node --test test/password-change-errors.test.cjs"
+    "test:password-change": "node --test test/password-change-errors.test.cjs",
+    "test:bulk-upload": "node --test test/bulk-upload-counts.test.cjs"
   },
   "dependencies": {
     "@fyimp/contracts": "file:../contracts",
