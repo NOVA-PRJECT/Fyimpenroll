@@ -489,6 +489,9 @@ export class AuthService {
     if (!currentPassword || !newPassword) {
       throw new BadRequestException('Current password and new password are required.')
     }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException({ code: 'PASSWORD_UNCHANGED', field: 'new_password', message: 'Your new password must be different from your current password.' })
+    }
 
     // 1. Verify current password
     const verifyAuthClient = this.supabase.createAuthClient()
@@ -499,12 +502,15 @@ export class AuthService {
     assertAuthProviderAvailable(verifyError)
 
     if (verifyError) {
-      throw new BadRequestException('Current password is incorrect')
+      if (!verifyError.code || verifyError.code === 'invalid_credentials') {
+        throw new BadRequestException({ code: 'CURRENT_PASSWORD_INCORRECT', field: 'current_password', message: 'Current password is incorrect. Check it and try again.' })
+      }
+      throw new BadRequestException({ code: 'PASSWORD_VERIFICATION_FAILED', message: 'Your current password could not be verified. Sign in again or contact your campus administrator.' })
     }
 
     // 2. Update to new password in Supabase Auth.
     // NOTE (R02): Mark pending_profile_sync: true as server-trusted proof before clearing must_change_password
-    const { error: pwError } = await this.supabase.admin.auth.admin.updateUserById(
+    const { error: pwError } = await authProviderCall(this.supabase.admin.auth.admin.updateUserById(
       user.userId,
       {
         password: newPassword,
@@ -516,10 +522,15 @@ export class AuthService {
           pending_profile_sync: true,
         },
       },
-    )
+    ))
 
+    assertAuthProviderAvailable(pwError)
     if (pwError) {
-      throw new InternalServerErrorException('Failed to update password in authentication system')
+      const code = pwError.code === 'same_password' ? 'PASSWORD_UNCHANGED' : pwError.code === 'weak_password' ? 'PASSWORD_TOO_WEAK' : 'NEW_PASSWORD_REJECTED'
+      const message = code === 'PASSWORD_UNCHANGED' ? 'Your new password must be different from your current password.'
+        : code === 'PASSWORD_TOO_WEAK' ? 'Choose a stronger new password. Avoid common or previously leaked passwords.'
+        : 'The new password was not accepted. Choose a different password and try again.'
+      throw new BadRequestException({ code, field: 'new_password', message })
     }
 
     // 3. Clear flag in database profile if student
