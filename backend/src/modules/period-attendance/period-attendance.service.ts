@@ -459,7 +459,7 @@ export class PeriodAttendanceService {
   async getTeacherSchedule(user: AuthUser, queryDate?: string) {
     const { data: faculty } = await this.supabase.admin
       .from('faculty')
-      .select('id, full_name, department_id, campus_id, departments(name), campuses(name)')
+      .select('id, full_name, department_id, campus_id, departments!faculty_department_id_fkey(name), campuses(name)')
       .eq('id', user.userId)
       .maybeSingle();
 

@@ -166,6 +166,7 @@ export default function HodDashboard() {
       try {
         const response = await entryFetch('/api/auth/profile', { signal: controller.signal })
         const data = await response.json().catch(() => ({}))
+        if (controller.signal.aborted) return
         const destination = sessionRedirect(response.status, data)
         if (destination) { router.replace(destination); return }
         if (!response.ok || !data.profile) throw new Error('Your profile couldn’t be loaded. Please try again.')
@@ -663,7 +664,7 @@ export default function HodDashboard() {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
-        {profileError && <div role="alert" className={styles.errorBanner}>{profileError} <button onClick={() => { setLoadingHod(true); setProfileRetry(value => value + 1) }}>Try again</button></div>}
+        {profileError && <div role="alert" className={styles.errorBanner}>{profileError} <button onClick={() => { setProfileError(''); setLoadingHod(true); setProfileRetry(value => value + 1) }}>Try again</button></div>}
 
         {/* ══ BULK UPLOAD TAB ══ */}
         {activeTab === 'upload' && (

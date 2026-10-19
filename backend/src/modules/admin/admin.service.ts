@@ -346,7 +346,7 @@ export class AdminService {
   async getFacultyList() {
     const { data, error } = await this.supabase.admin
       .from('faculty')
-      .select('id, full_name, email, role, department_id, campus_id, departments (name), campuses (name)')
+      .select('id, full_name, email, role, department_id, campus_id, departments!faculty_department_id_fkey(name), campuses (name)')
       .order('full_name')
     if (error) throw new InternalServerErrorException('Failed to fetch faculty list')
     return data ?? []

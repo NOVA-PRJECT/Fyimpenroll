@@ -455,7 +455,7 @@ export class AuthService {
     if (role === 'hod' || role === 'campus_director' || role === 'teaching_staff' || role === 'teacher') {
       const { data: faculty, error } = await this.supabase.admin
         .from('faculty')
-        .select('full_name, campus_id, department_id, departments(name), campuses(name)')
+        .select('full_name, campus_id, department_id, departments!faculty_department_id_fkey(name), campuses(name)')
         .eq('id', user.userId)
         .single()
       if (error) throw new BadRequestException('Faculty profile not found')
