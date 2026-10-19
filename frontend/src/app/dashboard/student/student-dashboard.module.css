@@ -3053,3 +3053,16 @@
     font-size: 0.58rem !important;
   }
 }
+
+/* A blueprint paper is a plan, not proof of registration or allocation. */
+.blueprintCourseCard {
+  background: var(--portal-info-bg,#f8fafc);
+  border-color: var(--portal-info-border,#cbd5e1);
+  box-shadow: none;
+}
+.blueprintCourseCard:hover { box-shadow: none; }
+.blueprintCourseBadge {
+  background: var(--portal-info-bg,#f1f5f9);
+  color: var(--portal-info-text,#475569);
+  border-color: var(--portal-info-border,#cbd5e1);
+}

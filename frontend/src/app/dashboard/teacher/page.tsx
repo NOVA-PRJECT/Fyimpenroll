@@ -1,5 +1,8 @@
 'use client'
 
+import AccessibleModal from '@/components/AccessibleModal'
+import { attendanceCopySource, copiedAbsences } from '@/core/attendance-copy'
+import { apiErrorMessage } from '@/core/api-error'
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
 import { BookOpen as UiBookOpen, CalendarDays as UiCalendarDays, Inbox as UiInbox, RefreshCw as UiRefreshCw, Search as UiSearch, Timer as UiTimer, Users as UiUsers, X as UiX } from 'lucide-react'
@@ -256,6 +259,21 @@ export default function TeacherDashboard() {
   const [sessionRevision, setSessionRevision] = useState<number | null>(null)
   const [conflictRevision, setConflictRevision] = useState<number | null>(null)
   const [copyingPractical, setCopyingPractical] = useState<string | null>(null)
+  const [copyNotice, setCopyNotice] = useState('')
+  const markingRequest = useRef<AbortController | null>(null)
+  const markingContext = useRef<{ slotId: string; date: string } | null>(null)
+  const copySource = activeSlotForMarking ? attendanceCopySource(schedulePeriods, activeSlotForMarking) : undefined
+  const closeMarkingModal = useCallback(() => {
+    markingRequest.current?.abort()
+    markingContext.current = null
+    setActiveSlotForMarking(null)
+    setCopyingPractical(null)
+    setCopyNotice('')
+  }, [])
+  useEffect(() => {
+    if (markingContext.current && markingContext.current.date !== scheduleDate) closeMarkingModal()
+  }, [scheduleDate, closeMarkingModal])
+  useEffect(() => () => { markingRequest.current?.abort(); markingContext.current = null }, [])
 
   // Tab 2: Assigned Papers & Rosters State
   const [assignedCourses, setAssignedCourses] = useState<Course[]>([])
@@ -392,7 +410,15 @@ export default function TeacherDashboard() {
 
   // Open Marking Modal for a slot (F47, F48, R29: Loads persisted marks and session revision for scheduleDate)
   async function handleOpenMarkingModal(slot: PeriodSlot) {
+    markingRequest.current?.abort()
+    const controller = new AbortController()
+    markingRequest.current = controller
+    const context = { slotId: slot.timetable_slot_id, date: scheduleDate }
+    markingContext.current = context
     setActiveSlotForMarking(slot)
+    setMarkingRoster([])
+    setCopyingPractical(null)
+    setCopyNotice('')
     setMarkingError('')
     setLoadingMarkingRoster(true)
     setAbsentStudentIds(new Set())
@@ -401,8 +427,9 @@ export default function TeacherDashboard() {
     setConflictRevision(null)
 
     try {
-      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`)
+      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`, { signal: controller.signal })
       const data = await res.json()
+      if (controller.signal.aborted || markingContext.current !== context) return
       if (res.ok && data.students) {
         setMarkingRoster(data.students)
         setLastMarkedAt(data.last_marked_at || null)
@@ -420,9 +447,9 @@ export default function TeacherDashboard() {
         setMarkingError(data.message || data.error || 'Failed to load enrolled students.')
       }
     } catch {
-      setMarkingError('Network error while loading roster.')
+      if (!controller.signal.aborted && markingContext.current === context) setMarkingError('Unable to load the roster. Check your connection and retry.')
     } finally {
-      setLoadingMarkingRoster(false)
+      if (!controller.signal.aborted && markingContext.current === context) setLoadingMarkingRoster(false)
     }
   }
 
@@ -449,7 +476,7 @@ export default function TeacherDashboard() {
 
   // Submit Period Attendance (F48, R29: Send explicit scheduleDate, lastMarkedAt, and expected_revision for CAS conflict check)
   async function handleSubmitAttendance(overrideRevision?: number) {
-    if (!activeSlotForMarking) return
+    if (!activeSlotForMarking || loadingMarkingRoster || copyingPractical || submittingAttendance) return
     setSubmittingAttendance(true)
     setMarkingError('')
 
@@ -474,7 +501,7 @@ export default function TeacherDashboard() {
       const result = await res.json()
       if (res.ok) {
         setGlobalSuccess(`Period ${activeSlotForMarking.period_number} attendance for ${scheduleDate} saved successfully!`)
-        setActiveSlotForMarking(null)
+        closeMarkingModal()
         setSessionRevision(null)
         setConflictRevision(null)
         // Refresh schedule to update marked badge and counts
@@ -503,68 +530,31 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Copy Practical Attendance to Next Period (F49, R03, R29: Strict pair authorization & target revision CAS)
-  async function handleCopyPractical(period: PeriodSlot) {
-    if (!period.adjacent_practical_slot_id) return
-    setCopyingPractical(period.timetable_slot_id)
+  // Pull source marks into the destination draft. Only Save & Submit persists anything.
+  async function handleCopyFromPrevious() {
+    if (!activeSlotForMarking || !copySource || loadingMarkingRoster || submittingAttendance || copyingPractical) return
+    const context = markingContext.current
+    if (!context) return
+    markingRequest.current?.abort()
+    const controller = new AbortController()
+    markingRequest.current = controller
+    setCopyingPractical(copySource.timetable_slot_id)
+    setMarkingError('')
+    setCopyNotice('')
     try {
-      let res = await fetch('/api/attendance/period/copy-to-next-period', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source_slot_id: period.timetable_slot_id,
-          target_slot_id: period.adjacent_practical_slot_id,
-          attendance_date: scheduleDate,
-          expected_target_revision: 0,
-          overwrite: false,
-        }),
-      })
-
-      if (res.status === 409) {
-        const confirmed = window.confirm(
-          `Next practical period already has attendance marks recorded for ${scheduleDate}. Overwrite existing marks?`
-        )
-        if (confirmed) {
-          let targetRev: number | undefined = undefined
-          try {
-            const marksRes = await fetch(`/api/attendance/period/slot-marks?slotId=${period.adjacent_practical_slot_id}&date=${scheduleDate}`)
-            const marksData = await marksRes.json()
-            if (marksRes.ok && marksData.revision !== undefined) {
-              targetRev = marksData.revision
-            }
-          } catch {
-            // fallback
-          }
-
-          res = await fetch('/api/attendance/period/copy-to-next-period', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              source_slot_id: period.timetable_slot_id,
-              target_slot_id: period.adjacent_practical_slot_id,
-              attendance_date: scheduleDate,
-              expected_target_revision: targetRev,
-              overwrite: true,
-            }),
-          })
-        } else {
-          setCopyingPractical(null)
-          return
-        }
+      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${copySource.timetable_slot_id}&date=${context.date}`, { signal: controller.signal })
+      const data = await res.json().catch(() => null)
+      if (controller.signal.aborted || markingContext.current !== context) return
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Unable to load the previous period’s attendance. Please retry.', res.status))
+      if (!data?.is_marked || data.attendance_date !== context.date || data.slot?.id !== copySource.timetable_slot_id || data.slot?.course_id !== activeSlotForMarking.course_id || !Array.isArray(data.students)) {
+        throw new Error('The previous period has no complete saved attendance for this class and date. Mark this period manually.')
       }
-
-      const data = await res.json()
-      if (res.ok) {
-        setGlobalSuccess(`Practical attendance copied to Period ${period.period_number + 1} for ${scheduleDate}!`)
-        await fetchTeacherSchedule(scheduleDate)
-        setTimeout(() => setGlobalSuccess(''), 4000)
-      } else {
-        setGlobalError(data.message || 'Failed to copy practical attendance.')
-      }
-    } catch {
-      setGlobalError('Network error while copying practical attendance.')
+      setAbsentStudentIds(copiedAbsences(markingRoster, data.students))
+      setCopyNotice(`Copied P${copySource.period_number} marks into this draft. Review them, then Save & Submit to record P${activeSlotForMarking.period_number}.`)
+    } catch (error) {
+      if (!controller.signal.aborted && markingContext.current === context) setMarkingError(error instanceof Error ? error.message : 'Unable to copy attendance. Please retry.')
     } finally {
-      setCopyingPractical(null)
+      if (!controller.signal.aborted && markingContext.current === context) setCopyingPractical(null)
     }
   }
 
@@ -879,23 +869,7 @@ export default function TeacherDashboard() {
                           {period.is_marked ? 'Update Attendance' : 'Mark Attendance Now'}
                         </button>
 
-                        {period.is_marked && period.adjacent_practical_slot_id && (
-                          <button
-                            type="button"
-                            className={styles.markAttendanceBtn}
-                            style={{
-                              background: "var(--portal-success-bg,#f0fdf4)",
-                              color: "var(--portal-success-text,#166534)",
-                              border: "1px solid var(--portal-success-border,#86efac)",
-                            }}
-                            onClick={() => handleCopyPractical(period)}
-                            disabled={copyingPractical === period.timetable_slot_id}
-                          >
-                            {copyingPractical === period.timetable_slot_id
-                              ? <LoadingIndicator message="Copying…" />
-                              : `Copy to P${period.period_number + 1}`}
-                          </button>
-                        )}
+
                       </div>
                     </div>
                   )
@@ -1302,7 +1276,7 @@ export default function TeacherDashboard() {
 
       {/* ATTENDANCE MARKING MODAL */}
       {activeSlotForMarking && (
-        <div className={styles.modalOverlay} onClick={() => setActiveSlotForMarking(null)}>
+        <AccessibleModal label={`Period ${activeSlotForMarking.period_number} Attendance`} className={styles.modalOverlay} busy={submittingAttendance} onClose={closeMarkingModal}>
           <div className={styles.attendanceModal} onClick={e => e.stopPropagation()}>
             <div className={styles.attendanceModalHeader}>
               <div>
@@ -1317,20 +1291,29 @@ export default function TeacherDashboard() {
               <button
                 type="button"
                 className={styles.modalCloseWhiteBtn}
-                onClick={() => setActiveSlotForMarking(null)}
+                onClick={closeMarkingModal}
                 aria-label="Close"
+                disabled={submittingAttendance}
               >
                 <UiX size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
               </button>
             </div>
 
-            {markingError && <div className={styles.errorBanner} style={{ margin: '0.75rem 1.25rem 0' }}>{markingError}</div>}
+            {markingError && <div role="alert" className={styles.errorBanner} style={{ margin: '0.75rem 1.25rem 0' }}>{markingError}</div>}
             {conflictRevision !== null && (
               <div style={{ margin: '0.75rem 1.25rem 0', padding: '0.75rem', background: "var(--portal-warning-bg,#fef3c7)", border: "1px solid var(--portal-warning-border,#f59e0b)", borderRadius: '0.375rem', color: "var(--portal-warning-text,#92400e)", fontSize: '0.875rem' }}>
                 <strong>Concurrent edit detected:</strong> Another teacher modified this record (now at revision {conflictRevision}). Your entered selections above are preserved. Click <strong>Overwrite with My Marks</strong> to submit your selections, or <strong>Cancel</strong> to discard.
               </div>
             )}
 
+            {copySource && <div style={{ margin: '0.75rem 1.25rem', padding: '0.75rem', border: '1px solid var(--portal-border,#cbd5e1)', borderRadius: '0.5rem' }}>
+              <button type="button" className={styles.quickBtn} onClick={handleCopyFromPrevious}
+                disabled={loadingMarkingRoster || submittingAttendance || !!copyingPractical || markingRoster.length === 0}>
+                {copyingPractical ? 'Copying marks…' : `Copy from P${copySource.period_number}`}
+              </button>
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.8rem' }}>Copy and paste the previous period’s saved attendance into this draft. Review before saving.</p>
+            </div>}
+            {copyNotice && <p role="status" style={{ margin: '0.75rem 1.25rem', fontSize: '0.85rem' }}>{copyNotice}</p>}
             <div className={styles.attendanceModalControls}>
               <div className={styles.attendanceStatsLive}>
                 <span>Total: <strong>{markingRoster.length}</strong></span>
@@ -1346,6 +1329,7 @@ export default function TeacherDashboard() {
                   type="button"
                   className={styles.quickBtn}
                   onClick={handleMarkAllPresent}
+                  disabled={loadingMarkingRoster || submittingAttendance || !!copyingPractical}
                 >
                   All Present
                 </button>
@@ -1353,6 +1337,7 @@ export default function TeacherDashboard() {
                   type="button"
                   className={styles.quickBtn}
                   onClick={handleMarkAllAbsent}
+                  disabled={loadingMarkingRoster || submittingAttendance || !!copyingPractical}
                 >
                   All Absent
                 </button>
@@ -1392,6 +1377,7 @@ export default function TeacherDashboard() {
                           isAbsent ? styles.toggleStatusAbsent : styles.toggleStatusPresent
                         }`}
                         onClick={() => handleToggleStudentStatus(student.id)}
+                        disabled={submittingAttendance || !!copyingPractical}
                       >
                         {isAbsent ? 'ABSENT' : 'PRESENT'}
                       </button>
@@ -1405,7 +1391,7 @@ export default function TeacherDashboard() {
               <button
                 type="button"
                 className={styles.modalCancelBtn}
-                onClick={() => setActiveSlotForMarking(null)}
+                onClick={closeMarkingModal}
                 disabled={submittingAttendance}
               >
                 Cancel
@@ -1415,7 +1401,7 @@ export default function TeacherDashboard() {
                   type="button"
                   className={styles.submitAttendanceBtn}
                   onClick={() => handleSubmitAttendance(conflictRevision)}
-                  disabled={submittingAttendance || loadingMarkingRoster}
+                  disabled={submittingAttendance || loadingMarkingRoster || !!copyingPractical || markingRoster.length === 0}
                   style={{ backgroundColor: '#d97706' }}
                 >
                   {submittingAttendance
@@ -1427,7 +1413,7 @@ export default function TeacherDashboard() {
                   type="button"
                   className={styles.submitAttendanceBtn}
                   onClick={() => handleSubmitAttendance()}
-                  disabled={submittingAttendance || loadingMarkingRoster}
+                  disabled={submittingAttendance || loadingMarkingRoster || !!copyingPractical || markingRoster.length === 0}
                 >
                   {submittingAttendance
                     ? <LoadingIndicator message="Submitting…" />
@@ -1436,7 +1422,7 @@ export default function TeacherDashboard() {
               )}
             </div>
           </div>
-        </div>
+        </AccessibleModal>
       )}
 
       {/* PDF EXPORT MODAL */}

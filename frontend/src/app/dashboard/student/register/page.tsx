@@ -1,5 +1,6 @@
 'use client'
 
+import { registrationSlotState } from '@/core/registration-display'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { Check as UiCheck, ClipboardList as UiClipboardList, GraduationCap as UiGraduationCap, Info as UiInfo, RefreshCw as UiRefreshCw, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
@@ -45,6 +46,7 @@ interface BlueprintData {
   allocationMetadata?: Record<string, { status?: string; allocated_by?: string; reason?: string; allocated_course_id?: string; rank?: number }>
   allocationCompleted?: boolean
   allocationCompletedAt?: string | null
+  submittedAt?: string | null
   availableSeats?: Record<string, number>
   existingSlots?: Record<string, string | null>
   allocatedCourses?: Record<string, Course>
@@ -104,6 +106,7 @@ export default function RegisterPage() {
   const [slotChangesRemaining, setSlotChangesRemaining] = useState<number>(3)
   const [slotChangesNextReset, setSlotChangesNextReset] = useState<string | null>(null)
 
+  const hasSubmitted = !!blueprint?.submittedAt || pageState === 'submitted'
   const windowIsOpen = serverWindowIsOpen && !!blueprint?.deadline && currentTime < Date.parse(blueprint.deadline)
 
   const [error, setError] = useState('')
@@ -133,9 +136,7 @@ export default function RegisterPage() {
       if (rawBp.availableSeats) {
         setAvailableSeats(rawBp.availableSeats)
       }
-      if (rawBp.allocatedCourses) {
-        setAllocatedCourses(rawBp.allocatedCourses)
-      }
+      setAllocatedCourses(rawBp.allocatedCourses || {})
 
       setSlotChangesRemaining(rawBp.slotChangesRemaining !== undefined ? rawBp.slotChangesRemaining : 3)
       setSlotChangesNextReset(rawBp.slotChangesNextReset || null)
@@ -155,16 +156,10 @@ export default function RegisterPage() {
       const minors: Course[] = rawBp.minorCourses || []
       setMinorCourses(minors)
 
-      if (rawBp.existingRegistration || rawBp.existingSlots) {
-        setExistingSubmission(rawBp.existingRegistration || {})
-      }
+      setExistingSubmission(rawBp.submittedAt ? (rawBp.existingRegistration || {}) : null)
 
-      if (rawBp.existingSlots) {
-        setExistingSlots(rawBp.existingSlots)
-      }
-      if (rawBp.allocationMetadata) {
-        setAllocationMetadata(rawBp.allocationMetadata)
-      }
+      setExistingSlots(rawBp.existingSlots || {})
+      setAllocationMetadata(rawBp.allocationMetadata || {})
 
       // Hydrate preferences: In post-allocation mode, preferences have ZERO importance!
       // Active enrollments are driven exclusively by existingSlots from student_registrations.
@@ -411,7 +406,7 @@ export default function RegisterPage() {
       : (rankedPreferences[slotNum]?.rank1 || existingCourseId)
 
     if (!targetCourseId) {
-      return (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED') ? (slot.course || null) : null
+      return !allocationCompleted && (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED') ? (slot.course || null) : null
     }
 
     // 1. Direct course lookup in allocatedCourses map (from backend student_registrations)
@@ -446,7 +441,7 @@ export default function RegisterPage() {
     }
 
     // 6. Fallback only if fixed slot rule
-    if (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED') {
+    if (!allocationCompleted && (slot.rule === 'FIXED' || slot.rule === 'CAMPUS_FIXED')) {
       return slot.course || null
     }
 
@@ -458,7 +453,7 @@ export default function RegisterPage() {
     if (!resolvedSlots.length) return 0
     let total = 0
     resolvedSlots.forEach((slot) => {
-      const course = getCourseForSlot(slot)
+      const course = allocationCompleted && !existingSlots[`slot_${slot.slot}`] ? null : getCourseForSlot(slot)
       if (course && course.credits != null) {
         total += Number(course.credits) || 0
       }
@@ -783,7 +778,7 @@ export default function RegisterPage() {
                   <div>
                     <strong>Registration window is closed — course changes are locked.</strong>
                     <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem' }}>
-                      Your registered courses remain available to view. Courses cannot be changed or added while registration is closed, even if you have changes remaining.
+                      {allocationCompleted ? 'Persisted allocations remain available to view. Course changes are locked.' : hasSubmitted ? 'Your preferences are submitted and awaiting allocation. Course changes are locked.' : 'No registration has been submitted. Blueprint courses below are not confirmed allocations. Contact your HOD for assistance.'}
                     </p>
                   </div>
                 </div>
@@ -940,7 +935,7 @@ export default function RegisterPage() {
                         ? 'Total Enrolled Credits:'
                         : windowIsOpen
                         ? 'Credits (Blueprint Papers):'
-                        : 'Total Confirmed Credits (Blueprint Papers):'}
+                        : 'Blueprint Credits (not confirmed allocations):'}
                     </span>
                     <span
                       className={`${styles.creditValue} ${
@@ -973,10 +968,10 @@ export default function RegisterPage() {
 
               <p className={styles.sectionTitle}>
                 {allocationCompleted
-                  ? windowIsOpen ? 'Your Course Allocations & Available Slots' : 'Your Registered Courses'
+                  ? windowIsOpen ? 'Your Course Allocations & Available Slots' : 'Course Allocation Status'
                   : windowIsOpen
                   ? 'Select Your Ranked Preferences'
-                  : 'Course Allocation Status'}
+                  : allocationCompleted ? 'Course Allocation Status' : 'Blueprint Courses & Registration Status'}
               </p>
 
               <div className={styles.slotsContainer}>
@@ -988,7 +983,8 @@ export default function RegisterPage() {
                     (!!slot.course && (!slot.options || slot.options.length === 0))
                   const slotKey = `slot_${slot.slot}`
                   const existingCourseId = existingSlots[slotKey]
-                  const isAllocated = !!existingCourseId
+                  const presentation = registrationSlotState({ allocationCompleted, submitted: hasSubmitted, windowOpen: windowIsOpen, persistedCourseId: existingCourseId, fixed: isFixed })
+                  const isAllocated = presentation.confirmed
                   const slotAllocMeta = allocationMetadata[slotKey]
                   const isFixedSlot =
                     isFixed ||
@@ -998,11 +994,10 @@ export default function RegisterPage() {
                     slot.rule === 'AEC_ELECT'
 
                   // Find course metadata if allocated or fixed
-                  const allocatedCourse = isFixed
-                    ? (slot.course || getCourseForSlot(slot))
-                    : getCourseForSlot(slot)
+                  const allocatedCourse = !allocationCompleted && isFixed ? (slot.course || getCourseForSlot(slot)) : getCourseForSlot(slot)
 
-                  const isConfirmed = isAllocated || (isFixed && !!slot.course)
+                  const isConfirmed = isAllocated
+                  const showFixedBlueprint = isFixed && !!allocatedCourse
                   const isCurrentlyEditing = windowIsOpen && slotChangesRemaining > 0 && editingSlot === slot.slot
 
                   return (
@@ -1221,12 +1216,12 @@ export default function RegisterPage() {
                                 <span><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Unassigned Paper Slot
                               </p>
                               <p className={styles.unallocatedText} style={{ margin: '0.25rem 0 0 0' }}>
-                                {windowIsOpen
+                                {isFixedSlot ? 'This fixed paper is not assigned to your registration. Contact your HOD.' : windowIsOpen
                                   ? 'This slot is unassigned. Choose from courses with remaining seats.'
                                   : 'Registration is closed. Contact your department HOD about this unassigned slot.'}
                               </p>
                             </div>
-                            {windowIsOpen && <button
+                            {windowIsOpen && !isFixedSlot && <button
                               type="button"
                               onClick={() => {
                                 setEditingSlot(slot.slot)
@@ -1251,15 +1246,13 @@ export default function RegisterPage() {
                         )
                       ) : (
                         /* PRE-ALLOCATION MODE */
-                        isConfirmed && allocatedCourse ? (
-                          <div className={styles.confirmedCard}>
+                        showFixedBlueprint && allocatedCourse ? (
+                          <div className={`${styles.confirmedCard} ${styles.blueprintCourseCard}`}>
                             <div className={styles.confirmedCardBody}>
                               <div className={styles.confirmedBadgeRow}>
-                                <span className={styles.confirmedBadge}>
-                                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  Confirmed Allocation
+                                <span className={`${styles.confirmedBadge} ${styles.blueprintCourseBadge}`}>
+                                  <UiInfo size="1em" aria-hidden="true" />
+                                  Fixed blueprint course
                                 </span>
                               </div>
 
@@ -1288,11 +1281,10 @@ export default function RegisterPage() {
                         ) : !windowIsOpen ? (
                           <div className={styles.unallocatedCard}>
                             <p className={styles.unallocatedTitle}>
-                              <span><UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Not yet allocated — contact your HOD
+                              <span><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> {presentation.pendingTitle}
                             </p>
                             <p className={styles.unallocatedText}>
-                              Your submitted preferences could not be resolved during automated rounds.
-                              Please contact your department HOD for manual placement.
+                              {presentation.pendingText}
                             </p>
                           </div>
                         ) : (
