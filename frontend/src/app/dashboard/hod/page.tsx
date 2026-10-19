@@ -98,7 +98,7 @@ export default function HodDashboard() {
   // ── Upload Tab State ──
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [batchPassword, setBatchPassword] = useState('')
-  const [showBatchPassword, setShowBatchPassword] = useState(false)
+  const [showBatchPassword, setShowBatchPassword] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [uploadError, setUploadError] = useState('')

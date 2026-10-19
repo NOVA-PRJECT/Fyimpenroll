@@ -1,5 +1,7 @@
 'use client'
 
+import { passwordChangeError } from '@/core/validation/passwordChangeErrors'
+import { apiErrorMessage } from '@/core/api-error'
 import { logoutPortal } from '@/core/security/logout'
 import { navigateAfterSessionChange } from '@/core/security/session-navigation'
 
@@ -60,6 +62,8 @@ export default function SharedChangePasswordPage() {
     else if (!letterMet) errors.new_password = 'Password must contain at least one letter'
     else if (!numberMet) errors.new_password = 'Password must contain at least one number'
 
+    if (newPassword && newPassword === currentPassword) errors.new_password = 'Your new password must be different from your current password.'
+
     if (!confirmPassword) errors.confirm_password = 'Please confirm your new password'
     else if (newPassword !== confirmPassword) errors.confirm_password = 'Passwords do not match'
 
@@ -69,6 +73,8 @@ export default function SharedChangePasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (loading || canRetrySync || retryingSync) return
+    setError('')
     if (!validate()) return
 
     setLoading(true)
@@ -85,17 +91,23 @@ export default function SharedChangePasswordPage() {
         }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
 
       if (!response.ok) {
-        setError(data.error ?? data.message ?? 'Failed to update password. Please try again.')
+        const failure = passwordChangeError(data, response.status)
+        setError(failure.message)
+        if (failure.field) setFieldErrors(previous => ({ ...previous, [failure.field!]: failure.message }))
         setLoading(false)
         return
       }
 
+      if (!data || typeof data.success !== 'boolean') {
+        setError('The server response could not be confirmed. Sign in again to check your password status before retrying.'); return
+      }
+
       // R32: Check for partial synchronization failure
       if (data.code === 'SYNC_FAILED' || data.success === false) {
-        setError(data.message || 'Password updated in authentication system, but profile synchronization failed.')
+        setError('Your password was changed, but account setup could not finish. Use Retry Profile Synchronization below; do not change your password again.')
         setCanRetrySync(true)
         setLoading(false)
         return
@@ -108,9 +120,8 @@ export default function SharedChangePasswordPage() {
       const dest = (role && ROLE_DASHBOARD_MAP[role]) || '/dashboard/student'
       navigateAfterSessionChange(dest)
     } catch {
-      setError('Network error updating password. Please check your connection.')
-      setLoading(false)
-    }
+      setError('The password change could not be confirmed. Check your connection, then sign in again to check your password before retrying.')
+    } finally { setLoading(false) }
   }
 
   async function handleRetrySync() {
@@ -121,15 +132,15 @@ export default function SharedChangePasswordPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
-      const data = await res.json()
-      if (res.ok && data.success) {
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success) {
         if (typeof window !== 'undefined') {
           sessionStorage.clear()
         }
         const dest = (role && ROLE_DASHBOARD_MAP[role]) || '/dashboard/student'
         navigateAfterSessionChange(dest)
       } else {
-        setError(data.message || 'Profile synchronization failed on retry. Please try again.')
+        setError(apiErrorMessage(data, 'Your password is already changed, but account setup could not finish. Retry synchronization shortly.', res.status))
         setRetryingSync(false)
       }
     } catch {
@@ -225,25 +236,28 @@ export default function SharedChangePasswordPage() {
                   </span>
                   <input
                     id="current-password"
+                    aria-invalid={!!fieldErrors.current_password}
+                    aria-describedby={fieldErrors.current_password ? "current-password-error" : undefined}
                     type={showCurrentPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
                       fieldErrors.current_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Enter temporary password"
                     value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    disabled={loading}
+                    onChange={(e) => { setCurrentPassword(e.target.value); setFieldErrors(previous => ({ ...previous, current_password: undefined })); setError('') }}
+                    disabled={loading || canRetrySync || retryingSync}
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
                   >
                     {showCurrentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.current_password && (
-                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.current_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1" id="current-password-error" role="alert">{fieldErrors.current_password}</p>
                 )}
               </div>
 
@@ -257,25 +271,28 @@ export default function SharedChangePasswordPage() {
                   </span>
                   <input
                     id="new-password"
+                    aria-invalid={!!fieldErrors.new_password}
+                    aria-describedby={fieldErrors.new_password ? "new-password-error" : undefined}
                     type={showNewPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
                       fieldErrors.new_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Create strong permanent password"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    disabled={loading}
+                    onChange={(e) => { setNewPassword(e.target.value); setFieldErrors(previous => ({ ...previous, new_password: undefined })); setError('') }}
+                    disabled={loading || canRetrySync || retryingSync}
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowNewPassword(!showNewPassword)}
+                    aria-label={showNewPassword ? "Hide new password" : "Show new password"}
                   >
                     {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.new_password && (
-                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.new_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1" id="new-password-error" role="alert">{fieldErrors.new_password}</p>
                 )}
               </div>
 
@@ -289,25 +306,28 @@ export default function SharedChangePasswordPage() {
                   </span>
                   <input
                     id="confirm-password"
+                    aria-invalid={!!fieldErrors.confirm_password}
+                    aria-describedby={fieldErrors.confirm_password ? "confirm-password-error" : undefined}
                     type={showConfirmPassword ? 'text' : 'password'}
                     className={`w-full pl-9 pr-9 py-2 text-xs rounded-lg border ${
                       fieldErrors.confirm_password ? 'border-[color:var(--portal-danger-border,#f87171)] focus:ring-[color:var(--portal-danger-border,#fecaca)]' : 'border-[color:var(--portal-strong-border,#cbd5e1)] focus:ring-emerald-200'
                     } focus:outline-none focus:ring-2`}
                     placeholder="Re-type new password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={loading}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setFieldErrors(previous => ({ ...previous, confirm_password: undefined })); setError('') }}
+                    disabled={loading || canRetrySync || retryingSync}
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--portal-info-text,#94a3b8)] hover:text-[color:var(--portal-info-text,#475569)]"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
                   >
                     {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {fieldErrors.confirm_password && (
-                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1">{fieldErrors.confirm_password}</p>
+                  <p className="text-[11px] text-[color:var(--portal-danger-text,#dc2626)] mt-1" id="confirm-password-error" role="alert">{fieldErrors.confirm_password}</p>
                 )}
               </div>
 
@@ -330,7 +350,7 @@ export default function SharedChangePasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || canRetrySync || retryingSync}
                 className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-semibold rounded-xl text-xs shadow transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? 'Updating Password...' : 'Save & Continue to Portal'}

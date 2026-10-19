@@ -1,5 +1,6 @@
 'use client'
 
+import { GLOBAL_BASKET_CATEGORIES, groupBlueprintCourses } from '@/core/blueprint-options'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { BookOpen as UiBookOpen, Check as UiCheck, Info as UiInfo, Pencil as UiPencil, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
@@ -666,7 +667,11 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
                             </div>
                           )
                         }
-                        return filtered.map(c => (
+                        return groupBlueprintCourses(filtered).map((group, groupIndex) => (
+                          <div key={group.label} role="group" aria-label={group.label}>
+                            {groupIndex > 0 && <div role="separator" style={{ borderTop: '2px solid var(--portal-border,#dde1e7)', margin: '0.25rem 0' }} />}
+                            <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--portal-muted,#6b7280)' }}>{group.label}</div>
+                            {group.courses.map(c => (
                           <div key={c.id}
                             onMouseDown={e => e.preventDefault()}
                             onClick={() => {
@@ -692,6 +697,8 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
                               {c.department_name ? ` • ${c.department_name}` : ''}
                             </div>
                           </div>
+                            ))}
+                          </div>
                         ))
                       })()}
                     </div>
@@ -701,10 +708,10 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
                 <select className={styles.input} value={slot.target}
                   onChange={e => updateSlot(pathwayIdx, slotIdx, 'target', e.target.value)}>
                   <option value="">— Select Category —</option>
-                  {slot.target && !(HOD_COURSE_CATEGORIES as readonly string[]).includes(slot.target) && (
-                    <option value={slot.target} disabled>Choose a category (previous target: {slot.target})</option>
+                  {slot.target && !GLOBAL_BASKET_CATEGORIES.includes(slot.target) && (
+                    <option value={slot.target} disabled>{slot.target} (saved target; choose another category to change)</option>
                   )}
-                  {HOD_COURSE_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                  {GLOBAL_BASKET_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
                 </select>
               ) : (
                 <>

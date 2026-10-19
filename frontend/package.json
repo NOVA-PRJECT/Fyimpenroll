@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "test:testing-fixes": "node --test test/logout.test.cjs test/middleware.test.cjs",
-    "test:course-loading": "node --test test/course-loading.test.cjs"
+    "test:course-loading": "node --test test/course-loading.test.cjs",
+    "test:blueprint-password": "node --test test/blueprint-password.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
