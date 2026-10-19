@@ -1,5 +1,7 @@
 'use client'
 
+import { apiErrorMessage } from '@/core/api-error'
+import { createSemesterCatalogue, type CatalogueSnapshot } from '@/core/semester-catalogue'
 import AccessibleModal from '@/components/AccessibleModal'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
@@ -17,8 +19,18 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
   const [departments, setDepartments] = useState<{ id: string; name: string; code: string }[]>([])
   const [courseSemester, setCourseSemester] = useState(semester)
   // Courses state
-  const [courses, setCourses] = useState<CatalogueCourse[]>([])
-  const [loadingCourses, setLoadingCourses] = useState(false)
+  const [catalogue, setCatalogue] = useState<CatalogueSnapshot<CatalogueCourse>>({ semester, rows: undefined, loading: true, error: '' })
+  const [catalogueLoader] = useState(() => createSemesterCatalogue<CatalogueCourse>(async (sem, signal) => {
+    let res: Response
+    try { res = await fetch(`/api/hod/courses?semester=${sem}&own=true`, { signal }) }
+    catch { throw new Error('Unable to load courses. Check your connection and retry.') }
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !Array.isArray(data)) throw new Error(apiErrorMessage(data, 'Unable to load courses. Please retry.', res.status))
+    return data
+  }, setCatalogue))
+  const currentCatalogue = catalogue.semester === semester ? catalogue : { semester, rows: undefined, loading: true, error: '' }
+  const courses = currentCatalogue.rows ?? []
+  const loadingCourses = currentCatalogue.loading && !currentCatalogue.rows
   const [showAddCourse, setShowAddCourse] = useState(false)
   const [editCourse, setEditCourse] = useState<CatalogueCourse | null>(null)
   const [deleteCourse, setDeleteCourse] = useState<CatalogueCourse | null>(null)
@@ -60,12 +72,8 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
     return () => controller.abort()
   }, [editCourse?.id])
 
-  const loadCatalogue = useEffectEvent((signal: AbortSignal) => { void fetchCourses(semester, signal) })
-  useEffect(() => {
-    const controller = new AbortController()
-    loadCatalogue(controller.signal)
-    return () => controller.abort()
-  }, [semester])
+  useEffect(() => { void catalogueLoader.start(semester) }, [semester, catalogueLoader])
+  useEffect(() => () => catalogueLoader.dispose(), [catalogueLoader])
   useEffect(() => { void fetchDepartmentsList() }, [])
 
   async function fetchDepartmentsList() {
@@ -118,22 +126,6 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
       return () => controller.abort()
     }
   }, [showAddCourse, editCourse, courseSemester])
-
-  async function fetchCourses(sem: number = semester, signal?: AbortSignal) {
-    setLoadingCourses(true)
-    try {
-      const url = `/api/hod/courses?semester=${sem}&own=true`
-      const res = await fetch(url, { signal })
-      const data = await res.json().catch(() => [])
-      if (signal?.aborted) return
-      if (!res.ok || !Array.isArray(data)) throw new Error(data.message || 'Failed to load courses')
-      setCourses(data)
-    } catch (err) {
-      if (!signal?.aborted) setError(err instanceof Error ? err.message : 'Failed to load courses')
-    } finally {
-      if (!signal?.aborted) setLoadingCourses(false)
-    }
-  }
 
   async function loadCourseRules(courseId: string, signal?: AbortSignal) {
     setLoadingRules(true)
@@ -360,7 +352,7 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
         setCourseCode(''); setCourseTitle(''); setCourseCredits(null); setCourseTheoryHours(null); setCoursePracticalHours(null); setCourseCategory(null)
         setCourseSeatLimit(60); setCoursePrereqs([]); setCourseRules([]); setNewRuleTarget('')
         setNewRuleType('DEPARTMENT'); setPriorCourseOpen(false); setPriorCourseSearch(''); setPriorCourseSemesterFilter(null)
-        fetchCourses()
+        void catalogueLoader.invalidate()
       }
     } catch { setError('Unable to save course. Check your connection and retry.') }
     finally { setSavingCourse(false) }
@@ -381,7 +373,7 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
         setSuccess(data.message)
         setTimeout(() => setSuccess(''), 1000)
         setDeleteCourse(null)
-        fetchCourses()
+        void catalogueLoader.invalidate()
       }
     } catch { setError('Unable to delete course. Check your connection and retry.') }
     finally { setDeletingCourse(false) }
@@ -400,12 +392,18 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
       )}
 
       {error && !showAddCourse && !editCourse && !deleteCourse && <div role="alert" className={styles.errorBanner}>{error}</div>}
+      {currentCatalogue.error && <div role="alert" className={styles.errorBanner}>
+        {currentCatalogue.rows ? 'Showing saved courses. ' : ''}{currentCatalogue.error}{' '}
+        <button type="button" onClick={() => void catalogueLoader.refresh()}>Retry</button>
+      </div>}
+      {currentCatalogue.loading && currentCatalogue.rows && <div role="status"><LoadingIndicator message="Updating courses…" /></div>}
       {/* Semester Selector */}
       <div className={styles.semesterRow}>
         <span className={styles.semesterLabel}><b>Courses for semester:</b></span>
         <select className={styles.semesterSelect} value={semester}
           onChange={e => {
             const nextSem = Number(e.target.value)
+            void catalogueLoader.select(nextSem)
             setSemester(nextSem)
           }}>
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
@@ -440,8 +438,8 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
 
               <div className={styles.tableWrapper}>
                 {loadingCourses ? (
-                  <LoadingState layout="cards" message="Loading courses…" />
-                ) : courses.length === 0 ? (
+                  <LoadingState layout="cards" message={`Loading Semester ${semester} courses…`} />
+                ) : currentCatalogue.error && !currentCatalogue.rows ? null : courses.length === 0 ? (
                   <div className={styles.emptyState}>
                     <div className={styles.emptyIcon}><UiBookOpen size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></div>
                     <p className={styles.emptyTitle}>No courses yet</p>

@@ -1,5 +1,6 @@
 'use client'
 
+import { adminRequest, apiErrorMessage } from '@/core/api-error'
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
 import { Building2 as UiBuilding2, Check as UiCheck, FileText as UiFileText, Pencil as UiPencil, Search as UiSearch, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, UserRound as UiUserRound } from 'lucide-react'
@@ -64,6 +65,7 @@ export default function SuperAdminDashboard() {
   const [loadingAdmin, setLoadingAdmin] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({})
 
   // Campuses state
   const [campuses, setCampuses] = useState<Campus[]>([])
@@ -133,16 +135,21 @@ export default function SuperAdminDashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    async function loadAdmin() {
+  async function loadAdminProfile() {
+    setLoadingAdmin(true)
+    setLoadErrors(previous => ({ ...previous, profile: '' }))
+    try {
       const response = await entryFetch('/api/auth/profile')
-      const data = await response.json()
-      if (!response.ok) { router.push('/login'); return }
-      if (data.profile) setAdminName(data.profile.full_name)
-      setLoadingAdmin(false)
-    }
-    loadAdmin()
-  }, [router, entryFetch])
+      const data = await response.json().catch(() => null)
+      if (response.status === 401 || response.status === 403) { router.push('/login'); return }
+      if (!response.ok || !data?.profile) throw new Error(apiErrorMessage(data, 'Unable to load your profile. Please retry.', response.status))
+      setAdminName(data.profile.full_name)
+    } catch {
+      setLoadErrors(previous => ({ ...previous, profile: 'Unable to load your profile. Check your connection and retry.' }))
+    } finally { setLoadingAdmin(false) }
+  }
+  const loadProfile = useEffectEvent(() => { void loadAdminProfile() })
+  useEffect(() => { loadProfile() }, [router, entryFetch])
 
   const loadActiveTab = useEffectEvent(() => {
     if (activeTab === 'campuses') fetchCampuses()
@@ -154,175 +161,91 @@ export default function SuperAdminDashboard() {
 
   function clearMessages() { setError(''); setSuccess('') }
 
-  // ── Logs Functions ──
-  async function fetchLogs() {
-    setLoadingLogs(true)
+  async function loadList<T>(key: string, url: string, setter: (rows: T[]) => void, busy: (value: boolean) => void) {
+    busy(true)
+    setLoadErrors(previous => ({ ...previous, [key]: '' }))
+    try {
+      const data = await adminRequest(url, `Unable to load ${key}. Please retry.`)
+      const rows = key === 'logs' ? data.logs : data
+      if (!Array.isArray(rows)) throw new Error(`Unable to load ${key}. Please retry.`)
+      setter(rows)
+    } catch (error) {
+      setLoadErrors(previous => ({ ...previous, [key]: error instanceof Error ? error.message : `Unable to load ${key}.` }))
+    } finally { busy(false) }
+  }
+
+  async function performAction(busy: (value: boolean) => void, action: () => Promise<void>) {
+    busy(true)
+    clearMessages()
+    try { await action() }
+    catch (error) { setError(error instanceof Error ? error.message : 'Unable to complete this action. Please retry.') }
+    finally { busy(false) }
+  }
+
+  function fetchLogs() {
     const params = new URLSearchParams()
     if (logTypeFilter !== 'all') params.append('log_type', logTypeFilter)
     if (logStatusFilter !== 'all') params.append('status', logStatusFilter)
     if (logSearch.trim()) params.append('search', logSearch.trim())
-    try {
-      const res = await fetch(`/api/admin/logs?${params.toString()}`)
-      const data = await res.json()
-      if (res.ok) setLogs(data.logs || [])
-    } catch {
-      setError('Failed to fetch system logs')
-    } finally {
-      setLoadingLogs(false)
-    }
+    return loadList('logs', `/api/admin/logs?${params}`, setLogs, setLoadingLogs)
   }
+  function fetchCampuses() { return loadList('campuses', '/api/admin/campuses', setCampuses, setLoadingCampuses) }
+  function fetchDepartments() { return loadList('departments', '/api/admin/departments', setDepartments, setLoadingDepts) }
+  function fetchFaculty() { return loadList('faculty', '/api/admin/faculty-list', setFaculty, setLoadingFaculty) }
 
-  // ── Campus Functions ──
-  async function fetchCampuses() {
-    setLoadingCampuses(true)
-    const res = await fetch('/api/admin/campuses')
-    const data = await res.json()
-    if (res.ok) setCampuses(data)
-    setLoadingCampuses(false)
-  }
-
-  async function handleSaveCampus() {
-    if (!campusName || !campusCode) { setError('Name and code are required'); return }
-    setSavingCampus(true)
-    clearMessages()
-    const isEdit = !!editCampus
-    const res = await fetch('/api/admin/campuses', {
-      method: isEdit ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isEdit
-        ? { id: editCampus.id, name: campusName, code: campusCode }
-        : { name: campusName, code: campusCode }
-      ),
+  function handleSaveCampus() {
+    if (!campusName.trim() || !campusCode.trim()) { setError('Campus name and code are required.'); return }
+    return performAction(setSavingCampus, async () => {
+      const data = await adminRequest('/api/admin/campuses', 'Unable to save the campus. Please retry.', {
+        method: editCampus ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(editCampus ? { id: editCampus.id } : {}), name: campusName.trim(), code: campusCode.trim() }),
+      })
+      setSuccess(data.message); setShowAddCampus(false); setEditCampus(null)
+      setCampusName(''); setCampusCode(''); void fetchCampuses()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to save campus') }
-    else {
-      setSuccess(data.message)
-      setShowAddCampus(false)
-      setEditCampus(null)
-      setCampusName(''); setCampusCode('')
-      fetchCampuses()
-    }
-    setSavingCampus(false)
   }
-
-  async function handleDeleteCampus() {
+  function handleDeleteCampus() {
     if (!deleteCampus) return
-    setDeletingCampus(true)
-    const res = await fetch('/api/admin/campuses', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campus_id: deleteCampus.id }),
+    return performAction(setDeletingCampus, async () => {
+      const data = await adminRequest('/api/admin/campuses', 'Unable to delete the campus. Please retry.', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campus_id: deleteCampus.id }),
+      })
+      setSuccess(data.message); setDeleteCampus(null); void fetchCampuses()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to delete campus') }
-    else { setSuccess(data.message); setDeleteCampus(null); fetchCampuses() }
-    setDeletingCampus(false)
   }
-
-  // ── Department Functions ──
-  async function fetchDepartments() {
-    setLoadingDepts(true)
-    const res = await fetch('/api/admin/departments')
-    const data = await res.json()
-    if (res.ok) setDepartments(data)
-    setLoadingDepts(false)
-  }
-
-  async function handleSaveDept() {
-    if (!deptName || !deptCode || !deptCampusId) { setError('All fields are required'); return }
-    setSavingDept(true)
-    clearMessages()
-    const isEdit = !!editDept
-    const res = await fetch('/api/admin/departments', {
-      method: isEdit ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isEdit
-        ? { id: editDept.id, name: deptName, code: deptCode }
-        : { name: deptName, code: deptCode, campus_id: deptCampusId }
-      ),
+  function handleSaveDept() {
+    if (!deptName.trim() || !deptCode.trim() || !deptCampusId) { setError('Department name, code and campus are required.'); return }
+    return performAction(setSavingDept, async () => {
+      const data = await adminRequest('/api/admin/departments', 'Unable to save the department. Please retry.', {
+        method: editDept ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(editDept ? { id: editDept.id } : { campus_id: deptCampusId }), name: deptName.trim(), code: deptCode.trim().toUpperCase() }),
+      })
+      setSuccess(data.message); setShowAddDept(false); setEditDept(null)
+      setDeptName(''); setDeptCode(''); setDeptCampusId(''); void fetchDepartments()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to save department') }
-    else {
-      setSuccess(data.message)
-      setShowAddDept(false)
-      setEditDept(null)
-      setDeptName(''); setDeptCode(''); setDeptCampusId('')
-      fetchDepartments()
-    }
-    setSavingDept(false)
   }
-
-  async function handleDeleteDept() {
+  function handleDeleteDept() {
     if (!deleteDept) return
-    setDeletingDept(true)
-    const res = await fetch('/api/admin/departments', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ department_id: deleteDept.id }),
+    return performAction(setDeletingDept, async () => {
+      const data = await adminRequest('/api/admin/departments', 'Unable to delete the department. Please retry.', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department_id: deleteDept.id }),
+      })
+      setSuccess(data.message); setDeleteDept(null); void fetchDepartments()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to delete department') }
-    else { setSuccess(data.message); setDeleteDept(null); fetchDepartments() }
-    setDeletingDept(false)
   }
-
-  // ── Faculty Functions ──
-  async function fetchFaculty() {
-    setLoadingFaculty(true)
-    const res = await fetch('/api/admin/faculty-list')
-    const data = await res.json()
-    if (res.ok) setFaculty(data)
-    setLoadingFaculty(false)
-  }
-
-  async function handleAddFaculty() {
-    if (!facultyName || !facultyEmail || !facultyPassword || !facultyCampusId) {
-      setError('All required fields must be filled')
-      return
-    }
-    if (facultyRole === 'hod' && !facultyDeptId) {
-      setError('Department is required for HOD')
-      return
-    }
-    setSavingFaculty(true)
-    clearMessages()
-    const res = await fetch('/api/admin/faculty-list', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        full_name: facultyName,
-        email: facultyEmail,
-        password: facultyPassword,
-        role: facultyRole,
-        department_id: facultyRole === 'hod' ? facultyDeptId : undefined,
-        campus_id: facultyCampusId,
-      }),
+  function handleAddFaculty() {
+    if (!facultyName.trim() || !facultyEmail.trim() || !facultyPassword || !facultyCampusId) { setError('Name, email, password and campus are required.'); return }
+    if (facultyRole === 'hod' && !facultyDeptId) { setError('Department is required for HOD.'); return }
+    return performAction(setSavingFaculty, async () => {
+      const data = await adminRequest('/api/admin/faculty-list', 'Unable to add the staff account. Please retry.', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: facultyName, email: facultyEmail, password: facultyPassword, role: facultyRole,
+          department_id: facultyRole === 'hod' ? facultyDeptId : undefined, campus_id: facultyCampusId }),
+      })
+      setSuccess(data.message); setShowAddFaculty(false)
+      setFacultyName(''); setFacultyEmail(''); setFacultyPassword(''); setFacultyDeptId(''); setFacultyCampusId(''); void fetchFaculty()
     })
-    const data = await res.json()
-    if (!res.ok) {
-      if (data.details && typeof data.details === 'object') {
-        const fieldErrors = data.details.fieldErrors || {}
-        const formatted = Object.entries(fieldErrors)
-          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
-          .join('; ')
-        setError(formatted || data.message || data.error || 'Failed to add faculty')
-      } else {
-        setError(data.message ?? data.details ?? data.error ?? 'Failed to add faculty')
-      }
-    }
-    else {
-      setSuccess(data.message)
-      setShowAddFaculty(false)
-      setFacultyName(''); setFacultyEmail(''); setFacultyPassword('')
-      setFacultyDeptId(''); setFacultyCampusId('')
-      fetchFaculty()
-    }
-    setSavingFaculty(false)
   }
-
-  // ── NEW: Edit Faculty ──
   function openEditFaculty(f: Faculty) {
     if (f.role === 'teacher') return
     setEditFaculty(f)
@@ -334,50 +257,28 @@ export default function SuperAdminDashboard() {
     clearMessages()
   }
 
-  async function handleUpdateFaculty() {
+  function handleUpdateFaculty() {
     if (!editFaculty) return
-    if (!editFacultyName) { setError('Name is required'); return }
-    if (editFacultyRole === 'hod' && !editFacultyDeptId) {
-      setError('Department is required for HOD')
-      return
-    }
-    setUpdatingFaculty(true)
-    clearMessages()
-    const res = await fetch('/api/admin/faculty-list', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: editFaculty.id,
-        full_name: editFacultyName,
-        role: editFacultyRole,
-        department_id: editFacultyRole === 'hod' ? editFacultyDeptId : null,
-        campus_id: editFacultyCampusId || editFaculty.campus_id,
-      }),
+    if (!editFacultyName.trim()) { setError('Name is required.'); return }
+    if (editFacultyRole === 'hod' && !editFacultyDeptId) { setError('Department is required for HOD.'); return }
+    return performAction(setUpdatingFaculty, async () => {
+      const data = await adminRequest('/api/admin/faculty-list', 'Unable to update the staff account. Please retry.', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editFaculty.id, full_name: editFacultyName, role: editFacultyRole,
+          department_id: editFacultyRole === 'hod' ? editFacultyDeptId : null, campus_id: editFacultyCampusId || editFaculty.campus_id }),
+      })
+      setSuccess(data.message); setEditFaculty(null); setEditFacultyName(''); setEditFacultyRole('hod')
+      setEditFacultyDeptId(''); setEditFacultyCampusId(''); void fetchFaculty()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.message ?? data.error ?? 'Failed to update faculty') }
-    else {
-      setSuccess(data.message)
-      setEditFaculty(null)
-      setEditFacultyName(''); setEditFacultyRole('hod')
-      setEditFacultyDeptId(''); setEditFacultyCampusId('')
-      fetchFaculty()
-    }
-    setUpdatingFaculty(false)
   }
-
-  async function handleDeleteFaculty() {
+  function handleDeleteFaculty() {
     if (!deleteFaculty) return
-    setDeletingFaculty(true)
-    const res = await fetch('/api/admin/faculty-list', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ faculty_id: deleteFaculty.id }),
+    return performAction(setDeletingFaculty, async () => {
+      const data = await adminRequest('/api/admin/faculty-list', 'Unable to remove the staff account. Please retry.', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faculty_id: deleteFaculty.id }),
+      })
+      setSuccess(data.message); setDeleteFaculty(null); void fetchFaculty()
     })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to delete faculty') }
-    else { setSuccess(data.message); setDeleteFaculty(null); fetchFaculty() }
-    setDeletingFaculty(false)
   }
 
   async function handleLogout() {
@@ -445,7 +346,10 @@ export default function SuperAdminDashboard() {
       {/* Main Content */}
       <div className={styles.mainContent}>
 
-        {error && !showAddFaculty && !editFaculty && <div className={styles.errorBanner}>{error}</div>}
+        {error && !showAddCampus && !editCampus && !deleteCampus && !showAddDept && !editDept && !deleteDept && !showAddFaculty && !editFaculty && !deleteFaculty && <div role="alert" className={styles.errorBanner}>{error}</div>}
+        {Object.entries(loadErrors).filter(([, message]) => message).map(([key, message]) => <div key={key} role="alert" className={styles.errorBanner}>
+          {message}{' '}<button type="button" onClick={() => void ({ campuses: fetchCampuses, departments: fetchDepartments, faculty: fetchFaculty, logs: fetchLogs, profile: loadAdminProfile }[key as Tab | 'profile']?.())}>Retry</button>
+        </div>)}
         {success && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {success}</div>}
 
         {/* ══ CAMPUSES TAB ══ */}
@@ -984,6 +888,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>{editCampus ? 'Edit Campus' : 'Add Campus'}</h3>
+            {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
                 <label className={styles.label}>Campus Name</label>
@@ -1013,6 +918,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>{editDept ? 'Edit Department' : 'Add Department'}</h3>
+            {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
                 <label className={styles.label}>Department Name</label>
@@ -1022,7 +928,7 @@ export default function SuperAdminDashboard() {
               <div className={styles.field}>
                 <label className={styles.label}>Department Code</label>
                 <input type="text" className={styles.input} placeholder="e.g. MAT"
-                  value={deptCode} onChange={e => setDeptCode(e.target.value)} />
+                  value={deptCode} onChange={e => setDeptCode(e.target.value.toUpperCase())} />
               </div>
               {!editDept && (
                 <div className={styles.field}>
@@ -1216,6 +1122,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Delete Campus</h3>
+            {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
             <p className={styles.modalSubtitle}>
               This will permanently delete <strong>{deleteCampus.name}</strong> and ALL data under it —
               departments, students, faculty, courses, blueprints and registrations.
@@ -1236,6 +1143,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Delete Department</h3>
+            {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
             <p className={styles.modalSubtitle}>
               This will permanently delete <strong>{deleteDept.name}</strong> and all its students,
               courses, blueprints and registrations. This cannot be undone.
@@ -1255,6 +1163,7 @@ export default function SuperAdminDashboard() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
             <h3 className={styles.modalTitle}>Remove Faculty</h3>
+            {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
             <p className={styles.modalSubtitle}>
               Are you sure you want to remove <strong>{deleteFaculty.full_name}</strong>?
               Their account will be permanently deleted.
