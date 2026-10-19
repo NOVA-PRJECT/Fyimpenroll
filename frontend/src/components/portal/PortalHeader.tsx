@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import React from 'react'
 import { ArrowLeft, House } from 'lucide-react'
 
@@ -15,8 +15,7 @@ export default function PortalHeader({ variant = 'back', rightAction }: PortalHe
     <header className="w-full min-h-16 shrink-0 border-b border-[color:var(--portal-strong-border,#e2e8f0)] bg-[color:var(--portal-surface,white)] sticky top-0 z-50 px-3 sm:px-6 md:px-8 py-2 flex items-center justify-between gap-2 sm:gap-4">
       {/* Left: Kannur University Institutional Identity */}
       <Link href="/" className="min-w-0 flex items-center gap-2 sm:gap-3 group">
-        <Image
-          src="/knrunilogo.png"
+        <UniversityLogo
           alt="Kannur University"
           width={31}
           height={34}

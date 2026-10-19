@@ -6,7 +6,7 @@ import { navigateAfterSessionChange, clearSessionStorage } from '@/core/security
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, Suspense } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CircleCheck, Eye, EyeOff, X } from 'lucide-react'
@@ -104,8 +104,7 @@ function LoginForm() {
           {/* Card Header */}
           <div className={styles.cardHeader}>
             <div className={styles.logoWrapper}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="Kannur University"
                 width={44}
                 height={48}

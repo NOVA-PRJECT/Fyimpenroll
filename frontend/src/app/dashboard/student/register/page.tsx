@@ -12,7 +12,7 @@ import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useEffectEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import styles from '../student-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import { useCurrentTime } from '@/core/hooks/useCurrentTime'
@@ -596,8 +596,7 @@ export default function RegisterPage() {
         <div className={styles.topBarLeft}>
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

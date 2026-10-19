@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './teacher-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
-import Image from 'next/image';
+import UniversityLogo from '@/components/UniversityLogo';
 
 interface Course {
   delivery_id: string
@@ -638,8 +638,7 @@ export default function TeacherDashboard() {
           {/* 1. Portal Branding Block */}
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

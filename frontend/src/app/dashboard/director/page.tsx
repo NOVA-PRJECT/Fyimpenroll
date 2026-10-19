@@ -14,7 +14,7 @@ import { sessionRedirect } from '@/core/security/session-response'
 import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './director-dashboard.module.css'
@@ -451,8 +451,7 @@ export default function DirectorDashboard() {
           {/* 1. Portal Branding Block */}
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

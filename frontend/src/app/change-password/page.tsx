@@ -6,7 +6,7 @@ import { logoutPortal } from '@/core/security/logout'
 import { navigateAfterSessionChange } from '@/core/security/session-navigation'
 
 import React, { useState, useEffect } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { Eye, EyeOff, Lock, KeyRound, AlertCircle, CheckCircle2, LogOut, Info } from 'lucide-react'
 import PortalHeader from '@/components/portal/PortalHeader'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
@@ -176,8 +176,7 @@ export default function SharedChangePasswordPage() {
           {/* Header Banner */}
           <div className="px-6 pt-6 pb-4 border-b border-[color:var(--portal-strong-border,#f1f5f9)] text-center">
             <div className="inline-flex items-center justify-center p-2 rounded-xl bg-[color:var(--portal-info-bg,#f1f5f9)] mb-3">
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="Kannur University"
                 width={48}
                 height={48}

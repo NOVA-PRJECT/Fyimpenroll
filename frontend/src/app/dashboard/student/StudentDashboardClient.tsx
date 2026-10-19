@@ -7,7 +7,7 @@ import { CalendarDays as UiCalendarDays, Check as UiCheck, Clock as UiClock, Fil
 import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import NavigationLink from '@/components/NavigationLink'
 import {
   LogOut,
@@ -198,8 +198,7 @@ export default function StudentDashboardClient({
           {/* 1. Portal Branding Block */}
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

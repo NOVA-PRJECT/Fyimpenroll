@@ -9,7 +9,7 @@ import { sessionRedirect } from '@/core/security/session-response';
 import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Image from 'next/image';
+import UniversityLogo from '@/components/UniversityLogo';
 import dynamic from 'next/dynamic';
 import type { SchedulingRule } from './BrowserRulesEditor';
 import { appliesToSemester, restoreBrowserRules, validateSchedulingRules } from '@/core/utils/schedulingRules';
@@ -694,8 +694,7 @@ export default function CampusDirectorTimetablePage() {
       {/* Top Navigation */}
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <Image
-            src="/knrunilogo.png"
+          <UniversityLogo
             alt="KU"
             width={26}
             height={28}

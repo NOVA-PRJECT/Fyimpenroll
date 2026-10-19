@@ -9,7 +9,7 @@ import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './teaching-staff.module.css'
@@ -298,8 +298,7 @@ export default function TeachingStaffDashboard() {
           {/* 1. Portal Branding Block */}
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

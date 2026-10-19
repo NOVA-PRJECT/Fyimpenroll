@@ -10,7 +10,7 @@ import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 import { logoutPortal } from '@/core/security/logout'
 
 import { useState, useEffect, useEffectEvent } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import styles from './superadmin-dashboard.module.css'
@@ -294,8 +294,7 @@ export default function SuperAdminDashboard() {
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
           <div className={styles.logoSmall}>
-            <Image
-              src="/knrunilogo.png"
+            <UniversityLogo
               alt="KU"
               width={26}
               height={28}

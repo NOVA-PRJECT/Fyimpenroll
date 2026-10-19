@@ -21,7 +21,7 @@ const PeriodMarkingTab = dynamic(() => import('./PeriodMarkingTab'), { loading: 
 const CampusAttendanceTab = dynamic(() => import('./CampusAttendanceTab'), { loading: () => <PageLoading layout="table" message="Loading campus attendance…" /> })
 const ManualAllocationTab = dynamic(() => import('./ManualAllocationTab'), { loading: () => <PageLoading layout="table" message="Loading course allocations…" /> })
 import { useState, useEffect, useEffectEvent, useRef } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import styles from './hod-dashboard.module.css'
@@ -540,8 +540,7 @@ export default function HodDashboard() {
           {/* 1. Portal Branding Block */}
           <div className={styles.topBarBranding}>
             <div className={styles.logoSmall}>
-              <Image
-                src="/knrunilogo.png"
+              <UniversityLogo
                 alt="KU"
                 width={27}
                 height={30}

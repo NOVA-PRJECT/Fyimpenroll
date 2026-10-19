@@ -3,7 +3,7 @@
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
+import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import StudentDashboardClient from './StudentDashboardClient'
 import styles from './student-dashboard.module.css'
@@ -131,8 +131,7 @@ export default function StudentDashboardPage() {
           <div className={styles.topBarLeft}>
             <div className={styles.topBarBranding}>
               <div className={styles.logoSmall}>
-                <Image
-                  src="/knrunilogo.png"
+                <UniversityLogo
                   alt="KU"
                   width={27}
                   height={30}

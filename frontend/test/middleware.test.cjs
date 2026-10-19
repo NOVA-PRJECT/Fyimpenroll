@@ -134,3 +134,14 @@ test('the logout fence rejects late restored cookies without refreshing them',as
     assert.match(res.headers.get('set-cookie'),/auth_token=;/)
   }
 })
+
+test('the public university logo stays an asset during and after logout', async () => {
+  for (const cookies of ['', 'session_ended=1', 'session_ended=1; auth_token=late-access; refresh_token=late-refresh']) {
+    const { middleware, calls } = harness()
+    const response = await middleware(request('/knrunilogo.png', cookies))
+    assert.equal(response.headers.get('x-middleware-next'), '1')
+    assert.equal(response.headers.get('location'), null)
+    unchanged(response)
+    assert.equal(calls.length, 0)
+  }
+})
