@@ -16,8 +16,8 @@ export const borderRadius = {
 };
 
 export const layout = {
-  minTouchTarget: 44, // 44x44pt touch target size
-  screenPadding: 16,
-  cardPadding: 16,
+  minTouchTarget: 48,
+  screenPadding: 20,
+  cardPadding: 20,
   headerHeight: 56,
 };

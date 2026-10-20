@@ -13,6 +13,8 @@ export function useTabScreenOptions() {
   const tabHeight = 56 + bottomInset;
 
   return {
+    tabBarHideOnKeyboard: true,
+    headerShadowVisible: false,
     tabBarActiveTintColor: colors.tabBarActive,
     tabBarInactiveTintColor: colors.tabBarInactive,
     tabBarStyle: {

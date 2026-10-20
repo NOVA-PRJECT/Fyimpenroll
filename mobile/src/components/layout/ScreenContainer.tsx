@@ -28,7 +28,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   contentContainerStyle,
   refreshing = false,
   onRefresh,
-  edges = ['top', 'left', 'right'],
+  edges = ['left', 'right'],
 }) => {
   const { colors, layout, spacing, typography } = useTheme();
   const { isOnline, pendingActions } = useOfflineQueue();
@@ -38,14 +38,15 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
 
   const offlineBanner = !isOnline || hasPending ? (
     <View
+      accessibilityLiveRegion="polite"
       style={[
         styles.offlineBanner,
         {
-          backgroundColor: !isOnline ? colors.danger : colors.warning,
+          backgroundColor: !isOnline ? colors.dangerLight : colors.warningLight,
         },
       ]}
     >
-      <Text style={[typography.caption, { color: '#FFFFFF', textAlign: 'center' }]}>
+      <Text style={[typography.bodySmall, { color: !isOnline ? colors.danger : colors.warning, textAlign: 'center' }]}>
         {!isOnline
           ? 'You are offline. Campus sign-in requires a connection. Saved class attendance will sync when reconnected.'
           : 'Pending actions queued for sync...'}
@@ -61,10 +62,16 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
       >
         {offlineBanner}
         <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={[
             {
               padding: layout.screenPadding,
               paddingBottom: spacing.xxl,
+              width: '100%',
+              maxWidth: 800,
+              alignSelf: 'center',
+              flexGrow: 1,
             },
             contentContainerStyle,
           ]}

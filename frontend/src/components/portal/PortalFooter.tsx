@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import UniversityLogo from '@/components/UniversityLogo'
 import React from 'react'
+import { useRouter } from 'next/navigation'
+import { usePwa } from '@/components/pwa/PwaProvider'
 
 export interface PortalFooterProps {
   className?: string
@@ -10,6 +12,8 @@ export interface PortalFooterProps {
 }
 
 export default function PortalFooter({ className = '', currentYear = 2024 }: PortalFooterProps) {
+  const { canInstall, isInstalled, install } = usePwa()
+  const router = useRouter()
   return (
     <footer
       className={`w-full border-t border-[color:var(--portal-strong-border,#e2e8f0)]/60 bg-[color:var(--portal-surface,white)] py-5 sm:py-6 px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[color:var(--portal-muted,#64748B)] gap-4 ${className}`}
@@ -24,7 +28,17 @@ export default function PortalFooter({ className = '', currentYear = 2024 }: Por
         />
         <span>© {currentYear} Kannur University. All rights reserved.</span>
       </div>
-      <div className="flex items-center gap-6">
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+        {!isInstalled && (canInstall ? (
+          <button type="button" className="min-h-11 font-semibold hover:text-[color:var(--portal-brand-text,#0f172a)] transition-colors" onClick={async () => {
+            try { if (await install() === 'unavailable') router.push('/install') }
+            catch { router.push('/install') }
+          }}>Install app</button>
+        ) : (
+          <Link className="min-h-11 inline-flex items-center font-semibold hover:text-[color:var(--portal-brand-text,#0f172a)] transition-colors" href="/install">
+            Install app
+          </Link>
+        ))}
         <Link className="hover:text-[color:var(--portal-brand-text,#0f172a)] transition-colors" href="/privacy-policy">
           Privacy Policy
         </Link>

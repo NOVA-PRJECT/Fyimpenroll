@@ -1,320 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Keyboard, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Input } from '../../src/components/common/Input';
 import { Button } from '../../src/components/common/Button';
 import { Card } from '../../src/components/common/Card';
-import { apiClient } from '../../src/api/client';
-import { API_ENDPOINTS } from '../../src/api/endpoints';
-import { ENV } from '../../src/config/env';
 
 export default function LoginScreen() {
-  const router = useRouter();
   const { login } = useAuth();
   const { colors, typography, spacing } = useTheme();
-
+  const passwordInput = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const submitting = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Backend connectivity diagnostic
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [serverLatency, setServerLatency] = useState<number | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-
-  const checkServerConnection = async () => {
-    setServerStatus('checking');
-    setServerError(null);
-    const start = Date.now();
-    try {
-      const data = await apiClient.get(API_ENDPOINTS.HEALTH, { skipAuth: true });
-      if (data && data.status === 'ok') {
-        setServerLatency(Date.now() - start);
-        setServerStatus('online');
-      } else {
-        setServerStatus('offline');
-        setServerError('Unexpected server response');
-      }
-    } catch (err: any) {
-      setServerStatus('offline');
-      setServerError(err?.message || 'Connection failed');
-    }
-  };
-
-  useEffect(() => {
-    checkServerConnection();
-  }, []);
-
   const handleLogin = async () => {
+    if (submitting.current) return;
     if (!email.trim() || !password) {
-      setError('Please enter both email and password.');
+      setError('Enter your university email and password to continue.');
       return;
     }
-
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Enter a valid university email address.');
+      return;
+    }
+    submitting.current = true;
+    Keyboard.dismiss();
     setError(null);
     setLoading(true);
-
     try {
-      const { role } = await login(email, password);
-
-      // Route based on authenticated role
-      if (role === 'student') {
-        router.replace('/(student)');
-      } else if (role === 'teaching_staff') {
-        router.replace('/(teacher)');
-      } else if (role === 'hod') {
-        router.replace('/(hod)');
-      } else {
-        router.replace('/(admin)/profile');
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Login failed. Please verify credentials.');
+      // The root navigation guard routes every authenticated role consistently.
+      await login(email.trim(), password);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingHorizontal: spacing.lg },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.headerContainer}>
-          <View
-            style={[
-              styles.logoBadge,
-              { backgroundColor: colors.primary },
-            ]}
-          >
-            <Text style={styles.logoText}>FYIMP</Text>
-          </View>
-          <Text
-            style={[
-              typography.h1,
-              { color: colors.textPrimary, marginTop: spacing.md },
-            ]}
-          >
-            Welcome Back
-          </Text>
-          <Text
-            style={[
-              typography.body,
-              { color: colors.textSecondary, marginTop: spacing.xs },
-            ]}
-          >
-            Sign in with your university account credentials
-          </Text>
-        </View>
-
-        <Card variant="elevated" style={styles.formCard}>
-          {error ? (
-            <View
-              style={[
-                styles.errorBanner,
-                {
-                  backgroundColor: colors.dangerLight,
-                  borderColor: colors.danger,
-                },
-              ]}
-            >
-              <Text style={[typography.bodySmall, { color: colors.danger }]}>
-                {error}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <View style={styles.content}>
+            <View style={[styles.brand, { backgroundColor: colors.primaryDark }]}>
+              <View style={styles.brandRow}>
+                <Ionicons name="school-outline" size={28} color="#FBBF24" />
+                <Text style={styles.brandName}>FYIMP PORTAL</Text>
+              </View>
+              <Text style={styles.brandTitle}>Your campus.{'\n'}All in one place.</Text>
+              <Text style={styles.brandDescription}>Keep up with classes, attendance and your academic progress.</Text>
+            </View>
+            <Card variant="outlined" style={styles.formCard}>
+              <Text accessibilityRole="header" style={[typography.h1, { color: colors.textPrimary }]}>Welcome back</Text>
+              <Text style={[typography.body, { color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.lg }]}>
+                Sign in with your university account.
+              </Text>
+              {error ? (
+                <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.errorBanner, { backgroundColor: colors.dangerLight }]}>
+                  <Text style={[typography.body, { color: colors.danger }]}>{error}</Text>
+                </View>
+              ) : null}
+              <Input
+                label="University email" placeholder="you@university.edu" value={email}
+                onChangeText={(text) => { setEmail(text); setError(null); }}
+                keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
+                autoComplete="email" textContentType="username" returnKeyType="next"
+                onSubmitEditing={() => passwordInput.current?.focus()} submitBehavior="submit"
+                editable={!loading} leftIcon="mail-outline"
+              />
+              <Input
+                ref={passwordInput} label="Password" placeholder="Enter your password" value={password}
+                onChangeText={(text) => { setPassword(text); setError(null); }}
+                isPassword autoCapitalize="none" autoCorrect={false}
+                autoComplete="current-password" textContentType="password" returnKeyType="go"
+                onSubmitEditing={handleLogin} editable={!loading} leftIcon="lock-closed-outline"
+              />
+              <Button title={loading ? 'Signing in…' : 'Sign in'} onPress={handleLogin} loading={loading} style={{ marginTop: spacing.sm }} />
+            </Card>
+            <View style={styles.help}>
+              <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+              <Text style={[typography.bodySmall, styles.helpText, { color: colors.textSecondary }]}>
+                Trouble signing in? Contact your campus administrative desk for account assistance.
               </Text>
             </View>
-          ) : null}
-
-          <Input
-            label="University Email"
-            placeholder="student@university.edu"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (error) setError(null);
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            leftIcon="mail-outline"
-          />
-
-          <Input
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) setError(null);
-            }}
-            isPassword
-            leftIcon="lock-closed-outline"
-          />
-
-          <Button
-            title="Sign In"
-            onPress={handleLogin}
-            loading={loading}
-            style={{ marginTop: spacing.sm }}
-          />
-        </Card>
-
-        {/* Backend Connectivity Status Diagnostic */}
-        <TouchableOpacity
-          onPress={checkServerConnection}
-          activeOpacity={0.7}
-          style={[
-            styles.serverBadge,
-            {
-              backgroundColor:
-                serverStatus === 'online'
-                  ? 'rgba(16, 185, 129, 0.08)'
-                  : serverStatus === 'offline'
-                  ? 'rgba(239, 68, 68, 0.08)'
-                  : 'rgba(100, 116, 139, 0.08)',
-              borderColor:
-                serverStatus === 'online'
-                  ? colors.success
-                  : serverStatus === 'offline'
-                  ? colors.danger
-                  : colors.border,
-            },
-          ]}
-        >
-          <View style={styles.serverBadgeContent}>
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor:
-                    serverStatus === 'online'
-                      ? colors.success
-                      : serverStatus === 'offline'
-                      ? colors.danger
-                      : colors.warning,
-                },
-              ]}
-            />
-            {serverStatus === 'checking' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginRight: 6 }} />
-                <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                  Testing Backend Connection...
-                </Text>
-              </View>
-            ) : serverStatus === 'online' ? (
-              <Text style={[typography.caption, { color: colors.success, fontWeight: '600' }]}>
-                Backend Online ({ENV.API_BASE_URL.replace(/^http:\/\//, '')}) • {serverLatency}ms
-              </Text>
-            ) : (
-              <View style={{ alignItems: 'center' }}>
-                <Text style={[typography.caption, { color: colors.danger, fontWeight: '600' }]}>
-                  Backend Offline ({ENV.API_BASE_URL.replace(/^http:\/\//, '')})
-                </Text>
-                <Text style={[typography.caption, { color: colors.danger, fontSize: 11, marginTop: 2 }]}>
-                  Tap to retry • {serverError}
-                </Text>
-              </View>
-            )}
+            <Text style={[typography.caption, { color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg }]}>
+              Four-Year Integrated Multidisciplinary Program
+            </Text>
           </View>
-        </TouchableOpacity>
-
-        <View style={styles.footerContainer}>
-          <Text
-            style={[
-              typography.caption,
-              { color: colors.textMuted, textAlign: 'center' },
-            ]}
-          >
-            Four-Year Integrated Multidisciplinary Program (FYIMP)
-          </Text>
-          <Text
-            style={[
-              typography.caption,
-              { color: colors.textMuted, textAlign: 'center', marginTop: 4 },
-            ]}
-          >
-            Need help? Contact your campus administrative desk.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logoBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 18,
-    letterSpacing: 1.5,
-  },
-  formCard: {
-    padding: 20,
-  },
-  errorBanner: {
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  serverBadge: {
-    marginTop: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignSelf: 'center',
-  },
-  serverBadgeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  footerContainer: {
-    marginTop: 32,
-    alignItems: 'center',
-  },
+  container: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 28 },
+  content: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  brand: { borderRadius: 24, padding: 28, marginBottom: 18 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  brandName: { color: '#FFFFFF', fontWeight: '700', fontSize: 13, letterSpacing: 2, flexShrink: 1 },
+  brandTitle: { color: '#FFFFFF', fontSize: 32, lineHeight: 40, fontWeight: '700', marginTop: 28 },
+  brandDescription: { color: '#CBD5E1', fontSize: 15, lineHeight: 23, marginTop: 12 },
+  formCard: { padding: 24, borderRadius: 24 },
+  errorBanner: { padding: 14, borderRadius: 12, marginBottom: 20 },
+  help: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 20, paddingHorizontal: 8 },
+  helpText: { flex: 1, lineHeight: 19 },
 });

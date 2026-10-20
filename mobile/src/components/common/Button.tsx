@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  StyleProp,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -17,8 +18,8 @@ interface ButtonProps {
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
 }
 
@@ -38,13 +39,13 @@ export const Button: React.FC<ButtonProps> = ({
     if (disabled) return colors.border;
     switch (variant) {
       case 'primary':
-        return colors.primary;
+        return colors.primaryDark;
       case 'secondary':
         return colors.surface;
       case 'outline':
         return 'transparent';
       case 'danger':
-        return colors.danger;
+        return '#B91C1C';
       default:
         return colors.primary;
     }
@@ -77,13 +78,16 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
       style={[
         styles.base,
         {
-          minHeight: layout.minTouchTarget, // Enforces >= 44pt touch target
+          minHeight: layout.minTouchTarget,
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
           borderWidth: variant === 'outline' || variant === 'secondary' ? 1 : 0,
@@ -100,7 +104,7 @@ export const Button: React.FC<ButtonProps> = ({
           <Text
             style={[
               typography.button,
-              { color: getTextColor(), marginLeft: icon ? 8 : 0 },
+              { color: getTextColor(), marginLeft: icon ? 8 : 0, textAlign: 'center', flexShrink: 1 },
               textStyle,
             ]}
           >

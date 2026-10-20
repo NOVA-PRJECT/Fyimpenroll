@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #0b1c30; background: #f8f9ff; }
+* { box-sizing: border-box; }
+body { min-height: 100svh; margin: 0; display: grid; place-items: center; padding: 32px 24px; }
+main { width: 100%; max-width: 440px; }
+.identity { display: flex; align-items: center; gap: 14px; margin-bottom: 52px; }
+.identity img { border-radius: 16px; background: white; border: 1px solid #e2e8f0; }
+.identity span { font-size: 13px; font-weight: 750; letter-spacing: 1.5px; }
+.identity small { display: block; margin-top: 6px; font-size: 12px; letter-spacing: 0; font-weight: 400; color: #64748b; }
+.connection-icon { width: 80px; height: 80px; border-radius: 24px; background: #e5eeff; color: #082042; display: grid; place-items: center; margin-bottom: 28px; }
+.eyebrow { font-size: 10px; font-weight: 750; letter-spacing: 1.8px; color: #64748b; }
+h1 { font-size: clamp(32px, 8vw, 44px); line-height: 1.15; letter-spacing: -1.5px; margin: 16px 0; }
+.description { color: #475569; font-size: 16px; line-height: 1.75; margin-bottom: 28px; }
+button { width: 100%; min-height: 52px; border: 0; border-radius: 12px; background: #082042; color: white; padding: 14px 20px; font: inherit; font-weight: 650; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+button:focus-visible, a:focus-visible { outline: 3px solid #3b82f6; outline-offset: 4px; }
+a { display: block; width: fit-content; margin: 12px auto 0; padding: 14px; min-height: 48px; color: #1e40af; text-decoration: none; font-size: 14px; font-weight: 600; }
+#connection-status { color: #64748b; font-size: 12px; line-height: 1.7; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 24px; }
+@media (prefers-color-scheme: dark) {
+  :root { background: #0b1120; color: #e7edf7; }
+  .connection-icon { background: #172b46; color: #93c5fd; }
+  .description, .eyebrow, .identity small, #connection-status { color: #a8b7cc; }
+  a { color: #93c5fd; }
+  button { background: #193858; }
+  #connection-status { border-color: #31415a; }
+}

@@ -4,11 +4,21 @@ import { ApiRefreshInit } from '../components/ApiRefreshInit'
 import ThemeToggle from '@/components/ThemeToggle'
 import ThemeBootstrap from '@/components/ThemeBootstrap'
 import LogoutDialog from '@/components/LogoutDialog'
+import type { Metadata, Viewport } from 'next'
+import { PwaProvider } from '@/components/pwa/PwaProvider'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'FYIMP COURSE REGISTRATION KUC',
   description: 'Academic Excellence Digitally Preserved.',
+  applicationName: 'FYIMP Portal',
+  appleWebApp: { capable: true, title: 'FYIMP Portal', statusBarStyle: 'default' },
+  icons: {
+    icon: [{ url: '/pwa/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/pwa/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
+
+export const viewport: Viewport = { themeColor: '#082042' }
 
 export default function RootLayout({
   children,
@@ -27,11 +37,13 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
+        <PwaProvider>
         <ThemeBootstrap />
         <ApiRefreshInit />
         {children}
         <LogoutDialog />
         <ThemeToggle />
+        </PwaProvider>
       </body>
     </html>
   );

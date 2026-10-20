@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, ViewStyle, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, ViewStyle, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
 interface SkeletonProps {
@@ -17,8 +17,22 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   const { colors, borderRadius: defaultRadius } = useTheme();
   const opacityAnim = useRef(new Animated.Value(0.3)).current;
+  const [reduceMotion, setReduceMotion] = useState(true);
 
   useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { active = false; subscription.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      opacityAnim.setValue(0.6);
+      return;
+    }
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacityAnim, {
@@ -36,10 +50,12 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     animation.start();
 
     return () => animation.stop();
-  }, [opacityAnim]);
+  }, [opacityAnim, reduceMotion]);
 
   return (
     <Animated.View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
       style={[
         styles.skeleton,
         {

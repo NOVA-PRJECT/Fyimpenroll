@@ -119,9 +119,9 @@ export async function middleware(request: NextRequest) {
   const isHomeRoute = pathname === '/'
   const isApiRoute = pathname.startsWith('/api')
 
-  // This public asset must remain available to older pages during/after logout.
-  // Never send login HTML in response to an image request.
-  if (pathname === '/knrunilogo.png') return NextResponse.next()
+  // Public branding, installation and offline assets are independent of sessions.
+  // Never send login HTML in response to a worker, manifest or image request.
+  if (pathname === '/knrunilogo.png' || pathname === '/sw.js' || pathname === '/manifest.webmanifest' || pathname === '/offline.html' || pathname === '/install' || pathname.startsWith('/pwa/')) return NextResponse.next()
 
   // Browser API refreshes are coordinated in one place after an explicit guard
   // rejection. Refreshing here as well races cookie rotation during polling,

@@ -17,14 +17,16 @@ interface InputProps extends TextInputProps {
   isPassword?: boolean;
 }
 
-export const Input: React.FC<InputProps> = ({
+export const Input = React.forwardRef<React.ComponentRef<typeof TextInput>, InputProps>(({
   label,
   error,
   leftIcon,
   isPassword = false,
   style,
+  onFocus,
+  onBlur,
   ...props
-}) => {
+}, ref) => {
   const { colors, borderRadius, layout, typography, spacing } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -46,7 +48,7 @@ export const Input: React.FC<InputProps> = ({
         style={[
           styles.inputWrapper,
           {
-            minHeight: layout.minTouchTarget, // Enforces >= 44pt touch target
+            minHeight: layout.minTouchTarget,
             backgroundColor: colors.surface,
             borderColor: error
               ? colors.danger
@@ -67,24 +69,27 @@ export const Input: React.FC<InputProps> = ({
         )}
 
         <TextInput
+          {...props}
+          ref={ref}
+          accessibilityLabel={props.accessibilityLabel ?? label}
           placeholderTextColor={colors.textMuted}
-          secureTextEntry={isPassword && !showPassword}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          secureTextEntry={isPassword ? !showPassword : props.secureTextEntry}
+          onFocus={(event) => { setIsFocused(true); onFocus?.(event); }}
+          onBlur={(event) => { setIsFocused(false); onBlur?.(event); }}
           style={[
             styles.textInput,
-            typography.body,
+            typography.bodyLarge,
             { color: colors.textPrimary },
             style,
           ]}
-          {...props}
         />
 
         {isPassword && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
             onPress={() => setShowPassword(!showPassword)}
             style={styles.rightIcon}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -97,6 +102,8 @@ export const Input: React.FC<InputProps> = ({
 
       {error ? (
         <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
           style={[
             typography.caption,
             { color: colors.danger, marginTop: spacing.xs },
@@ -107,7 +114,8 @@ export const Input: React.FC<InputProps> = ({
       ) : null}
     </View>
   );
-};
+});
+Input.displayName = 'Input';
 
 const styles = StyleSheet.create({
   container: {
@@ -124,10 +132,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   rightIcon: {
-    padding: 4,
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     flex: 1,
-    height: '100%',
+    minHeight: 52,
+    paddingVertical: 12,
   },
 });

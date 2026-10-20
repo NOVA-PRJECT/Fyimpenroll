@@ -34,7 +34,8 @@
           "backgroundColor": "#1E3A8A",
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-system-ui"
     ],
     "experiments": {
       "typedRoutes": true
