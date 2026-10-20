@@ -3,20 +3,13 @@
   "version": "7.0.0",
   "private": true,
   "scripts": {
-    "test:middleware": "node --test test/middleware.test.cjs",
     "dev": "next dev --turbo",
     "build": "next build",
-    "start": "next start -p 3000",
-    "test:testing-fixes": "node --test test/logout.test.cjs test/middleware.test.cjs",
-    "test:course-loading": "node --test test/course-loading.test.cjs",
-    "test:blueprint-password": "node --test test/blueprint-password.test.cjs",
-    "test:registration-attendance": "node --test test/registration-attendance.test.cjs",
-    "test:bulk-upload": "node --test test/bulk-upload-result.test.cjs"
+    "start": "next start -p 3000"
   },
   "dependencies": {
+    "@fyimp/contracts": "file:../contracts",
     "@supabase/supabase-js": "^2.49.1",
-    "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
     "@xyflow/react": "^12.11.6",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
@@ -24,9 +17,7 @@
     "next": "16.4.0",
     "papaparse": "^5.5.3",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "zod": "^4.3.6",
-    "@fyimp/contracts": "file:../contracts"
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

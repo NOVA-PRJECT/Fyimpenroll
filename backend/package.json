@@ -3,18 +3,10 @@
   "version": "7.0.0",
   "private": true,
   "scripts": {
-    "test:blueprints": "node --test test/blueprint-rules.test.cjs",
-    "test:timetable": "node --test test/timetable-publication.test.cjs",
-    "test:timetable-rules": "node --test test/timetable-rules.test.cjs",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
-    "start:prod": "node dist/main",
-    "test:testing-fixes": "node --test test/testing-fixes.test.cjs",
-    "test:departments": "node --test test/department-metadata.test.cjs",
-    "test:password-change": "node --test test/password-change-errors.test.cjs",
-    "test:bulk-upload": "node --test test/bulk-upload-counts.test.cjs",
-    "test:faculty-profiles": "node --test test/faculty-profile-joins.test.cjs"
+    "start:prod": "node dist/main"
   },
   "dependencies": {
     "@fyimp/contracts": "file:../contracts",
@@ -33,7 +25,6 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.10",
     "@nestjs/cli": "^11.0.5",
     "@nestjs/schematics": "^11.0.2",
     "@types/cookie-parser": "^1.4.8",

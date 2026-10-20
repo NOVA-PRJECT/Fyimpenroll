@@ -1,4 +1,5 @@
 ﻿import { Module } from '@nestjs/common'
+import { join } from 'node:path'
 import { ConfigModule } from '@nestjs/config'
 import { DatabaseModule } from './core/database/database.module'
 import { LoggingModule } from './core/logging/logging.module'
@@ -23,7 +24,7 @@ import { HealthController } from './modules/health/health.controller'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../.env'],
+      envFilePath: join(__dirname, '..', '.env'),
     }),
     DatabaseModule,
     LoggingModule,

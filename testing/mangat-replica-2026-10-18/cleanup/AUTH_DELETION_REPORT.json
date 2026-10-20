@@ -1,8 +1,0 @@
-{
-  "status": "COMPLETE_VERIFIED",
-  "expected_removed_auth_users": 151,
-  "deleted_this_run": 151,
-  "remaining_reviewed_auth_users": 0,
-  "preserved_auth_users": 258,
-  "preserved_auth_metadata_unchanged": true
-}
