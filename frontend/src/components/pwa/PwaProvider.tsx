@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import InstallReminder from './InstallReminder'
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -23,6 +24,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   const [canInstall, setCanInstall] = useState(false)
   const [isInstalled, setInstalled] = useState(false)
   const [isIOS, setIOS] = useState(false)
+  const [ready, setReady] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [updating, setUpdating] = useState(false)
   const updateRequested = useRef(false)
@@ -32,6 +34,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
     const updateDisplayMode = () => setInstalled(displayMode.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true)
     updateDisplayMode()
     setIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+    setReady(true)
     const onPrompt = (event: Event) => {
       event.preventDefault()
       installPrompt.current = event as InstallPromptEvent
@@ -105,6 +108,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   return (
     <PwaContext.Provider value={{ canInstall, isInstalled, isIOS, install }}>
       {children}
+      <InstallReminder ready={ready} installed={isInstalled} blocked={!!waitingWorker} />
       {waitingWorker && (
         <aside aria-label="App update" className="fixed bottom-4 left-4 z-[100] max-w-[calc(100vw-5rem)] rounded-xl border border-[color:var(--portal-strong-border,#cbd5e1)] bg-[color:var(--portal-surface,#fff)] p-4 shadow-lg sm:max-w-sm">
           <p role="status" className="text-sm font-semibold">A new version is ready</p>

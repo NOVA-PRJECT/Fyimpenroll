@@ -1,0 +1,47 @@
+.card {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: calc(9rem + env(safe-area-inset-bottom));
+  z-index: 90;
+  width: min(360px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 11rem);
+  overflow-y: auto;
+  border: 1px solid var(--portal-strong-border, #cbd5e1);
+  border-radius: 20px;
+  padding: 24px;
+  background: var(--portal-surface, #fff);
+  color: var(--portal-brand-text, #0b1c30);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.16);
+}
+.close {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--portal-muted, #64748b);
+  cursor: pointer;
+}
+.icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--portal-info-bg, #eef3fb);
+  color: var(--portal-info-text, #1e40af);
+}
+.card h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 650; }
+.card p { margin: 8px 0 20px; font-size: 14px; line-height: 1.65; color: var(--portal-muted, #64748b); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.primary, .later { min-height: 44px; border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #082042; color: white; text-decoration: none; }
+.later { border: 0; background: transparent; color: var(--portal-muted, #64748b); }
+.close:focus-visible, .primary:focus-visible, .later:focus-visible { outline: 2px solid var(--portal-info-text, #2563eb); outline-offset: 3px; }
+@media (min-width: 640px) { .card { bottom: 1rem; max-height: calc(100dvh - 2rem); } }
+@media print { .card { display: none; } }

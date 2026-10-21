@@ -18,6 +18,12 @@ Open `http://localhost:3000/install` on the development computer. For installati
 
 Service worker registration runs only in production on secure origins (including localhost). `npm run dev` intentionally does not register a worker.
 
+## Installation reminder
+
+A small non-blocking card appears after three seconds on visible portal pages, except `/install`, when the app is not detected as installed. The existing update notice takes priority. Viewing the card starts a 72-hour cooldown stored under `fyimp:pwa-install-reminder:last-shown:v1`; closing it or choosing Not now does not reset that timestamp. It can appear again on the next eligible navigation or tab visit after the cooldown expires.
+
+Both the reminder and the permanent home-page Get the app button open `/install` and write `fyimp:pwa-install-reminder:handled:v1=true`. That permanently stops automatic reminders for that browser, regardless of whether installation is completed. The home-page button remains available. Storage events synchronize open tabs; no account or backend data is involved. Sign-in/logout cleanup preserves these two browser preference keys. Clearing browser storage resets the preference. If storage is blocked or full, an in-memory fallback suppresses further reminders during the current page load only.
+
 ## Offline behavior and updates
 
 `public/sw.js` caches an explicit list of public offline assets. Navigations use the network and show `offline.html` only when the network request fails. API requests, account pages, RSC responses, authentication, submissions and downloaded records are never cached by this worker. The PWA requires a connection for portal operations; it does not queue offline writes.
@@ -29,6 +35,7 @@ The manifest, worker, install page and public fallback assets remain reachable a
 ## Validate a production build
 
 Run the service worker regression tests with `node --test frontend/tests/pwa-service-worker.test.cjs` from the repository root.
+Run reminder persistence and cooldown tests with `node --test frontend/tests/install-reminder.test.cjs` (Node 24, as required by the repository).
 
 1. Inspect `/manifest.webmanifest`: standalone display, root scope/start URL and 192/512px icons.
 2. Open `/install`, wait for service worker activation, and check browser DevTools → Application → Service Workers.

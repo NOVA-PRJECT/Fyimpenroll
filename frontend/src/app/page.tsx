@@ -8,6 +8,7 @@ import { Role } from '@/core/constants/roles'
 import PortalHeader from '@/components/portal/PortalHeader'
 import PortalFooter from '@/components/portal/PortalFooter'
 import { ArrowRight, BookOpen } from 'lucide-react'
+import { GetAppLink } from '@/components/pwa/InstallReminder'
 
 export default function Home() {
   const router = useRouter()
@@ -104,6 +105,7 @@ export default function Home() {
             >
               <span>Academic Guidelines</span>
             </Link>
+            <GetAppLink className="min-h-11 px-5 py-3 text-[color:var(--portal-brand-text,#0B192C)] hover:bg-[color:var(--portal-info-bg,#dce9ff)]/50 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2 border border-[color:var(--portal-strong-border,#cbd5e1)] bg-[color:var(--portal-surface,white)]" />
           </div>
 
           {/* Pulsing 3-dot yellow loader in space between CTA and footer while checking session */}
