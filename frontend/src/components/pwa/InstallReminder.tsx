@@ -66,14 +66,16 @@ export default function InstallReminder({ ready, installed, blocked }: {
 
   if (!visible || !allowed) return null
 
-  return <aside aria-label="App installation reminder" aria-live="polite" className={styles.card}>
-    <button type="button" aria-label="Dismiss app reminder" className={styles.close} onClick={() => setVisible(false)}><X size={18} aria-hidden="true" /></button>
-    <div className={styles.icon}><Download size={22} aria-hidden="true" /></div>
-    <h2>Keep FYIMP Portal on your home screen</h2>
-    <p>Quick access to your courses, timetable and attendance.</p>
-    <div className={styles.actions}>
-      <GetAppLink className={styles.primary} />
-      <button type="button" className={styles.later} onClick={() => setVisible(false)}>Not now</button>
-    </div>
-  </aside>
+  return <div className={styles.backdrop} onClick={() => setVisible(false)}>
+    <aside aria-label="App installation reminder" aria-live="polite" className={styles.card} onClick={(e) => e.stopPropagation()}>
+      <button type="button" aria-label="Dismiss app reminder" className={styles.close} onClick={() => setVisible(false)}><X size={18} aria-hidden="true" /></button>
+      <div className={styles.icon}><Download size={22} aria-hidden="true" /></div>
+      <h2>Keep FYIMP Portal on your home screen</h2>
+      <p>Quick access to your courses, timetable and attendance.</p>
+      <div className={styles.actions}>
+        <GetAppLink className={styles.primary} />
+        <button type="button" className={styles.later} onClick={() => setVisible(false)}>Not now</button>
+      </div>
+    </aside>
+  </div>
 }
