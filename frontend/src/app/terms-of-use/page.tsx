@@ -34,7 +34,7 @@ export default function TermsOfUsePage() {
               </span>
               <span className="text-xs text-[color:var(--portal-muted,#64748b)] hidden sm:inline">•</span>
               <span className="text-xs font-medium text-[color:var(--portal-muted,#64748b)] hidden sm:inline">
-                Version: 2026-09-08 • Effective: Sept 8, 2026
+                Version: 2026-10-22 • Effective: Oct 22, 2026
               </span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-serif font-semibold text-[color:var(--portal-brand-text,#0f172a)] tracking-tight">

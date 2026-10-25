@@ -1,0 +1,8 @@
+\set ON_ERROR_STOP on
+\ir schema.sql
+\ir reference-data.sql
+\ir ../migrations/20261022141208_atomic_teacher_changes.sql
+\ir ../migrations/20261025044031_plain_course_prerequisites.sql
+\ir ../migrations/20261025044158_retire_legacy_course_prerequisites.sql
+\ir ../migrations/20261025062135_consolidate_application_schema.sql
+SELECT public.production_readiness();

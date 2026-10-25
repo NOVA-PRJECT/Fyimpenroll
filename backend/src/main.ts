@@ -41,7 +41,6 @@ async function bootstrap() {
     }
     next()
   })
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
   const rawOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((o) => o.trim()).filter(Boolean)
     : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001']

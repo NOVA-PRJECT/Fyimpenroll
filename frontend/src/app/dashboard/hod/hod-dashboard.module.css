@@ -1991,177 +1991,21 @@
   box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.05);
 }
 
-/* ── CONSTRAINT PICKERS & CARDS (LIGHT UNIVERSITY THEME) ── */
-.constraintDeptGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.6rem;
-  border: 1.5px solid var(--portal-border,#dde1e7);
-  border-radius: 0.5rem;
-  background: var(--portal-surface,#ffffff);
-  max-height: 140px;
-  overflow-y: auto;
+/* Prerequisite point editor */
+.prerequisitePoint { position: relative; margin: .8rem 0; }
+.prerequisitePointInput { display: block; padding-bottom: 2.9rem; -webkit-touch-callout: none; }
+.prerequisitePointCount { position: absolute; bottom: .65rem; left: .8rem; font-size: .7rem; color: var(--portal-muted, #64748b); pointer-events: none; }
+.prerequisitePointActions { position: absolute; bottom: .4rem; right: .5rem; display: flex; gap: .25rem; padding: .15rem; border-radius: 7px; background: var(--portal-surface, #fff); box-shadow: 0 1px 6px #00000014; opacity: 0; pointer-events: none; }
+.prerequisitePointActions button { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--portal-border, #cbd5e1); border-radius: 5px; background: var(--portal-surface, #fff); color: var(--portal-brand-text, #1e293b); cursor: pointer; }
+.prerequisitePointActions button:disabled { opacity: .4; cursor: not-allowed; }
+.prerequisitePointActions button:focus-visible { outline: 2px solid var(--portal-brand-text, #1e293b); outline-offset: 2px; }
+.prerequisitePoint[data-controls-open] .prerequisitePointActions,
+.prerequisitePointActions:focus-within { opacity: 1; pointer-events: auto; }
+.prerequisitePointHint { font-size: .75rem; color: var(--portal-muted, #64748b); line-height: 1.5; }
+@media (hover: hover) and (pointer: fine) {
+  .prerequisitePoint:hover .prerequisitePointActions { opacity: 1; pointer-events: auto; }
 }
-
-.constraintDeptLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.76rem;
-  cursor: pointer;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--portal-strong-border,#e2e8f0);
-  border-radius: 4px;
-  background: var(--portal-info-bg,#f8fafc);
-  color: var(--portal-info-text,#475569);
-  transition: all 0.15s ease;
-  user-select: none;
+@media (pointer: coarse) {
+  .prerequisitePointActions button { width: 44px; height: 44px; }
+  .prerequisitePointInput { padding-bottom: 3.4rem; }
 }
-
-.constraintDeptLabel:hover {
-  background: var(--portal-info-bg,#f1f5f9);
-  border-color: var(--portal-strong-border,#cbd5e1);
-}
-
-.constraintDeptLabelActive {
-  border: 1.5px solid var(--portal-info-border,#002147) !important;
-  background: var(--portal-info-bg,#e6f0fa) !important;
-  color: var(--portal-brand-text,#002147) !important;
-  font-weight: 600;
-}
-
-.priorCourseDropdownWrapper {
-  position: relative;
-  width: 100%;
-}
-
-.priorCourseTrigger {
-  width: 100%;
-  padding: 0.6rem 0.85rem;
-  font-family: inherit;
-  font-size: 0.82rem;
-  color: var(--portal-text,#191c1d);
-  background: var(--portal-canvas,#f8f9fa);
-  border: 1.5px solid var(--portal-border,#dde1e7);
-  border-radius: 0.5rem;
-  outline: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-  transition: border-color 0.15s ease;
-  box-sizing: border-box;
-}
-
-.priorCourseTrigger:hover {
-  border-color: var(--portal-info-border,#002147);
-  background: var(--portal-surface,#ffffff);
-}
-
-.priorCourseMenu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--portal-surface,#ffffff);
-  border: 1.5px solid var(--portal-border,#dde1e7);
-  border-radius: 0.6rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  z-index: 60;
-  padding: 0.65rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.priorCourseSemFilterRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--portal-strong-border,#f1f5f9);
-}
-
-.priorCourseSemPill {
-  background: var(--portal-info-bg,#f1f5f9);
-  border: 1px solid var(--portal-strong-border,#e2e8f0);
-  border-radius: 999px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--portal-info-text,#475569);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.priorCourseSemPill:hover {
-  background: var(--portal-info-bg,#e2e8f0);
-}
-
-.priorCourseSemPillActive {
-  background: var(--portal-primary,#002147) !important;
-  color: #ffffff !important;
-  border-color: var(--portal-info-border,#002147) !important;
-}
-
-.priorCourseSearchInput {
-  width: 100%;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.78rem;
-  border: 1px solid var(--portal-border,#dde1e7);
-  border-radius: 0.35rem;
-  background: var(--portal-info-bg,#f8fafc);
-  outline: none;
-  box-sizing: border-box;
-}
-
-.priorCourseSearchInput:focus {
-  border-color: var(--portal-info-border,#002147);
-  background: var(--portal-surface,#ffffff);
-}
-
-.priorCourseList {
-  max-height: 180px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.priorCourseOption {
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.35rem;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.78rem;
-  transition: background 0.15s ease;
-}
-
-.priorCourseOption:hover {
-  background: var(--portal-info-bg,#f0f4f8);
-}
-
-.constraintCardLight {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--portal-surface,#ffffff);
-  border: 1px solid var(--portal-strong-border,#e2e8f0);
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.15s ease;
-}
-
-.constraintCardLight:hover {
-  border-color: var(--portal-strong-border,#cbd5e1);
-}
-
-
-
-
-

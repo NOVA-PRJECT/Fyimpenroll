@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   NotFoundException,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { SupabaseService } from '../../core/database/supabase.service';
@@ -14,8 +13,6 @@ import { sanitizeSpreadsheetValue } from '../credit-ledger/export.service';
 
 @Injectable()
 export class AttendanceExportService {
-  private readonly logger = new Logger(AttendanceExportService.name);
-
   constructor(private readonly supabase: SupabaseService) {}
 
   /**

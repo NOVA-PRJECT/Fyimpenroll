@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import PortalHeader from '@/components/portal/PortalHeader'
 import PortalFooter from '@/components/portal/PortalFooter'
 import { supabase } from '@/core/supabase/client'
+import { requestPasswordRecovery } from '@/core/security/password-recovery'
 import {
   getChecks,
   getPasswordLevel,
@@ -148,16 +149,7 @@ function ConfirmResetForm() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      const syncRes = await fetch('/api/auth/sync-password-status', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      })
+      const syncRes = await requestPasswordRecovery(supabase, '/api/auth/sync-password-status')
       const syncData = await syncRes.json().catch(() => ({}))
       if (!syncRes.ok || syncData.success === false) {
         setSubmitError(syncData.message || 'Synchronization retry failed. Please try again.')
@@ -193,30 +185,9 @@ function ConfirmResetForm() {
     setSubmitting(true)
 
     try {
-      // Step F.1: Call supabase.auth.updateUser({ password: newPassword })
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
-      })
-
-      // Step F.2: If that fails, show the error message inline — do not redirect
-      if (updateError) {
-        setSubmitError(updateError.message || 'Failed to update password. Please try again.')
-        setSubmitting(false)
-        return
-      }
-
-      // Step F.3: If that succeeds, call POST /api/auth/complete-password-reset with credentials: 'include'
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
-      const resetRes = await fetch('/api/auth/complete-password-reset', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ passwordUpdated: true }),
-      })
+      // The backend owns the password update and its recoverable profile sync.
+      // Recovery uses its explicit session, independently of an older portal logout.
+      const resetRes = await requestPasswordRecovery(supabase, '/api/auth/complete-password-reset', { newPassword: password })
 
       const resetData = await resetRes.json().catch(() => ({}))
 
@@ -226,7 +197,7 @@ function ConfirmResetForm() {
           resetData.message ||
           'Password updated in authentication system, but student account synchronization failed. Please retry synchronization below.'
         setSubmitError(errorMsg)
-        setCanRetrySync(true)
+        setCanRetrySync(resetData.canRetrySync === true)
         setSubmitting(false)
         return
       }

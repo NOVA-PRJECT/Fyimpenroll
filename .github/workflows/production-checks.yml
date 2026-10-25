@@ -32,3 +32,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only-placeholder
           OPENBLAS_NUM_THREADS: '1'
           OMP_NUM_THREADS: '1'
+      - run: npm run test:regression
+      - run: npm run typecheck --workspace=mobile
+      - run: npm run build --workspace=mobile
+        env:
+          EXPO_PUBLIC_API_BASE_URL: https://backend.example.test
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: build-only-placeholder
+          EXPO_PUBLIC_PORTAL_URL: https://fyimpenroll.vercel.app

@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
-import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 import { AuthUser } from '../../core/auth/types'
 
@@ -14,7 +13,6 @@ import { AuthUser } from '../../core/auth/types'
 export class FacultyService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly serverLogger: ServerLoggerService,
   ) {}
 
   async getCourses(user: AuthUser) {

@@ -18,7 +18,7 @@ import { ErrorView } from '../../src/components/common/ErrorView';
 export default function TeacherHomeScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { colors, typography, spacing } = useTheme();
+  const { colors, typography } = useTheme();
 
   const teacherId = user?.id || '';
   const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];

@@ -9,10 +9,10 @@ export function getRedisClient(): Redis {
     if (!url || !token) {
       // In local dev without Redis, mock minimal set/get interface
       return {
-        async get(key: string) {
+        async get(_key: string) {
           return null;
         },
-        async set(key: string, value: any, opts?: any) {
+        async set(_key: string, _value: any, _opts?: any) {
           return 'OK';
         },
       } as unknown as Redis;

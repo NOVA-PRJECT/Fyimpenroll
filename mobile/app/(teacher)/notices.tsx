@@ -14,7 +14,7 @@ import { ErrorView } from '../../src/components/common/ErrorView';
 
 export default function TeacherNoticesScreen() {
   const { profile } = useAuth();
-  const { colors, typography, spacing } = useTheme();
+  const { colors, typography } = useTheme();
 
   const deptId = profile?.department_id;
 

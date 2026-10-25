@@ -3,15 +3,7 @@ import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
 import type { Pathway } from '../types/course.types'
 
 export function getBlueprintPathways(blueprint: Record<string, any> | null | undefined): Pathway[] {
-  if (!blueprint) return []
-  if (Array.isArray(blueprint.pathways) && blueprint.pathways.length) return blueprint.pathways
-  const slots = Array.from({ length: 8 }, (_, i) => ({
-    rule: blueprint[`slot_${i + 1}_rule`] || '',
-    target: blueprint[`slot_${i + 1}_target`] || '',
-    name: blueprint[`slot_${i + 1}_name`] || `Paper ${i + 1}`,
-  }))
-  while (slots.length && !slots[slots.length - 1].rule) slots.pop()
-  return slots.length ? [{ id: 'legacy-default', name: 'Default', slots }] : []
+  return Array.isArray(blueprint?.pathways) ? blueprint.pathways : []
 }
 
 export function isBasketCategory(target: string): boolean {
@@ -111,20 +103,6 @@ export function isCourseEligibleForSlot(
   return false
 }
 
-export interface PrerequisiteRule {
-  id?: string
-  course_id: string
-  rule: 'COMPLETED_COURSE' | 'COMPLETED_SEMESTER' | 'DEPARTMENT' | string
-  target: string
-  created_at?: string
-}
-
-export interface PrerequisiteEvaluationResult {
-  eligible: boolean
-  reason?: string
-  score: number
-}
-
 /**
  * Validates pathway slots for duplicate fixed courses and unsupported slot counts (F20, D02).
  * Allows variable component sizes (1 to 8) to accommodate research and project semesters.
@@ -194,86 +172,5 @@ export function validatePathwaySlots(
   return {
     valid: errors.length === 0,
     errors,
-  }
-}
-
-/**
- * Evaluates prerequisite eligibility and scoring across all assignment paths (F19).
- * Prior registration in a course is treated as evidence of completion.
- * An ineligible student is strictly denied; eligible students are scored consistently.
- */
-export function evaluateCoursePrerequisites(
-  course: {
-    id: string
-    course_code: string
-    semester: number
-    prerequisite_course_ids?: string[] | null
-  },
-  rules: PrerequisiteRule[],
-  student: {
-    department_code?: string | null
-    current_semester: number
-  },
-  completedCourseCodes: Set<string>,
-  completedCourseIds: Set<string> = new Set(),
-): PrerequisiteEvaluationResult {
-  let earnedScore = 0
-
-  // 1. Check legacy prerequisite_course_ids UUIDs if configured
-  if (Array.isArray(course.prerequisite_course_ids) && course.prerequisite_course_ids.length > 0) {
-    for (const prereqId of course.prerequisite_course_ids) {
-      if (prereqId && !completedCourseIds.has(prereqId)) {
-        return {
-          eligible: false,
-          reason: `Missing required prior registration for prerequisite course ID ${prereqId}`,
-          score: 0,
-        }
-      }
-    }
-  }
-
-  // 2. Check HOD-managed course_prerequisite_rules
-  for (const r of rules) {
-    if (r.rule === 'COMPLETED_COURSE') {
-      const requiredCode = normalizeCourseCode(r.target)
-      if (!completedCourseCodes.has(requiredCode)) {
-        return {
-          eligible: false,
-          reason: `Missing required prior registration in prerequisite course ${r.target.trim().toUpperCase()}`,
-          score: 0,
-        }
-      }
-      earnedScore += 1
-    } else if (r.rule === 'COMPLETED_SEMESTER') {
-      const targetSem = parseInt(r.target.trim(), 10)
-      if (isNaN(targetSem) || student.current_semester <= targetSem) {
-        return {
-          eligible: false,
-          reason: `Requires completion of semester ${r.target.trim()} prior to enrolment (current semester: ${student.current_semester})`,
-          score: 0,
-        }
-      }
-      earnedScore += 1
-    } else if (r.rule === 'DEPARTMENT') {
-      const allowedCodes = r.target.split(',').map((c) => c.trim().toUpperCase())
-      const dept = (student.department_code || '').trim().toUpperCase()
-      if (!dept || !allowedCodes.includes(dept)) {
-        return {
-          eligible: false,
-          reason: `Course enrollment is restricted to departments: ${r.target} (student department: ${dept || 'None'})`,
-          score: 0,
-        }
-      }
-      earnedScore += 1
-    }
-  }
-
-  // Proximity points for ranking tie-breaks
-  const proximityPoints = Math.max(0, student.current_semester - course.semester)
-  earnedScore += proximityPoints
-
-  return {
-    eligible: true,
-    score: earnedScore,
   }
 }

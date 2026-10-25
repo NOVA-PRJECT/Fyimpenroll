@@ -2,7 +2,7 @@
 
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle, AlertTriangle, UserCheck, BookOpen, RefreshCw } from 'lucide-react'
 
 interface PreferenceChoice {
@@ -39,6 +39,7 @@ interface RemainingCourse {
 }
 
 interface PlacementCourse extends RemainingCourse {
+  prerequisites?: string[]
   can_allocate: boolean
   unavailable_reason: string | null
 }
@@ -636,11 +637,16 @@ export default function ManualAllocationTab() {
                     </option>
                   ))}
               </select>
+              {placementCourses.find(course => course.id === selectedCourseId)?.prerequisites?.length ? (
+                <details><summary>Course prerequisites (guidance)</summary>
+                  <ol style={{ listStyle: 'decimal', paddingLeft: '1.5rem' }}>{placementCourses.find(course => course.id === selectedCourseId)?.prerequisites?.map((point, index) => <li key={index}>{point}</li>)}</ol>
+                </details>
+              ) : null}
               <div id="placement-course-status" role={placementError ? 'alert' : 'status'} style={{ fontSize: '0.8rem', color: 'var(--portal-muted,#64748b)' }}>
-                {placementError || (placementLoading ? 'Checking courses, prerequisites and available seats…'
+                {placementError || (placementLoading ? 'Checking courses and available seats…'
                   : placementCourses.length === 0 ? 'No courses are configured for this paper in the student’s curriculum.'
-                  : !placementCourses.some(c => c.can_allocate) ? 'No course can currently be assigned to this paper. The listed courses show unmet prerequisites or full capacity.'
-                  : 'Courses with unmet prerequisites or no remaining seats are shown but cannot be selected.')}
+                  : !placementCourses.some(c => c.can_allocate) ? 'No course can currently be assigned to this paper. The listed courses show full capacity or another placement restriction.'
+                  : 'Courses already assigned to another paper or with no remaining seats are shown but cannot be selected.')}
               </div>
             </div>
 

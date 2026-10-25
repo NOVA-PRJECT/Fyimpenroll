@@ -15,6 +15,7 @@ import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser, Role } from '../../core/auth/types'
 import { createHash } from 'crypto'
+import { assertPasswordNotCompromised } from '../../core/security/password-security'
 import { currentConsentStatus } from '../../core/auth/consent-status'
 import { assertAuthProviderAvailable, authProviderCall } from '../../core/auth/provider-error'
 
@@ -508,6 +509,7 @@ export class AuthService {
       throw new BadRequestException({ code: 'PASSWORD_VERIFICATION_FAILED', message: 'Your current password could not be verified. Sign in again or contact your campus administrator.' })
     }
 
+    await assertPasswordNotCompromised(newPassword)
     // 2. Update to new password in Supabase Auth.
     // NOTE (R02): Mark pending_profile_sync: true as server-trusted proof before clearing must_change_password
     const { error: pwError } = await authProviderCall(this.supabase.admin.auth.admin.updateUserById(
@@ -606,6 +608,7 @@ export class AuthService {
       throw new BadRequestException('Verified password update confirmation required: A new password is required to complete password reset. Client assertions are not accepted.')
     }
 
+    await assertPasswordNotCompromised(body.newPassword)
     // 1. Update password in Supabase Auth and establish server-trusted pending_profile_sync state
     const { error: pwError } = await this.supabase.admin.auth.admin.updateUserById(userId, {
       password: body.newPassword,

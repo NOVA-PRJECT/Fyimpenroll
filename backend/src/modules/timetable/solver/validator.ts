@@ -13,7 +13,7 @@ import { buildCampusPaperGroups, CAMPUS_WIDE_CATEGORIES } from './campus-paper-g
 export function validateTimetable(
   response: AIGeneratorResponse,
   courses: CourseNode[],
-  slotMap: SlotMap,
+  _slotMap: SlotMap,
   parallelGroups: ParallelGroup[] = [],
   teacherReservations: TeacherReservation[] = [],
   options?: {

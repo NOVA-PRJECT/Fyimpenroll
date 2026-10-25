@@ -3066,3 +3066,18 @@
   color: var(--portal-info-text,#475569);
   border-color: var(--portal-info-border,#cbd5e1);
 }
+
+.prerequisiteBackdrop { min-height: 100dvh; display: grid; place-items: center; padding: 1rem; background: #0008; }
+.prerequisiteDialog { width: min(100%, 36rem); max-height: 85dvh; overflow-y: auto; padding: 1.5rem; border-radius: 12px; background: var(--portal-surface, #fff); color: var(--portal-brand-text, #1e293b); }
+.prerequisiteDialog h2, .prerequisiteDialog p { margin-bottom: 1rem; }
+.prerequisiteDialog ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+.prerequisiteDialog li { margin-bottom: .6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prerequisiteActions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.prerequisiteActions button { padding: .65rem .9rem; border: 1px solid var(--portal-border, #cbd5e1); border-radius: 6px; background: var(--portal-surface, #fff); color: inherit; cursor: pointer; }
+.prerequisiteActions button:first-child { background: var(--portal-primary, #002147); color: #fff; }
+
+.prerequisiteOverlay { background: transparent; }
+.prerequisiteReviewDialog { width: min(100%, 46rem); }
+.prerequisiteReviewCourse { padding: 1rem 0; border-top: 1px solid var(--portal-border, #cbd5e1); }
+.prerequisiteReviewCourse h3 { font-weight: 700; margin-bottom: .35rem; overflow-wrap: anywhere; }
+.prerequisiteReviewPlacement { font-size: .8rem; color: var(--portal-muted, #64748b); }

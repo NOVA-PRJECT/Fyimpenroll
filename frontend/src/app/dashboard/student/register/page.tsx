@@ -10,13 +10,15 @@ import { sessionRedirect } from '@/core/security/session-response'
 
 import { logoutPortal } from '@/core/security/logout'
 
-import { useState, useEffect, useEffectEvent } from 'react'
+import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import UniversityLogo from '@/components/UniversityLogo'
 import styles from '../student-dashboard.module.css'
 import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import { useCurrentTime } from '@/core/hooks/useCurrentTime'
 import CustomSelect, { Course } from './CourseSelect'
+import AccessibleModal from '@/components/AccessibleModal'
+import { createPrerequisiteAnswers, groupCoursePrerequisites, type PrerequisiteContext, type PrerequisiteReviewGroup } from '@/core/course-prerequisites'
 interface BlueprintSlot {
   slot: number
   rule: string
@@ -31,6 +33,8 @@ interface PathwaySummary {
 }
 
 interface BlueprintData {
+  academicYear: string
+  student?: { id: string; full_name: string; current_semester: number }
   window_status: 'OPEN' | 'CLOSED'
   windowOpen?: boolean
   deadline: string
@@ -55,6 +59,7 @@ interface BlueprintData {
 }
 
 interface StudentInfo {
+  id: string
   full_name: string
   current_semester: number
 }
@@ -113,6 +118,67 @@ export default function RegisterPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
+  const [prerequisiteAnswers] = useState(() => createPrerequisiteAnswers(() => window.sessionStorage))
+  const [, refreshPrerequisiteAnswers] = useState(0)
+  const [prerequisiteQuestion, setPrerequisiteQuestion] = useState<{ course: Course; accept: () => void } | null>(null)
+  const [prerequisiteReview, setPrerequisiteReview] = useState<{ groups: PrerequisiteReviewGroup<Course>[]; fingerprint: string } | null>(null)
+  const submissionPending = useRef(false)
+
+  function prerequisiteContext(): PrerequisiteContext | undefined {
+    const student = studentInfo || blueprint?.student
+    if (!student?.id || !blueprint?.academicYear) return undefined
+    return { studentId: student.id, academicYear: blueprint.academicYear, semester: student.current_semester }
+  }
+
+  function findCourse(courseId: string): Course | undefined {
+    return allocatedCourses[courseId] || minorCourses.find(course => course.id === courseId)
+      || resolvedSlots.flatMap(slot => [...(slot.options || []), ...(slot.course ? [slot.course] : [])]).find(course => course.id === courseId)
+  }
+
+  function prerequisiteUnavailable(course: Course): string | undefined {
+    const context = prerequisiteContext()
+    return context && prerequisiteAnswers.get(context, course) === false
+      ? 'You answered No to this course’s prerequisites for this session.' : undefined
+  }
+
+  function confirmPrerequisites(courseId: string, accept: () => void, showOnSelection = false): boolean {
+    if (!courseId) return true
+    const course = findCourse(courseId)
+    if (!course) { setError('Course details are unavailable. Refresh and try again.'); return false }
+    if (!course.prerequisites?.length) return true
+    const context = prerequisiteContext()
+    if (!context) { setError('Registration context is unavailable. Refresh and try again.'); return false }
+    const answer = prerequisiteAnswers.get(context, course)
+    if (answer === true && !showOnSelection) return true
+    if (answer === false) { setError(prerequisiteUnavailable(course) || 'This course cannot be selected in this session.'); return false }
+    setPrerequisiteQuestion({ course, accept })
+    return false
+  }
+
+  function answerPrerequisites(answer: boolean) {
+    const question = prerequisiteQuestion
+    const context = prerequisiteContext()
+    if (!question || !context) return
+    prerequisiteAnswers.set(context, question.course, answer)
+    refreshPrerequisiteAnswers(value => value + 1)
+    setPrerequisiteQuestion(null)
+    if (answer) question.accept()
+    else {
+      // Clear only editable preferences, never confirmed allocations.
+      if (!allocationCompleted) setRankedPreferences(previous => Object.fromEntries(Object.entries(previous).map(([slot, ranks]) => [slot, {
+        rank1: ranks.rank1 === question.course.id ? '' : ranks.rank1,
+        rank2: ranks.rank2 === question.course.id ? '' : ranks.rank2,
+        rank3: ranks.rank3 === question.course.id ? '' : ranks.rank3,
+      }])))
+      setSelectedCourseForSlot(previous => previous === question.course.id ? '' : previous)
+      setError('Choose another course. You answered No to the prerequisites for this course.')
+    }
+  }
+
+  function chooseCourseForChange(courseId: string) {
+    if (confirmPrerequisites(courseId, () => setSelectedCourseForSlot(courseId), true)) setSelectedCourseForSlot(courseId)
+  }
+
   async function loadBlueprint() {
     try {
       const response = await fetch('/api/registrations/blueprint', { cache: 'no-store' })
@@ -143,6 +209,7 @@ export default function RegisterPage() {
 
       if (data.student) {
         setStudentInfo({
+          id: data.student.id,
           full_name: data.student.full_name,
           current_semester: data.student.current_semester,
         })
@@ -234,6 +301,8 @@ export default function RegisterPage() {
   }, [])
 
   async function handleUpdateSlot(slotNumber: number, courseId: string) {
+    if (courseId !== existingSlots[`slot_${slotNumber}`]
+      && !confirmPrerequisites(courseId, () => { void handleUpdateSlot(slotNumber, courseId) })) return
     if (!windowIsOpen || !blueprint?.deadline || Date.now() >= Date.parse(blueprint.deadline)) {
       setWindowIsOpen(false)
       setEditingSlot(null)
@@ -363,7 +432,11 @@ export default function RegisterPage() {
     setError('')
   }
 
-  function handlePreferenceChange(
+  function handlePreferenceChange(slotNumber: number, rank: 'rank1' | 'rank2' | 'rank3', courseId: string) {
+    if (confirmPrerequisites(courseId, () => commitPreferenceChange(slotNumber, rank, courseId), true)) commitPreferenceChange(slotNumber, rank, courseId)
+  }
+
+  function commitPreferenceChange(
     slotNumber: number,
     rank: 'rank1' | 'rank2' | 'rank3',
     courseId: string,
@@ -469,11 +542,17 @@ export default function RegisterPage() {
     }, 0)
   }
 
-  async function handleSubmit() {
-    if (!blueprint || !selectedPathwayId || !windowIsOpen) return
+  async function handleSubmit(reviewedFingerprint?: string) {
+    if (submissionPending.current || !blueprint || !selectedPathwayId || !windowIsOpen) return
+    if (Date.now() >= Date.parse(blueprint.deadline)) {
+      setWindowIsOpen(false)
+      setPrerequisiteReview(null)
+      return
+    }
 
     const preferencesPayload: Record<string, { course_id: string; rank: number }[]> = {}
     const chosenRank1Courses = new Map<string, number>()
+    const reviewSelections: Array<{ course: Course; placement: string; informational: boolean }> = []
 
     for (const slot of activeSlots) {
       const isFixed =
@@ -484,6 +563,7 @@ export default function RegisterPage() {
 
       if (isFixed && slot.course) {
         chosenRank1Courses.set(slot.course.id, slot.slot)
+        reviewSelections.push({ course: slot.course, placement: `${slot.name} — Fixed paper (guidance)`, informational: true })
       } else {
         const slotKey = `slot_${slot.slot}`
         const currentPrefs = rankedPreferences[slot.slot] || { rank1: '', rank2: '', rank3: '' }
@@ -514,10 +594,26 @@ export default function RegisterPage() {
           choices.push({ course_id: currentPrefs.rank3, rank: 3 })
         }
 
+        for (const choice of choices) {
+          if (!confirmPrerequisites(choice.course_id, () => { void handleSubmit() })) return
+          const course = findCourse(choice.course_id)
+          if (!course) { setError('Course details are unavailable. Refresh and try again.'); return }
+          reviewSelections.push({ course, placement: `${slot.name} — Choice ${choice.rank}`, informational: false })
+        }
         preferencesPayload[slotKey] = choices
       }
     }
 
+    const groups = groupCoursePrerequisites(reviewSelections)
+    const fingerprint = JSON.stringify([selectedPathwayId, blueprint.academicYear, studentInfo?.current_semester, preferencesPayload, groups])
+    if (reviewedFingerprint !== fingerprint) {
+      setError('')
+      setPrerequisiteReview({ groups, fingerprint })
+      return
+    }
+
+    submissionPending.current = true
+    setPrerequisiteReview(null)
     setPageState('submitting')
     setError('')
 
@@ -568,6 +664,8 @@ export default function RegisterPage() {
       const msg = (err instanceof Error ? err.message : '') || 'Network connection failed. Your course preferences have been preserved. Please check your connection and click Submit again.'
       setError(msg)
       setPageState('ready')
+    } finally {
+      submissionPending.current = false
     }
   }
 
@@ -640,6 +738,53 @@ export default function RegisterPage() {
           </button>
         </div>
       </header>
+
+      {prerequisiteQuestion && (
+        <AccessibleModal className={styles.prerequisiteOverlay} label="Course prerequisites" onClose={() => setPrerequisiteQuestion(null)}>
+          <div className={styles.prerequisiteBackdrop}>
+            <section className={styles.prerequisiteDialog}>
+              <h2>Course prerequisites</h2>
+              <p><strong>{prerequisiteQuestion.course.title}</strong> ({prerequisiteQuestion.course.course_code})</p>
+              <ol>{prerequisiteQuestion.course.prerequisites?.map((point, index) => <li key={index}>{point}</li>)}</ol>
+              <p>Do you meet all the prerequisites listed above?</p>
+              <div className={styles.prerequisiteActions}>
+                <button type="button" onClick={() => answerPrerequisites(true)}>Yes, I meet all</button>
+                <button type="button" onClick={() => answerPrerequisites(false)}>No, I do not</button>
+                <button type="button" onClick={() => setPrerequisiteQuestion(null)}>Cancel</button>
+              </div>
+            </section>
+          </div>
+        </AccessibleModal>
+      )}
+
+      {prerequisiteReview && (
+        <AccessibleModal className={styles.prerequisiteOverlay} label="Review all course prerequisites" onClose={() => setPrerequisiteReview(null)}>
+          <div className={styles.prerequisiteBackdrop}>
+            <section className={`${styles.prerequisiteDialog} ${styles.prerequisiteReviewDialog}`}>
+              <h2>Review all course prerequisites</h2>
+              <p>Review the prerequisites for every ranked choice and fixed paper before submitting your preferences.</p>
+              {prerequisiteReview.groups.map(group => (
+                <section key={group.course.id} className={styles.prerequisiteReviewCourse} aria-label={`${group.course.course_code} prerequisites`}>
+                  <h3>{group.course.title} ({group.course.course_code})</h3>
+                  <p className={styles.prerequisiteReviewPlacement}>{group.placements.join(' · ')}</p>
+                  {group.course.prerequisites?.length ? (
+                    <ol>{group.course.prerequisites.map((point, index) => <li key={index}>{point}</li>)}</ol>
+                  ) : <p>No prerequisites specified.</p>}
+                  {group.informational && <p className={styles.prerequisiteReviewPlacement}>These points are guidance for a mandatory fixed paper.</p>}
+                </section>
+              ))}
+              <div className={styles.prerequisiteActions}>
+                <button type="button" disabled={!windowIsOpen || pageState === 'submitting'} onClick={() => {
+                  const fingerprint = prerequisiteReview.fingerprint
+                  setPrerequisiteReview(null)
+                  void handleSubmit(fingerprint)
+                }}>Confirm and submit preferences</button>
+                <button type="button" onClick={() => setPrerequisiteReview(null)}>Back to preferences</button>
+              </div>
+            </section>
+          </div>
+        </AccessibleModal>
+      )}
 
       <div className={styles.mainContent}>
 
@@ -1039,6 +1184,12 @@ export default function RegisterPage() {
                         )}
                       </div>
 
+                      {allocatedCourse?.prerequisites?.length ? (
+                        <details style={{ margin: '0.5rem 0', fontSize: '0.8rem' }}>
+                          <summary>Course prerequisites{isFixed ? ' (guidance)' : ''}</summary>
+                          <ol style={{ listStyle: 'decimal', paddingLeft: '1.5rem' }}>{allocatedCourse.prerequisites.map((point, index) => <li key={index}>{point}</li>)}</ol>
+                        </details>
+                      ) : null}
                       {/* POST-ALLOCATION DIRECT REGISTRATION FLOW */}
                       {allocationCompleted ? (
                         isCurrentlyEditing ? (
@@ -1068,9 +1219,10 @@ export default function RegisterPage() {
                               return (
                                 <>
                                   <CustomSelect
+                                    unavailableReason={prerequisiteUnavailable}
                                     options={optionsWithSeats}
                                     value={selectedCourseForSlot || existingCourseId || ''}
-                                    onChange={(val) => setSelectedCourseForSlot(val)}
+                                    onChange={chooseCourseForChange}
                                     disabled={!windowIsOpen || updatingSlot}
                                     placeholder="— Select a course with open seats —"
                                   />
@@ -1291,7 +1443,7 @@ export default function RegisterPage() {
                             <p style={{ fontSize: '0.75rem', color: "var(--portal-muted,#64748b)", margin: 0 }}>
                               {isOptionalMinor(slot.slot)
                                 ? 'Select an elective course offered by any department outside your own for this Minor Paper.'
-                                : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and prerequisites.'}
+                                : 'Rank your preferences for this paper. The algorithm allocates round-by-round based on capacity and ranking.'}
                             </p>
 
                             <div>
@@ -1310,6 +1462,7 @@ export default function RegisterPage() {
                                 </label>
                               </div>
                               <CustomSelect
+                                    unavailableReason={prerequisiteUnavailable}
                                 options={slot.options ?? []}
                                 value={rankedPreferences[slot.slot]?.rank1 ?? ''}
                                 onChange={(val) => handlePreferenceChange(slot.slot, 'rank1', val)}
@@ -1333,6 +1486,7 @@ export default function RegisterPage() {
                                   2nd Choice
                                 </label>
                                 <CustomSelect
+                                    unavailableReason={prerequisiteUnavailable}
                                   options={(slot.options ?? []).filter(
                                     (c) => c.id !== rankedPreferences[slot.slot]?.rank1,
                                   )}
@@ -1359,6 +1513,7 @@ export default function RegisterPage() {
                                   3rd Choice
                                 </label>
                                 <CustomSelect
+                                    unavailableReason={prerequisiteUnavailable}
                                   options={(slot.options ?? []).filter(
                                     (c) =>
                                       c.id !== rankedPreferences[slot.slot]?.rank1 &&
@@ -1438,7 +1593,7 @@ export default function RegisterPage() {
               {!allocationCompleted && windowIsOpen && (pageState === 'ready' || pageState === 'submitting') && (
                 <button
                   className={styles.submitBtn}
-                  onClick={handleSubmit}
+                  onClick={() => { void handleSubmit() }}
                   disabled={pageState === 'submitting' || !isValidCredits}
                 >
                   {pageState === 'submitting' ? (

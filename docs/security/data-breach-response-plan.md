@@ -14,7 +14,7 @@ A short, practical plan for what to do if personal data in the System (student/f
 
 ## What counts as a breach here
 
-- Unauthorized access to the Supabase database or Railway backend
+- Unauthorized access to the Supabase database or Render backend
 - A leaked or compromised API key, service role key, or admin credential
 - A vulnerability (e.g. found via Strix or otherwise) that was actually exploited against production, not just discovered in testing
 - Accidental public exposure of a database backup, export file, or log containing personal data
@@ -25,7 +25,7 @@ A short, practical plan for what to do if personal data in the System (student/f
 ## Immediate steps, in order
 
 ### 1. Contain it first, investigate second.
-- Rotate any exposed credentials or API keys immediately (Supabase service role key, Railway environment secrets, etc.)
+- Rotate any exposed credentials or API keys immediately (Supabase service role key, Render environment secrets, etc.)
 - If a specific vulnerability is being actively exploited, take the affected endpoint offline or patch it before continuing investigation
 - Do not wait for a full understanding of scope before containing — stop the bleeding first
 

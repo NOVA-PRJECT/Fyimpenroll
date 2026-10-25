@@ -2,9 +2,9 @@ import {
   BadRequestException,
   Injectable,
   ForbiddenException,
-  NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { mutateTeacherAssignments } from '../../core/database/teacher-mutations';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { AuthUser } from '../../core/auth/types';
@@ -16,18 +16,6 @@ export class AssignmentsService {
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService
   ) {}
-
-  private async resolveAcademicYear(campusId: string | null | undefined, academicYear?: string) {
-    if (!campusId) throw new BadRequestException('A host campus is required for teacher assignments.');
-    if (academicYear?.trim()) return academicYear.trim();
-    const { data: settings, error } = await this.supabase.admin
-      .from('campus_settings').select('academic_year').eq('campus_id', campusId).maybeSingle();
-    if (error) throw new InternalServerErrorException('Unable to load the host campus academic year.');
-    if (!settings?.academic_year?.trim()) {
-      throw new BadRequestException('Configure the host campus academic year before assigning teachers.');
-    }
-    return settings.academic_year.trim();
-  }
 
   /**
    * Returns all courses in the HOD's department, each with their currently assigned teachers,
@@ -127,563 +115,50 @@ export class AssignmentsService {
     };
   }
 
-  /**
-   * Assigns a teacher to a course (supporting visiting teachers across campuses and term identity).
-   */
   async assignTeacher(
-    user: AuthUser,
-    teacherId: string,
-    courseId: string,
-    ip: string,
+    user: AuthUser, teacherId: string, courseId: string, ip: string,
     opts?: { campus_id?: string; academic_year?: string; semester?: number },
   ) {
-    const departmentId = user.department_id;
-    if (!departmentId) {
-      throw new ForbiddenException('Only department HODs can assign teachers.');
-    }
-
-    // Verify course belongs to HOD's department (preserving catalog ownership)
-    const { data: course, error: courseCheckError } = await this.supabase.admin
-      .from('courses')
-      .select('id, department_id, title, course_code, semester')
-      .eq('id', courseId)
-      .maybeSingle();
-
-    if (courseCheckError || !course) {
-      throw new NotFoundException('Course not found.');
-    }
-
-    if (course.department_id !== departmentId) {
-      throw new ForbiddenException('Cannot assign teachers to courses outside your department.');
-    }
-
-    // Verify target faculty exists and strictly enforce role === 'teacher'
-    const { data: targetFaculty, error: facultyError } = await this.supabase.admin
-      .from('faculty')
-      .select('id, department_id, campus_id, role, full_name')
-      .eq('id', teacherId)
-      .maybeSingle();
-
-    if (facultyError || !targetFaculty) {
-      throw new NotFoundException('Teacher faculty record not found.');
-    }
-
-    if (targetFaculty.role === 'teaching_staff') {
-      throw new ForbiddenException(
-        'Only faculty with the teacher role can be assigned to instruct courses. Teaching staff accounts are roster-only.',
-      );
-    }
-
-    if (targetFaculty.role !== 'teacher') {
-      throw new ForbiddenException(
-        `Only faculty with the teacher role can be assigned to instruct courses (received role '${targetFaculty.role}').`,
-      );
-    }
-
-    // Resolve campus and term identity
-    const campusId = opts?.campus_id || user.campus_id;
-    const academicYear = await this.resolveAcademicYear(campusId, opts?.academic_year);
-    const semester = opts?.semester ?? course.semester ?? null;
-
-    const assignedAt = new Date().toISOString();
-
-    const assignmentPayload: any = {
-      teacher_id: teacherId,
-      course_id: courseId,
-      assigned_by: user.userId,
-      assigned_at: assignedAt,
-      campus_id: campusId,
-      academic_year: academicYear,
-      semester,
-    };
-
-    // R08: Check published timetable slots for this course delivery
-    let coursePublishedSlots: any[] | null = null;
-    try {
-      const teTable = this.supabase.admin.from('timetable_entries');
-      if (typeof teTable?.select === 'function') {
-        let publishedSlotsQuery = teTable
-          .select('id, time_slot_id, academic_year, semester, campus_id, time_slots(day_of_week, period_number)')
-          .eq('course_id', courseId)
-          .eq('academic_year', academicYear)
-          .eq('status', 'published');
-
-        if (semester) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('semester', semester);
-        }
-        if (campusId) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('campus_id', campusId);
-        }
-
-        const res = await publishedSlotsQuery;
-        coursePublishedSlots = res?.data || null;
-
-        if (coursePublishedSlots && coursePublishedSlots.length > 0) {
-          const slotIds = coursePublishedSlots.map((e: any) => e.time_slot_id).filter(Boolean);
-          if (slotIds.length > 0) {
-            const clashRes = await this.supabase.admin
-              .from('timetable_entries')
-              .select('id, course_id, academic_year, semester, campus_id, time_slot_id, time_slots(day_of_week, period_number)')
-              .eq('teacher_id', teacherId)
-              .eq('academic_year', academicYear)
-              .eq('status', 'published')
-              .in('time_slot_id', slotIds);
-
-            const clashingEntries = clashRes?.data || [];
-            if (clashingEntries && clashingEntries.length > 0) {
-              const clash = clashingEntries[0];
-              const slot = (clash as any).time_slots;
-              throw new BadRequestException(
-                `Teacher already has a published class scheduled at Day ${slot?.day_of_week ?? '?'} Period ${slot?.period_number ?? '?'} in Semester ${clash.semester} (R08 shared-teacher clash).`,
-              );
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err instanceof BadRequestException) throw err;
-      coursePublishedSlots = null;
-    }
-
-    // Upsert into teacher_course_assignments with composite campus/term conflict target
-    let { data, error } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .upsert(assignmentPayload, { onConflict: 'teacher_id,course_id,campus_id,academic_year,semester' })
-      .select()
-      .single();
-
-    if (error && (error.message?.includes('uq_teacher_course_assignments_term') || error.message?.includes('ON CONFLICT'))) {
-      const fallbackRes = await this.supabase.admin
-        .from('teacher_course_assignments')
-        .upsert(assignmentPayload, { onConflict: 'teacher_id,course_id' })
-        .select()
-        .single();
-      data = fallbackRes.data;
-      error = fallbackRes.error;
-    }
-
-    if (error) {
-      throw new InternalServerErrorException(`Failed to assign teacher: ${error.message}`);
-    }
-
-    // R08: Synchronize timetable_entries.teacher_id atomically without regenerating slots
-    if (coursePublishedSlots && coursePublishedSlots.length > 0) {
-      const entryIds = coursePublishedSlots.map((e: any) => e.id);
-      try {
-        await this.supabase.admin
-          .from('timetable_entries')
-          .update({ teacher_id: teacherId })
-          .in('id', entryIds);
-      } catch {
-        // safe ignore in test mocks that lack full timetable_entries update
-      }
-    }
-
-    await this.auditLogger.log({
-      eventType: 'teacher_assigned',
-      userId: user.userId,
-      userRole: user.role,
-      action: `assigned teacher ${teacherId} to course ${course.course_code}`,
-      resourceType: 'course_assignment',
-      resourceId: data.id,
-      status: 'success',
-      ipAddress: ip,
+    const result = await mutateTeacherAssignments(this.supabase, {
+      p_actor_id: user.userId, p_operation: 'assign',
+      p_items: [{ teacher_id: teacherId, course_id: courseId, ...opts }],
     });
-
-    return {
-      success: true,
-      assignment: data,
-    };
+    await this.auditLogger.log({ eventType: 'teacher_assigned', userId: user.userId, userRole: user.role,
+      action: `assigned teacher ${teacherId} to course ${courseId}`, resourceType: 'course_assignment',
+      resourceId: result.assignment.id, status: 'success', ipAddress: ip });
+    return { success: true, assignment: result.assignment };
   }
 
-  /**
-   * Batch assigns multiple teachers to courses in a single atomic database operation.
-   */
-  async batchAssignTeachers(
-    user: AuthUser,
-    assignments: BatchAssignmentItem[],
-    ip: string
-  ) {
-    const departmentId = user.department_id;
-    if (!departmentId) {
-      throw new ForbiddenException('Only department HODs can assign teachers.');
+  async batchAssignTeachers(user: AuthUser, assignments: BatchAssignmentItem[], ip: string) {
+    if (!Array.isArray(assignments) || !assignments.length || assignments.length > 100) {
+      throw new BadRequestException('Provide between 1 and 100 assignments.');
     }
-
-    if (!assignments || assignments.length === 0) {
-      throw new BadRequestException('No assignments provided.');
-    }
-
-    const courseIds = Array.from(new Set(assignments.map((a) => a.course_id)));
-    const teacherIds = Array.from(new Set(assignments.map((a) => a.teacher_id)));
-
-    // 1. Verify all courses belong to HOD's department
-    const { data: courses, error: coursesError } = await this.supabase.admin
-      .from('courses')
-      .select('id, department_id, course_code, semester')
-      .in('id', courseIds);
-
-    if (coursesError || !courses || courses.length !== courseIds.length) {
-      throw new BadRequestException('One or more courses not found or invalid.');
-    }
-
-    for (const c of courses) {
-      if (c.department_id !== departmentId) {
-        throw new ForbiddenException(`Course ${c.course_code} does not belong to your department.`);
-      }
-    }
-
-    // 2. Verify all teachers exist and strictly have role === 'teacher' (allow visiting teachers across campuses)
-    const { data: facultyMembers, error: facultyError } = await this.supabase.admin
-      .from('faculty')
-      .select('id, department_id, role, full_name, campus_id')
-      .in('id', teacherIds);
-
-    if (facultyError || !facultyMembers || facultyMembers.length !== teacherIds.length) {
-      throw new BadRequestException('One or more faculty members not found.');
-    }
-
-    for (const f of facultyMembers) {
-      if (f.role === 'teaching_staff') {
-        throw new ForbiddenException(
-          `Faculty member (${f.full_name}) is teaching staff (roster-only) and cannot be assigned to teach courses.`,
-        );
-      }
-      if (f.role !== 'teacher') {
-        throw new ForbiddenException(
-          `Faculty member (${f.full_name}) cannot be assigned as a course teacher (only role 'teacher' is permitted; received '${f.role}').`,
-        );
-      }
-    }
-
-    const courseMap = new Map((courses || []).map((c) => [c.id, c]));
-    const campusYears = new Map<string | null | undefined, string>();
-    for (const campusId of new Set(assignments.filter((a) => !a.academic_year?.trim()).map((a) => a.campus_id || user.campus_id))) {
-      campusYears.set(campusId, await this.resolveAcademicYear(campusId));
-    }
-    if (assignments.some((a) => !(a.campus_id || user.campus_id))) {
-      throw new BadRequestException('A host campus is required for teacher assignments.');
-    }
-    const assignedAt = new Date().toISOString();
-    const rowsToUpsert = assignments.map((a) => ({
-      teacher_id: a.teacher_id,
-      course_id: a.course_id,
-      assigned_by: user.userId,
-      assigned_at: assignedAt,
-      campus_id: a.campus_id || user.campus_id,
-      academic_year: a.academic_year?.trim() || campusYears.get(a.campus_id || user.campus_id)!,
-      semester: a.semester ?? courseMap.get(a.course_id)?.semester ?? null,
-    }));
-
-    // R08: Check published timetable slot clashes for all batch items
-    try {
-      for (const item of rowsToUpsert) {
-        const teTable = this.supabase.admin.from('timetable_entries');
-        if (typeof teTable?.select !== 'function') break;
-
-        let publishedSlotsQuery = teTable
-          .select('id, time_slot_id, academic_year, semester, campus_id, time_slots(day_of_week, period_number)')
-          .eq('course_id', item.course_id)
-          .eq('academic_year', item.academic_year)
-          .eq('status', 'published');
-
-        if (item.semester) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('semester', item.semester);
-        }
-        if (item.campus_id) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('campus_id', item.campus_id);
-        }
-
-        const { data: publishedSlots } = await publishedSlotsQuery;
-        if (publishedSlots && publishedSlots.length > 0) {
-          const slotIds = publishedSlots.map((e: any) => e.time_slot_id).filter(Boolean);
-          if (slotIds.length > 0) {
-            const { data: clashingEntries } = await this.supabase.admin
-              .from('timetable_entries')
-              .select('id, course_id, academic_year, semester, campus_id, time_slot_id, time_slots(day_of_week, period_number)')
-              .eq('teacher_id', item.teacher_id)
-              .eq('academic_year', item.academic_year)
-              .eq('status', 'published')
-              .in('time_slot_id', slotIds);
-
-            if (clashingEntries && clashingEntries.length > 0) {
-              const clash = clashingEntries[0];
-              const slot = (clash as any).time_slots;
-              throw new BadRequestException(
-                `Teacher already has a published class scheduled at Day ${slot?.day_of_week ?? '?'} Period ${slot?.period_number ?? '?'} in Semester ${clash.semester} (R08 shared-teacher clash).`,
-              );
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err instanceof BadRequestException) throw err;
-    }
-
-    // 3. Single batch upsert into teacher_course_assignments
-    let { data, error } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .upsert(rowsToUpsert, { onConflict: 'teacher_id,course_id,campus_id,academic_year,semester' })
-      .select();
-
-    if (error && (error.message?.includes('uq_teacher_course_assignments_term') || error.message?.includes('ON CONFLICT'))) {
-      const fallbackRes = await this.supabase.admin
-        .from('teacher_course_assignments')
-        .upsert(rowsToUpsert, { onConflict: 'teacher_id,course_id' })
-        .select();
-      data = fallbackRes.data;
-      error = fallbackRes.error;
-    }
-
-    if (error) {
-      throw new InternalServerErrorException(`Failed to batch assign teachers: ${error.message}`);
-    }
-
-    // R08: Atomically synchronize timetable_entries.teacher_id for each assigned course
-    try {
-      for (const item of rowsToUpsert) {
-        let updateTimetableQuery = this.supabase.admin
-          .from('timetable_entries')
-          .update({ teacher_id: item.teacher_id })
-          .eq('course_id', item.course_id)
-          .eq('academic_year', item.academic_year)
-          .eq('status', 'published');
-
-        if (item.semester) {
-          updateTimetableQuery = updateTimetableQuery.eq('semester', item.semester);
-        }
-        if (item.campus_id) {
-          updateTimetableQuery = updateTimetableQuery.eq('campus_id', item.campus_id);
-        }
-
-        await updateTimetableQuery;
-      }
-    } catch {
-      // safe ignore in test mocks that lack full timetable_entries update
-    }
-
-    // 4. Consolidated audit log
-    await this.auditLogger.log({
-      eventType: 'teachers_batch_assigned',
-      userId: user.userId,
-      userRole: user.role,
-      action: `batch assigned ${assignments.length} courses to faculty`,
-      resourceType: 'course_assignment_batch',
-      status: 'success',
-      ipAddress: ip,
-      metadata: { count: assignments.length, courseIds, teacherIds },
+    const result = await mutateTeacherAssignments(this.supabase, {
+      p_actor_id: user.userId, p_operation: 'batch', p_items: assignments,
     });
-
-    return {
-      success: true,
-      count: assignments.length,
-      assignments: data,
-      message: `Successfully saved ${assignments.length} faculty assignment(s).`,
-    };
+    await this.auditLogger.log({ eventType: 'teachers_batch_assigned', userId: user.userId, userRole: user.role,
+      action: `batch assigned ${result.count} courses to faculty`, resourceType: 'course_assignment_batch',
+      status: 'success', ipAddress: ip, metadata: { count: result.count } });
+    return { ...result, message: `Successfully saved ${result.count} faculty assignment(s).` };
   }
 
-
-  /**
-   * Reassigns an existing assignment row to a new teacher mid-semester.
-   */
   async reassignTeacher(user: AuthUser, assignmentId: string, newTeacherId: string, ip: string) {
-    // 1. Fetch existing assignment (including term and campus identity)
-    const { data: existing, error: fetchError } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .select('id, course_id, teacher_id, campus_id, academic_year, semester')
-      .eq('id', assignmentId)
-      .maybeSingle();
-
-    if (fetchError || !existing) {
-      throw new NotFoundException('Assignment record not found.');
-    }
-
-    const { data: course, error: courseError } = await this.supabase.admin
-      .from('courses')
-      .select('id, department_id, course_code')
-      .eq('id', existing.course_id)
-      .maybeSingle();
-
-    if (courseError || !course) {
-      throw new NotFoundException('Associated course not found.');
-    }
-
-    if (user.role === 'hod' && course.department_id !== user.department_id) {
-      throw new ForbiddenException('Cannot modify assignments outside your department.');
-    }
-
-    // Verify new teacher faculty exists, belongs to HOD's department, and is strictly not HOD
-    const { data: targetFaculty, error: facultyError } = await this.supabase.admin
-      .from('faculty')
-      .select('id, department_id, campus_id, role, full_name')
-      .eq('id', newTeacherId)
-      .maybeSingle();
-
-    if (facultyError || !targetFaculty) {
-      throw new NotFoundException('New teacher faculty record not found.');
-    }
-
-    if (targetFaculty.role === 'teaching_staff') {
-      throw new ForbiddenException(
-        'Only faculty with the teacher role can be assigned to instruct courses. Teaching staff accounts are roster-only.',
-      );
-    }
-
-    if (targetFaculty.role !== 'teacher') {
-      throw new ForbiddenException(
-        `Only faculty with the teacher role can be assigned to instruct courses (received role '${targetFaculty.role}').`,
-      );
-    }
-
-    // R08: Check published timetable slot clashes for new teacher before reassigning
-    let coursePublishedSlots: any[] | null = null;
-    try {
-      const teTable = this.supabase.admin.from('timetable_entries');
-      if (typeof teTable?.select === 'function') {
-        let publishedSlotsQuery = teTable
-          .select('id, time_slot_id, academic_year, semester, campus_id, time_slots(day_of_week, period_number)')
-          .eq('course_id', existing.course_id)
-          .eq('status', 'published');
-
-        if (existing.academic_year) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('academic_year', existing.academic_year);
-        }
-        if (existing.semester) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('semester', existing.semester);
-        }
-        if (existing.campus_id) {
-          publishedSlotsQuery = publishedSlotsQuery.eq('campus_id', existing.campus_id);
-        }
-
-        const res = await publishedSlotsQuery;
-        coursePublishedSlots = res?.data || null;
-
-        if (coursePublishedSlots && coursePublishedSlots.length > 0) {
-          const slotIds = coursePublishedSlots.map((e: any) => e.time_slot_id).filter(Boolean);
-          if (slotIds.length > 0) {
-            let clashQuery = this.supabase.admin
-              .from('timetable_entries')
-              .select('id, course_id, academic_year, semester, campus_id, time_slot_id, time_slots(day_of_week, period_number)')
-              .eq('teacher_id', newTeacherId)
-              .eq('status', 'published')
-              .in('time_slot_id', slotIds);
-
-            if (existing.academic_year) {
-              clashQuery = clashQuery.eq('academic_year', existing.academic_year);
-            }
-
-            const clashingEntries = (await clashQuery)?.data || [];
-
-            if (clashingEntries && clashingEntries.length > 0) {
-              const clash = clashingEntries[0];
-              const slot = (clash as any).time_slots;
-              throw new BadRequestException(
-                `Teacher already has a published class scheduled at Day ${slot?.day_of_week ?? '?'} Period ${slot?.period_number ?? '?'} in Semester ${clash.semester} (R08 shared-teacher clash).`,
-              );
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err instanceof BadRequestException) throw err;
-      coursePublishedSlots = null;
-    }
-
-    const assignedAt = new Date().toISOString();
-
-    // 2. Update existing row by ID (in-place replacement)
-    const { data: updated, error: updateError } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .update({
-        teacher_id: newTeacherId,
-        assigned_by: user.userId,
-        assigned_at: assignedAt,
-      })
-      .eq('id', assignmentId)
-      .select()
-      .single();
-
-    if (updateError) {
-      throw new InternalServerErrorException(`Failed to reassign teacher: ${updateError.message}`);
-    }
-
-    // R08: Atomically synchronize timetable_entries.teacher_id in-place
-    if (coursePublishedSlots && coursePublishedSlots.length > 0) {
-      const entryIds = coursePublishedSlots.map((e: any) => e.id);
-      try {
-        await this.supabase.admin
-          .from('timetable_entries')
-          .update({ teacher_id: newTeacherId })
-          .in('id', entryIds);
-      } catch {
-        // safe ignore in test mocks that lack full timetable_entries update
-      }
-    }
-
-    await this.auditLogger.log({
-      eventType: 'teacher_reassigned',
-      userId: user.userId,
-      userRole: user.role,
-      action: `reassigned course ${course.course_code} from ${existing.teacher_id} to ${newTeacherId}`,
-      resourceType: 'course_assignment',
-      resourceId: assignmentId,
-      status: 'success',
-      ipAddress: ip,
+    const result = await mutateTeacherAssignments(this.supabase, {
+      p_actor_id: user.userId, p_operation: 'reassign', p_assignment_id: assignmentId, p_teacher_id: newTeacherId,
     });
-
-    return {
-      success: true,
-      assignment: updated,
-    };
+    await this.auditLogger.log({ eventType: 'teacher_reassigned', userId: user.userId, userRole: user.role,
+      action: `reassigned course ${result.assignment.course_id} to teacher ${newTeacherId}`,
+      resourceType: 'course_assignment', resourceId: assignmentId, status: 'success', ipAddress: ip });
+    return { success: true, assignment: result.assignment };
   }
 
-  /**
-   * Removes a specific teacher-course assignment.
-   */
   async removeAssignment(user: AuthUser, assignmentId: string, ip: string) {
-    const { data: existing, error: fetchError } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .select('id, course_id, teacher_id')
-      .eq('id', assignmentId)
-      .maybeSingle();
-
-    if (fetchError || !existing) {
-      throw new NotFoundException('Assignment record not found.');
-    }
-
-    const { data: course, error: courseError } = await this.supabase.admin
-      .from('courses')
-      .select('id, department_id, course_code')
-      .eq('id', existing.course_id)
-      .maybeSingle();
-
-    if (courseError || !course) {
-      throw new NotFoundException('Associated course not found.');
-    }
-
-    if (user.role === 'hod' && course.department_id !== user.department_id) {
-      throw new ForbiddenException('Cannot delete assignments outside your department.');
-    }
-
-    const { error: deleteError } = await this.supabase.admin
-      .from('teacher_course_assignments')
-      .delete()
-      .eq('id', assignmentId);
-
-    if (deleteError) {
-      throw new InternalServerErrorException(`Failed to delete assignment: ${deleteError.message}`);
-    }
-
-    await this.auditLogger.log({
-      eventType: 'teacher_assignment_removed',
-      userId: user.userId,
-      userRole: user.role,
-      action: `removed assignment for course ${course.course_code} (${assignmentId})`,
-      resourceType: 'course_assignment',
-      resourceId: assignmentId,
-      status: 'success',
-      ipAddress: ip,
+    const result = await mutateTeacherAssignments(this.supabase, {
+      p_actor_id: user.userId, p_operation: 'remove', p_assignment_id: assignmentId,
     });
-
-    return { success: true };
+    await this.auditLogger.log({ eventType: 'teacher_assignment_removed', userId: user.userId, userRole: user.role,
+      action: `removed assignment ${assignmentId}`, resourceType: 'course_assignment',
+      resourceId: assignmentId, status: 'success', ipAddress: ip });
+    return result;
   }
 }

@@ -21,7 +21,7 @@ export const BatchAssignTeacherSchema = z.object({
         semester: z.number().int().min(1).max(10).optional(),
       })
     )
-    .min(1, 'At least one assignment is required'),
+    .min(1, 'At least one assignment is required').max(100, 'Maximum 100 assignments per request'),
 });
 
 export interface BatchAssignmentItem {

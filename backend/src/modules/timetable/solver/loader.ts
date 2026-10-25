@@ -29,7 +29,7 @@ function buildConflictSummary(
     : 'No conflicts with other courses';
 }
 
-export function validatePreflightRules(courses: CourseNode[], semester: number): void {
+export function validatePreflightRules(courses: CourseNode[], _semester: number): void {
   for (const c of courses) {
     if (![c.theoryHours, c.practicalHours].every(hours => Number.isInteger(hours) && hours >= 0)) {
       throw new Error(`[Preflight Rule Conflict] Course ${c.courseCode} has invalid contact hours. Hours must be nonnegative integers.`);

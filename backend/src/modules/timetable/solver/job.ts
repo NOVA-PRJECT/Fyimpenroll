@@ -32,7 +32,7 @@ export async function runGenerationJob(
   jobId: string,
   academicYear: string,
   semester: number,
-  triggeredBy: string,
+  _triggeredBy: string,
   supabase: SupabaseClient,
   redis: Redis,
   campusId?: string,
@@ -119,8 +119,6 @@ export async function runGenerationJob(
     const {
       courses,
       slotMap,
-      slotLookup,
-      studentDeptMap,
       parallelGroups,
       teacherReservations,
       preflightDiagnostics,
@@ -321,8 +319,9 @@ export async function runGenerationJob(
 
     // Verify worker lease hasn't expired before committing entries
     const { data: jobCheck } = await dbClient
-      .from('timetable_generation_jobs')
+      .from('system_logs')
       .select('status, error_message')
+      .eq('log_type', 'timetable_job')
       .eq('id', jobId)
       .maybeSingle();
 

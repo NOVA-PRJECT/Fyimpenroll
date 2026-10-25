@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
-import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
 import { SLOT_RULES } from '../../core/constants/courseCategories'
 import { Pathway, PathwaySlot } from '../../core/types/course.types'
@@ -20,8 +19,6 @@ import {
   getBlueprintPathways,
   normalizeCourseCode,
   validatePathwaySlots,
-  evaluateCoursePrerequisites,
-  PrerequisiteRule,
 } from '../../core/utils/slotRules'
 
 @Injectable()
@@ -31,7 +28,6 @@ export class RegistrationsService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
-    private readonly serverLogger: ServerLoggerService,
   ) {}
 
   async resolvePathwaySlots(
@@ -76,7 +72,7 @@ export class RegistrationsService {
     if (fixedTargets.length > 0) {
       const { data: fixedCourses } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, department_id, semester, credits, category')
+        .select('id, course_code, title, department_id, semester, credits, category, prerequisites')
         .in('course_code', fixedTargets)
 
       if (fixedCourses) {
@@ -112,7 +108,7 @@ export class RegistrationsService {
 
         let query = this.supabase.admin
           .from('courses')
-          .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisite_course_ids')
+          .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisites')
 
         if (fixedCourseIds.length > 0) {
           query = query.not('id', 'in', `(${fixedCourseIds.join(',')})`)
@@ -307,7 +303,7 @@ export class RegistrationsService {
     const [prefRes, regResWith8, completedRunRes] = await Promise.all([
       this.supabase.admin
         .from('registration_preferences')
-        .select('id, pathway_id, preferences, allocation_metadata, submitted_at')
+        .select('id, pathway_id, preferences, submitted_at')
         .eq('student_id', user.userId)
         .eq('semester', semester)
         .eq('academic_year', settings.academic_year)
@@ -320,8 +316,9 @@ export class RegistrationsService {
         .eq('academic_year', settings.academic_year)
         .maybeSingle(),
       this.supabase.admin
-        .from('allocation_runs')
+        .from('system_logs')
         .select('id, status, completed_at')
+        .eq('log_type', 'allocation_run')
         .eq('campus_id', campusId)
         .eq('academic_year', settings.academic_year)
         .eq('semester', semester)
@@ -358,7 +355,7 @@ export class RegistrationsService {
     // Fetch candidate minor courses for student (courses from other departments in same semester)
     const { data: minorCoursesRaw } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, department_id, semester, credits, category')
+      .select('id, course_code, title, department_id, semester, credits, category, prerequisites')
       .eq('semester', semester)
       .neq('department_id', departmentId)
       .in('category', ['DSC', 'DSE', 'DSS', 'MDC'])
@@ -371,7 +368,6 @@ export class RegistrationsService {
 
     let preferences: Record<string, { course_id: string; rank: number }[]> = {}
     let allocationMetadata: Record<string, any> = {
-      ...(typeof existingPref?.allocation_metadata === 'object' && existingPref?.allocation_metadata ? existingPref.allocation_metadata : {}),
       ...(typeof existingReg?.allocation_metadata === 'object' && existingReg?.allocation_metadata ? existingReg.allocation_metadata : {}),
     }
 
@@ -401,8 +397,6 @@ export class RegistrationsService {
         } else if (typeof raw === 'object') {
           preferences = raw as any
         }
-      } else if (existingReg?.selections && Object.keys(existingReg.selections).length > 0) {
-        preferences = existingReg.selections as any
       }
 
       // Backfill any confirmed slots from existingReg into preferences map if missing
@@ -431,7 +425,7 @@ export class RegistrationsService {
       if (enrolledCids.length > 0) {
         const { data: enrolledData } = await this.supabase.admin
           .from('courses')
-          .select('id, course_code, title, credits, department_id, semester, seat_limit, category')
+          .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisites')
           .in('id', enrolledCids)
 
         if (enrolledData) {
@@ -534,6 +528,7 @@ export class RegistrationsService {
       slotChangesNextReset,
       submittedAt: submittedAt,
       student: {
+        id: user.userId,
         full_name: studentRecord?.full_name || user.full_name || '',
         current_semester: semester,
       },
@@ -691,8 +686,9 @@ export class RegistrationsService {
 
     // Post-allocation guard: Block preference submissions once allocation has completed for this semester
     const { data: completedRun } = await this.supabase.admin
-      .from('allocation_runs')
+      .from('system_logs')
       .select('id')
+      .eq('log_type', 'allocation_run')
       .eq('campus_id', campusId)
       .eq('academic_year', settings.academic_year)
       .eq('semester', semester)
@@ -721,7 +717,7 @@ export class RegistrationsService {
     const [existingPrefRes, existingRegRes] = await Promise.all([
       this.supabase.admin
         .from('registration_preferences')
-        .select('id, submitted_at, allocation_metadata, preferences')
+        .select('id, submitted_at, preferences')
         .eq('student_id', user.userId)
         .eq('semester', semester)
         .eq('academic_year', settings.academic_year)
@@ -741,7 +737,6 @@ export class RegistrationsService {
     // Step 3 tiebreaker rule: frozen on first submission. Re-ranking preferences never resets this timestamp (F17)
     const submittedAt = existingPref?.submitted_at ?? existingReg?.submitted_at ?? new Date().toISOString()
     const allocationMetadata: Record<string, any> = {
-      ...(typeof existingPref?.allocation_metadata === 'object' && existingPref?.allocation_metadata ? existingPref.allocation_metadata : {}),
       ...(typeof existingReg?.allocation_metadata === 'object' && existingReg?.allocation_metadata ? existingReg.allocation_metadata : {}),
     }
 
@@ -767,7 +762,7 @@ export class RegistrationsService {
     if (fixedTargets.length > 0) {
       const { data: fixedCourses } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, category, semester')
+        .select('id, course_code, title, credits, department_id, category, semester, prerequisites')
         .in('course_code', fixedTargets)
       if (fixedCourses) {
         for (const c of fixedCourses) {
@@ -896,7 +891,7 @@ export class RegistrationsService {
       })
     }
 
-    // Registration validates the blueprint; course prerequisites are evaluated during allocation.
+    // Prerequisite self-declarations are browser-only guidance; validate blueprint eligibility here.
     const allElectiveCourseIds = new Set<string>()
     unifiedPreferences.forEach((sItem) => {
       if (!sItem.is_fixed) {
@@ -907,7 +902,7 @@ export class RegistrationsService {
     if (allElectiveCourseIds.size > 0) {
       const { data: electiveCourses, error: elecErr } = await this.supabase.admin
         .from('courses')
-        .select('id, course_code, title, credits, department_id, semester, category')
+        .select('id, course_code, title, credits, department_id, semester, category, prerequisites')
         .in('id', Array.from(allElectiveCourseIds))
 
       if (elecErr || !electiveCourses) {
@@ -995,43 +990,6 @@ export class RegistrationsService {
     const isUpdate = !!(existingPref || existingReg)
 
     // F17: Atomic persistence via RPC submit_student_registration
-    const regPayload: Record<string, any> = {
-      student_id: user.userId,
-      campus_id: campusId || user.campus_id,
-      semester,
-      academic_year: settings.academic_year,
-      pathway_id,
-      total_credits: totalCredits,
-      allocation_metadata: {
-        ...allocationMetadata,
-        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
-      },
-      submitted_at: submittedAt,
-      slot_1_course_id: fixedCourseAssignments.slot_1 ?? null,
-      slot_2_course_id: fixedCourseAssignments.slot_2 ?? null,
-      slot_3_course_id: fixedCourseAssignments.slot_3 ?? null,
-      slot_4_course_id: fixedCourseAssignments.slot_4 ?? null,
-      slot_5_course_id: fixedCourseAssignments.slot_5 ?? null,
-      slot_6_course_id: fixedCourseAssignments.slot_6 ?? null,
-      slot_7_course_id: fixedCourseAssignments.slot_7 ?? null,
-      slot_8_course_id: fixedCourseAssignments.slot_8 ?? null,
-    }
-
-    const prefPayload = {
-      student_id: user.userId,
-      campus_id: campusId || user.campus_id,
-      semester,
-      academic_year: settings.academic_year,
-      pathway_id,
-      preferences: unifiedPreferences,
-      allocation_metadata: {
-        ...allocationMetadata,
-        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
-      },
-      submitted_at: submittedAt,
-      updated_at: new Date().toISOString(),
-    }
-
     // R10/R11: Execute atomic transaction RPC submit_student_registration; do NOT bypass with direct table writes
     if (typeof this.supabase.admin.rpc !== 'function') {
       throw new InternalServerErrorException('Database RPC submit_student_registration is required')
@@ -1147,7 +1105,7 @@ export class RegistrationsService {
 
     if (slotDef.rule === 'LEGACY_MINOR') {
       candidateCourses = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
-        .select('id, course_code, title, department_id, semester, credits, category, seat_limit')
+        .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisites')
         .eq('semester', sem).neq('department_id', departmentId)
         .in('category', ['DSC', 'DSE', 'DSS', 'MDC']).order('id'))
     } else {
@@ -1228,6 +1186,7 @@ export class RegistrationsService {
           category: c.category,
           seat_limit: seatLimit,
           remaining_seats: remainingSeats,
+          prerequisites: c.prerequisites || [],
         }
       })
       .filter((c) => c.remaining_seats > 0)
@@ -1256,11 +1215,10 @@ export class RegistrationsService {
     let departmentId = user.department_id
     let currentSemester = user.current_semester
 
-    let deptCode: string | null = null
     if (!campusId || !departmentId || !currentSemester) {
       const { data: student } = await this.supabase.admin
         .from('students')
-        .select('campus_id, department_id, current_semester, departments(code)')
+        .select('campus_id, department_id, current_semester')
         .eq('id', user.userId)
         .single()
 
@@ -1268,15 +1226,7 @@ export class RegistrationsService {
         campusId = campusId || student.campus_id
         departmentId = departmentId || student.department_id
         currentSemester = currentSemester || student.current_semester
-        deptCode = (student.departments as any)?.code || null
       }
-    } else {
-      const { data: dept } = await this.supabase.admin
-        .from('departments')
-        .select('code')
-        .eq('id', departmentId)
-        .maybeSingle()
-      deptCode = dept?.code || null
     }
 
     if (!campusId || !currentSemester) {
@@ -1385,7 +1335,7 @@ export class RegistrationsService {
     // Step 4: Verify the target course exists and belongs to current semester
     const { data: course, error: cErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisite_course_ids')
+      .select('id, course_code, title, credits, department_id, semester, seat_limit, category, prerequisites')
       .eq('id', course_id)
       .single()
 
@@ -1415,51 +1365,6 @@ export class RegistrationsService {
     const deptMap = new Map<string, string>((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
     if (!isCourseEligibleForSlot(course, slotDef.rule, slotDef.target || '', departmentId, deptMap, currentSemester, slotDef.name)) {
       throw new BadRequestException(`Course ${course.course_code} is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`)
-    }
-
-    // Step 4.5: Enforce strict prerequisite checks (F19)
-    const { data: priorRegs } = await this.supabase.admin
-      .from('student_registrations')
-      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-      .eq('student_id', user.userId)
-      .lt('semester', currentSemester)
-
-    const priorCourseIds = new Set<string>()
-    for (const pr of priorRegs ?? []) {
-      for (let s = 1; s <= 8; s++) {
-        const cid = (pr as any)[`slot_${s}_course_id`]
-        if (cid) priorCourseIds.add(cid)
-      }
-    }
-
-    const completedCodes = new Set<string>()
-    if (priorCourseIds.size > 0) {
-      const { data: codeData } = await this.supabase.admin
-        .from('courses')
-        .select('id, course_code')
-        .in('id', Array.from(priorCourseIds))
-      for (const cd of codeData ?? []) {
-        completedCodes.add(normalizeCourseCode(cd.course_code))
-      }
-    }
-
-    const { data: rulesData } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .select('id, course_id, rule, target')
-      .eq('course_id', course_id)
-
-    const prereqEval = evaluateCoursePrerequisites(
-      course,
-      (rulesData || []) as PrerequisiteRule[],
-      { department_code: deptCode, current_semester: currentSemester },
-      completedCodes,
-      priorCourseIds,
-    )
-
-    if (!prereqEval.eligible) {
-      throw new BadRequestException(
-        `Cannot change to course ${course.course_code}: prerequisite requirement not satisfied (${prereqEval.reason})`,
-      )
     }
 
     // Step 5: Global capacity check across ALL campuses for active academic year (F21)

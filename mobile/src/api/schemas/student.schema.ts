@@ -9,6 +9,7 @@ export const CourseSchema = z.object({
   faculty_name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   prerequisites: z.string().nullable().optional(),
+  prerequisite_points: z.array(z.string()).optional().default([]),
 });
 
 export const TimetableSlotSchema = z.object({

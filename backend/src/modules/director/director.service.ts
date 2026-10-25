@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService } from '../../core/logging/audit-logger.service'
-import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
 import { attendanceSettings, CampusAttendanceSettingsSchema, campusSetupError } from '../campus-attendance/campus-settings'
 
@@ -15,7 +14,6 @@ export class DirectorService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
-    private readonly serverLogger: ServerLoggerService,
   ) {}
 
   async getAttendanceSettings(user: AuthUser) {

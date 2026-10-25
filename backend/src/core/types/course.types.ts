@@ -17,25 +17,7 @@ export type SemesterBlueprint = {
   semester: Semester
   min_credits: number
   max_credits: number
-  slot_1_rule: SlotRule | null
-  slot_1_target: string | null
-  slot_1_name: string | null
-  slot_2_rule: SlotRule | null
-  slot_2_target: string | null
-  slot_2_name: string | null
-  slot_3_rule: SlotRule | null
-  slot_3_target: string | null
-  slot_3_name: string | null
-  slot_4_rule: SlotRule | null
-  slot_4_target: string | null
-  slot_4_name: string | null
-  slot_5_rule: SlotRule | null
-  slot_5_target: string | null
-  slot_5_name: string | null
-  slot_6_rule: SlotRule | null
-  slot_6_target: string | null
-  slot_6_name: string | null
-  pathways: Pathway[] | null
+  pathways: Pathway[]
 }
 
 // ── Pathway types ───────────────────────────────────────────

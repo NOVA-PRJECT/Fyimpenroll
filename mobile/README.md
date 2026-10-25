@@ -13,7 +13,7 @@ npm run start:go --workspace=mobile
 
 Install Expo Go on your phone and keep your phone and computer on the same Wi-Fi. Scan the terminal QR code using Expo Go on Android, or the Camera app on iOS. This starts Expo Go mode explicitly and clears the Metro cache after SDK changes.
 
-Copy `.env.example` to `.env` in this directory and fill in the public API and authentication configuration. Use an API address reachable from the phone; `localhost` on a phone points to the phone itself. For a local backend, set `EXPO_PUBLIC_API_BASE_URL` to your computer's Wi-Fi IPv4 address and backend port, for example `http://192.168.1.100:4000`, then run `npm run dev:backend` from the repository root in a separate terminal. Configure `EXPO_PUBLIC_PORTAL_URL` for the privacy and terms screens.
+Copy `.env.example` to `.env` in this directory and fill in the public API and authentication configuration. Use an API address reachable from the phone; `localhost` on a phone points to the phone itself. For a local backend, set `EXPO_PUBLIC_API_BASE_URL` to your computer's Wi-Fi IPv4 address and backend port, for example `http://192.168.1.100:4000`, then run `npm run dev:backend` from the repository root in a separate terminal. Set `EXPO_PUBLIC_PORTAL_URL=https://fyimpenroll.vercel.app` for the privacy and terms screens. The production export validates all four public environment variables before bundling, so missing policy links cannot ship as an unusable consent screen.
 
 If the LAN connection fails, try:
 

@@ -7,7 +7,6 @@ import { ROLE_DASHBOARD_MAP } from '@/core/security/routeConfig'
 import { Role } from '@/core/constants/roles'
 import PortalHeader from '@/components/portal/PortalHeader'
 import PortalFooter from '@/components/portal/PortalFooter'
-import { ArrowRight, BookOpen } from 'lucide-react'
 import { GetAppLink } from '@/components/pwa/InstallReminder'
 
 export default function Home() {

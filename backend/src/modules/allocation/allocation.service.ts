@@ -9,18 +9,15 @@ import {
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
-import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
-import { AuthorizationPolicy } from '../../core/auth/authorization-policy'
 import { SLOT_RULES } from '../../core/constants/courseCategories'
 import { Pathway } from '../../core/types/course.types'
 import {
-  normalizeCourseCode,
-  evaluateCoursePrerequisites,
   isCourseEligibleForSlot,
   getStudentSlotDefinition,
   getBlueprintPathways,
 } from '../../core/utils/slotRules'
+import { allocationRunResponse } from '../../core/logging/allocation-run'
 import * as crypto from 'crypto'
 import { revalidateAllocationChoices } from '../../core/utils/allocationEligibility'
 import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
@@ -33,15 +30,6 @@ export interface CourseItem {
   department_id: string
   seat_limit: number
   category: string
-  prerequisite_course_ids?: string[] | null
-}
-
-export interface PrerequisiteRule {
-  id: string
-  course_id: string
-  rule: 'COMPLETED_COURSE' | 'COMPLETED_SEMESTER' | 'DEPARTMENT'
-  target: string
-  created_at?: string
 }
 
 export interface PreferenceChoice {
@@ -64,214 +52,7 @@ export class AllocationService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
-    private readonly serverLogger: ServerLoggerService,
   ) {}
-
-  // ──────────────── Prerequisite Rule Engine Endpoints ────────────────
-
-  async getPrerequisites(courseId: string, user: AuthUser) {
-    const { data: course, error: courseErr } = await this.supabase.admin
-      .from('courses')
-      .select('id, course_code, department_id')
-      .eq('id', courseId)
-      .maybeSingle()
-
-    if (courseErr || !course) {
-      throw new NotFoundException('Course not found')
-    }
-
-    AuthorizationPolicy.assertCourseManagementScope(user, course.department_id)
-
-    const { data: rules, error } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      this.logger.error(`Failed to fetch prerequisites for course ${courseId}: ${error.message}`)
-      throw new InternalServerErrorException('Failed to fetch course prerequisite rules')
-    }
-
-    return {
-      success: true,
-      rules: rules ?? [],
-    }
-  }
-
-  async addPrerequisite(
-    courseId: string,
-    body: { rule: string; target: string },
-    user: AuthUser,
-  ) {
-    const { rule, target } = body
-    if (!rule || !target) {
-      throw new BadRequestException('Both rule and target are required')
-    }
-
-    const validRules = ['COMPLETED_COURSE', 'COMPLETED_SEMESTER', 'DEPARTMENT']
-    if (!validRules.includes(rule)) {
-      throw new BadRequestException(
-        `Invalid rule type "${rule}". Must be one of: ${validRules.join(', ')}`,
-      )
-    }
-
-    let cleanTarget = target.trim()
-    if (!cleanTarget) {
-      throw new BadRequestException('Target cannot be empty')
-    }
-
-    if (rule === 'COMPLETED_SEMESTER') {
-      const semNum = parseInt(cleanTarget, 10)
-      if (isNaN(semNum) || semNum < 1 || semNum > 10) {
-        throw new BadRequestException('Target for COMPLETED_SEMESTER must be an integer between 1 and 10')
-      }
-      cleanTarget = String(semNum)
-    } else if (rule === 'DEPARTMENT') {
-      cleanTarget = cleanTarget
-        .split(',')
-        .map((c) => c.trim().toUpperCase())
-        .filter(Boolean)
-        .join(',')
-      if (!cleanTarget) {
-        throw new BadRequestException('At least one department code must be selected')
-      }
-    } else {
-      cleanTarget = cleanTarget.toUpperCase()
-    }
-
-    // Verify course exists
-    const { data: course, error: courseErr } = await this.supabase.admin
-      .from('courses')
-      .select('id, course_code, department_id')
-      .eq('id', courseId)
-      .single()
-
-    if (courseErr || !course) {
-      throw new NotFoundException('Course not found')
-    }
-
-    // Enforce HOD / Superadmin course ownership; block campus directors and foreign HODs
-    AuthorizationPolicy.assertCourseManagementScope(user, course.department_id)
-
-    // If DEPARTMENT rule already exists for this course, update it
-    if (rule === 'DEPARTMENT') {
-      const { data: existingDeptRule } = await this.supabase.admin
-        .from('course_prerequisite_rules')
-        .select('*')
-        .eq('course_id', courseId)
-        .eq('rule', 'DEPARTMENT')
-        .maybeSingle()
-
-      if (existingDeptRule) {
-        const { data: updatedRule, error: updErr } = await this.supabase.admin
-          .from('course_prerequisite_rules')
-          .update({ target: cleanTarget })
-          .eq('id', existingDeptRule.id)
-          .select('*')
-          .single()
-
-        if (updErr) {
-          this.logger.error(`Failed to update department rule: ${updErr.message}`)
-          throw new InternalServerErrorException('Failed to update department rule')
-        }
-
-        await this.auditLogger.log({
-          eventType: AuditEvents.COURSE_UPDATED,
-          userId: user.userId,
-          userRole: user.role,
-          action: `updated prerequisite rule ${rule} (${cleanTarget}) on course ${course.course_code}`,
-          resourceType: 'course',
-          resourceId: courseId,
-          status: 'success',
-        })
-
-        return {
-          success: true,
-          message: 'Department constraint updated successfully',
-          rule: updatedRule,
-        }
-      }
-    }
-
-    const { data: newRule, error: insertErr } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .insert({
-        course_id: courseId,
-        rule,
-        target: cleanTarget,
-      })
-      .select('*')
-      .single()
-
-    if (insertErr) {
-      if (insertErr.code === '23505') {
-        throw new ConflictException('This prerequisite rule already exists for this course')
-      }
-      this.logger.error(`Failed to add prerequisite rule: ${insertErr.message}`)
-      throw new InternalServerErrorException('Failed to create prerequisite rule')
-    }
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.COURSE_UPDATED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `added prerequisite rule ${rule} (${cleanTarget}) to course ${course.course_code}`,
-      resourceType: 'course',
-      resourceId: courseId,
-      status: 'success',
-      metadata: { rule, target: cleanTarget },
-    })
-
-    return {
-      success: true,
-      rule: newRule,
-    }
-  }
-
-  async deletePrerequisite(ruleId: string, user: AuthUser) {
-    const { data: rule, error: fetchErr } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .select('id, course_id, rule, target, courses(department_id, course_code)')
-      .eq('id', ruleId)
-      .single()
-
-    if (fetchErr || !rule) {
-      throw new NotFoundException('Prerequisite rule not found')
-    }
-
-    const courseDeptId = (rule.courses as any)?.department_id
-    if (!courseDeptId) {
-      throw new NotFoundException('Associated course department not found')
-    }
-    AuthorizationPolicy.assertCourseManagementScope(user, courseDeptId)
-
-    const { error: delErr } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .delete()
-      .eq('id', ruleId)
-
-    if (delErr) {
-      this.logger.error(`Failed to delete prerequisite rule: ${delErr.message}`)
-      throw new InternalServerErrorException('Failed to delete prerequisite rule')
-    }
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.COURSE_UPDATED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `deleted prerequisite rule ${rule.rule} (${rule.target}) from course ${(rule.courses as any)?.course_code}`,
-      resourceType: 'course',
-      resourceId: rule.course_id,
-      status: 'success',
-      metadata: { rule: rule.rule, target: rule.target },
-    })
-
-    return {
-      success: true,
-      message: 'Prerequisite rule deleted successfully',
-    }
-  }
 
   // ──────────────── Campus Director: Trigger 3-Round Allocation ────────────────
   async runAllocation(
@@ -388,7 +169,7 @@ export class AllocationService {
     try {
       // Step C: Fetch all courses offered in this semester
       const coursesData = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
-        .select('id, course_code, title, semester, department_id, seat_limit, category, prerequisite_course_ids').eq('semester', body.semester).order('id'))
+        .select('id, course_code, title, semester, department_id, seat_limit, category').eq('semester', body.semester).order('id'))
 
       const courses: CourseItem[] = (coursesData ?? []).map((c) => ({
         id: c.id,
@@ -396,34 +177,17 @@ export class AllocationService {
         title: c.title,
         semester: c.semester,
         category: c.category,
-        prerequisite_course_ids: c.prerequisite_course_ids,
         department_id: c.department_id,
         seat_limit: c.seat_limit ? Number(c.seat_limit) : 60,
       }))
 
       const courseMap = new Map<string, CourseItem>(courses.map((c) => [c.id, c]))
-      const courseIds = courses.map((c) => c.id)
-
-      // Step D: Fetch all prerequisite rules for these courses
-      const courseRulesMap = new Map<string, PrerequisiteRule[]>()
-      if (courseIds.length > 0) {
-        const rulesData = await fetchByIdChunks<any>(courseIds, ids => this.supabase.admin.from('course_prerequisite_rules')
-          .select('id, course_id, rule, target').in('course_id', ids).order('id'))
-        if (rulesData) {
-          for (const r of rulesData) {
-            if (!courseRulesMap.has(r.course_id)) {
-              courseRulesMap.set(r.course_id, [])
-            }
-            courseRulesMap.get(r.course_id)!.push(r as PrerequisiteRule)
-          }
-        }
-      }
 
       // Step E & R36: Fetch all student preference submissions from registration_preferences (paginated)
       // Only students who have a row in registration_preferences are processed!
       const prefQuery = this.supabase.admin
         .from('registration_preferences')
-        .select('id, student_id, campus_id, semester, academic_year, pathway_id, preferences, allocation_metadata, submitted_at')
+        .select('id, student_id, campus_id, semester, academic_year, pathway_id, preferences, submitted_at')
         .eq('campus_id', campusId)
         .eq('academic_year', body.academicYear)
         .eq('semester', body.semester)
@@ -435,7 +199,7 @@ export class AllocationService {
       const studentMap = new Map<string, any>()
       if (studentIds.length > 0) {
         const studentsData = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('students')
-          .select('id, department_id, current_semester, departments(id, code)').in('id', ids).order('id'))
+          .select('id, department_id, current_semester').in('id', ids).order('id'))
         if (studentsData) {
           for (const s of studentsData) {
             studentMap.set(s.id, s)
@@ -494,50 +258,6 @@ export class AllocationService {
         skippedChoices.push(...checked.skipped.map(choice => ({ student_id: pref.student_id, ...choice })))
       }
       if (skippedChoices.length) this.logger.warn(`Skipped ${skippedChoices.length} saved choices that no longer satisfy blueprint eligibility`)
-
-      // Step F: Fetch prior registrations for prerequisite checks by course code/ID and scoring.
-      // We check courses the student was enrolled in prior semesters (semester < body.semester)
-      const studentCompletedCourseCodesMap = new Map<string, Set<string>>()
-      const studentCompletedCourseIdsMap = new Map<string, Set<string>>()
-      if (studentIds.length > 0) {
-        const priorRegs = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin
-          .from('student_registrations')
-          .select('id, student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-          .in('student_id', ids).lt('semester', body.semester).order('id'))
-
-        const priorCourseIds = new Set<string>()
-        for (const pr of priorRegs ?? []) {
-          for (let s = 1; s <= 8; s++) {
-            const cid = (pr as any)[`slot_${s}_course_id`]
-            if (cid) priorCourseIds.add(cid)
-          }
-        }
-
-        const courseCodeLookup = new Map<string, string>()
-        if (priorCourseIds.size > 0) {
-          const codeData = await fetchByIdChunks<any>([...priorCourseIds], ids => this.supabase.admin.from('courses')
-            .select('id, course_code').in('id', ids).order('id'))
-          for (const cd of codeData ?? []) {
-            courseCodeLookup.set(cd.id, cd.course_code.toUpperCase())
-          }
-        }
-
-        for (const pr of priorRegs ?? []) {
-          if (!studentCompletedCourseCodesMap.has(pr.student_id)) {
-            studentCompletedCourseCodesMap.set(pr.student_id, new Set())
-            studentCompletedCourseIdsMap.set(pr.student_id, new Set())
-          }
-          const set = studentCompletedCourseCodesMap.get(pr.student_id)!
-          const completedIds = studentCompletedCourseIdsMap.get(pr.student_id)!
-          for (let s = 1; s <= 8; s++) {
-            const cid = (pr as any)[`slot_${s}_course_id`]
-            if (cid) completedIds.add(cid)
-            if (cid && courseCodeLookup.has(cid)) {
-              set.add(courseCodeLookup.get(cid)!)
-            }
-          }
-        }
-      }
 
       // Track slot resolution status per registration/student across all 8 slots (F15):
       // student_id -> slotKey -> { resolved: boolean, course_id: string | null }
@@ -607,41 +327,6 @@ export class AllocationService {
         }
       }
 
-      // Scoring Function:
-      // Uses course_prerequisite_rules (+1 per matched rule) + semester proximity points
-      const calculateStudentScore = (
-        studentId: string,
-        studentSemester: number,
-        studentDeptCode: string,
-        course: CourseItem,
-      ): number => {
-        const rules = courseRulesMap.get(course.id) || []
-        let prereqPoints = 0
-        const priorCodes = studentCompletedCourseCodesMap.get(studentId)
-
-        for (const r of rules) {
-          if (r.rule === 'COMPLETED_COURSE') {
-            if (priorCodes && priorCodes.has(r.target.trim().toUpperCase())) {
-              prereqPoints += 1
-            }
-          } else if (r.rule === 'COMPLETED_SEMESTER') {
-            const targetSem = parseInt(r.target.trim(), 10)
-            if (!isNaN(targetSem) && studentSemester > targetSem) {
-              prereqPoints += 1
-            }
-          } else if (r.rule === 'DEPARTMENT') {
-            const allowedCodes = r.target.split(',').map((c: string) => c.trim().toUpperCase())
-            if (studentDeptCode && allowedCodes.includes(studentDeptCode.toUpperCase())) {
-              prereqPoints += 1
-            }
-          }
-        }
-
-        // Proximity points
-        const proximityPoints = Math.max(0, studentSemester - course.semester)
-        return prereqPoints + proximityPoints
-      }
-
       const finalAllocations: {
         student_id: string
         preference_id: string
@@ -659,9 +344,6 @@ export class AllocationService {
           {
             prefId: string
             studentId: string
-            studentDeptId: string
-            studentDeptCode: string
-            studentSemester: number
             submittedAt: string
             slotKey: string
             score: number
@@ -671,8 +353,6 @@ export class AllocationService {
         for (const pref of studentPrefList) {
           const slotMap = studentSlotState.get(pref.student_id)!
           const slots = extractSlots(pref.preferences)
-          const studentDeptId = (pref.students as any)?.department_id ?? ''
-          const studentDeptCode = (pref.students as any)?.departments?.code ?? ''
           const studentSemester = (pref.students as any)?.current_semester ?? body.semester
 
           for (const slotItem of slots) {
@@ -697,37 +377,7 @@ export class AllocationService {
             }
             if (alreadyAssignedThisCourse) continue
 
-            // Enforce course-level DEPARTMENT constraint
-            const deptRules = (courseRulesMap.get(course.id) || []).filter((r) => r.rule === 'DEPARTMENT')
-            if (deptRules.length > 0) {
-              const allAllowed = deptRules.flatMap((r) => r.target.split(',').map((c) => c.trim().toUpperCase()))
-              if (studentDeptCode && !allAllowed.includes(studentDeptCode.toUpperCase())) {
-                continue
-              }
-            }
-
-            // F19: Enforce course-level prerequisites
-            const rules = (courseRulesMap.get(course.id) || []) as PrerequisiteRule[]
-            const prereqEval = evaluateCoursePrerequisites(
-              course,
-              rules,
-              {
-                department_code: studentDeptCode,
-                current_semester: studentSemester,
-              },
-              studentCompletedCourseCodesMap.get(pref.student_id) || new Set(),
-              studentCompletedCourseIdsMap.get(pref.student_id) || new Set(),
-            )
-            if (!prereqEval.eligible) {
-              continue
-            }
-
-            const score = calculateStudentScore(
-              pref.student_id,
-              studentSemester,
-              studentDeptCode,
-              course,
-            )
+            const score = Math.max(0, studentSemester - course.semester)
 
             if (!courseCandidates.has(course.id)) {
               courseCandidates.set(course.id, [])
@@ -736,9 +386,6 @@ export class AllocationService {
             courseCandidates.get(course.id)!.push({
               prefId: pref.id,
               studentId: pref.student_id,
-              studentDeptId,
-              studentDeptCode,
-              studentSemester,
               submittedAt: pref.submitted_at,
               slotKey,
               score,
@@ -892,7 +539,7 @@ export class AllocationService {
       }
 
       // Step H: Commit allocations atomically via RPC (F24, F70, R16 Fencing)
-      const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc(
+      const { error: rpcErr } = await this.supabase.admin.rpc(
         'apply_course_allocation',
         {
           p_run_id: runId,
@@ -979,12 +626,13 @@ export class AllocationService {
     }
 
     const { data: run, error } = await this.supabase.admin
-      .from('allocation_runs')
-      .select('id,status,academic_year,semester,campus_id,triggered_at,completed_at,error_message,summary,total_students,fully_allocated,partially_allocated,unallocated')
+      .from('system_logs')
+      .select('id,status,academic_year,semester,campus_id,user_id,started_at,completed_at,created_at,error_message,metadata')
+      .eq('log_type', 'allocation_run')
       .eq('campus_id', campusId)
       .eq('academic_year', academicYear)
       .eq('semester', semester)
-      .order('triggered_at', { ascending: false })
+      .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
@@ -994,7 +642,7 @@ export class AllocationService {
 
     return {
       success: true,
-      run: run ?? null,
+      run: allocationRunResponse(run),
     }
   }
 
@@ -1007,8 +655,9 @@ export class AllocationService {
 
     // Fetch the run to verify it belongs to this campus and is actually failed (F25)
     const { data: run, error: fetchErr } = await this.supabase.admin
-      .from('allocation_runs')
+      .from('system_logs')
       .select('id, campus_id, academic_year, semester, status')
+      .eq('log_type', 'allocation_run')
       .eq('id', runId)
       .maybeSingle()
 
@@ -1050,7 +699,7 @@ export class AllocationService {
       )
     }
 
-    // Delete from system_logs (allocation_runs is a view backed by system_logs)
+    // Delete only the verified failed allocation log.
     const { error: delErr } = await this.supabase.admin
       .from('system_logs')
       .delete()
@@ -1108,7 +757,7 @@ export class AllocationService {
     }
 
     const prefList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('registration_preferences')
-      .select('id, student_id, preferences, allocation_metadata').in('student_id',ids)
+      .select('id, student_id, preferences').in('student_id',ids)
       .eq('semester',sem).eq('academic_year',academicYear).order('id'))
     const regList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('student_registrations')
       .select('id, student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id, allocation_metadata')
@@ -1157,7 +806,7 @@ export class AllocationService {
       if (!student) continue
 
       const confirmedReg = regMap.get(pRow.student_id)
-      const meta = (pRow.allocation_metadata as Record<string, any>) || {}
+      const meta = (confirmedReg?.allocation_metadata as Record<string, any>) || {}
       const unresolvedSlots: any[] = []
 
       // Extract slot preferences
@@ -1257,7 +906,6 @@ export class AllocationService {
     let registration: any
     let slotName: string | undefined
     const departments = new Map<string, { code: string; name: string }>()
-    const prerequisiteResults = new Map<string, { eligible: boolean; reason?: string }>()
     if (studentId && slotKey) {
       // A placement is governed by the student's pathway, not the course-owning department.
       const [studentRes, registrationRes, blueprintRes] = await Promise.all([
@@ -1291,7 +939,7 @@ export class AllocationService {
       const [departmentRows, semesterCourses] = await Promise.all([
         fetchAllPaginated<any>(this.supabase.admin.from('departments').select('id, code, name').order('id')),
         fetchAllPaginated<any>(this.supabase.admin.from('courses')
-          .select('id, course_code, title, credits, department_id, semester, category, seat_limit, prerequisite_course_ids')
+          .select('id, course_code, title, credits, department_id, semester, category, seat_limit, prerequisites')
           .eq('semester', sem).order('id')),
       ])
       const deptMap = new Map<string, string>()
@@ -1303,33 +951,10 @@ export class AllocationService {
       courseList = semesterCourses.filter(course => isCourseEligibleForSlot(
         course, definition.rule, definition.target || '', departmentId, deptMap, sem, definition.name,
       ))
-      const [rules, priorRegistrations] = await Promise.all([
-        fetchByIdChunks<any>(courseList.map(course => course.id), ids => this.supabase.admin.from('course_prerequisite_rules')
-          .select('id, course_id, rule, target').in('course_id', ids).order('id')),
-        fetchAllPaginated<any>(this.supabase.admin.from('student_registrations')
-          .select('id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-          .eq('student_id', studentId).lt('semester', sem).order('id')),
-      ])
-      const completedIds = new Set<string>()
-      for (const prior of priorRegistrations) for (let slot = 1; slot <= 8; slot++) {
-        if (prior[`slot_${slot}_course_id`]) completedIds.add(prior[`slot_${slot}_course_id`])
-      }
-      const priorCourses = await fetchByIdChunks<any>([...completedIds], ids => this.supabase.admin.from('courses')
-        .select('id, course_code').in('id', ids).order('id'))
-      const completedCodes = new Set(priorCourses.map(course => normalizeCourseCode(course.course_code)))
-      const rulesByCourse = new Map<string, PrerequisiteRule[]>()
-      for (const rule of rules) {
-        if (!rulesByCourse.has(rule.course_id)) rulesByCourse.set(rule.course_id, [])
-        rulesByCourse.get(rule.course_id)!.push(rule)
-      }
-      for (const course of courseList) prerequisiteResults.set(course.id, evaluateCoursePrerequisites(
-        course, rulesByCourse.get(course.id) || [],
-        { department_code: departments.get(departmentId)?.code, current_semester: sem }, completedCodes, completedIds,
-      ))
     } else {
       // Keep the department-capacity overview separate from a particular placement.
       const { data: courses, error: courseErr } = await this.supabase.admin.from('courses')
-        .select('id, course_code, title, credits, category, seat_limit')
+        .select('id, course_code, title, credits, category, seat_limit, prerequisites')
         .eq('department_id', departmentId).eq('semester', sem)
       if (courseErr) throw new InternalServerErrorException('Failed to fetch courses')
       courseList = courses ?? []
@@ -1362,9 +987,7 @@ export class AllocationService {
       if (studentId && slotKey) {
         const alreadyAssignedElsewhere = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}`)
           .some(key => key !== slotKey && registration[`${key}_course_id`] === course.id)
-        const prerequisite = prerequisiteResults.get(course.id)!
         unavailableReason = alreadyAssignedElsewhere ? 'Already assigned to another paper'
-          : !prerequisite.eligible ? prerequisite.reason || 'Prerequisite requirements not met'
           : remaining === 0 && registration[`${slotKey}_course_id`] !== course.id ? `No remaining seats (${totalAllocated}/${seatLimit} allocated globally)` : null
       }
 
@@ -1374,6 +997,7 @@ export class AllocationService {
         title: course.title,
         category: course.category,
         credits: course.credits,
+        prerequisites: course.prerequisites || [],
         seat_limit: seatLimit,
         total_allocated: totalAllocated,
         remaining_seats: remaining,
@@ -1470,7 +1094,7 @@ export class AllocationService {
     // Fetch target course
     const { data: course, error: courseErr } = await this.supabase.admin
       .from('courses')
-      .select('id, course_code, title, department_id, seat_limit, semester, credits, category, prerequisite_course_ids')
+      .select('id, course_code, title, department_id, seat_limit, semester, credits, category, prerequisites')
       .eq('id', course_id)
       .single()
 
@@ -1529,54 +1153,6 @@ export class AllocationService {
     const deptMap = new Map<string, string>((depts || []).map((d: any) => [d.code.toUpperCase(), d.id]))
     if (!isCourseEligibleForSlot(course, slotDef.rule, slotDef.target || '', student.department_id, deptMap, activeSemester, slotDef.name)) {
       throw new BadRequestException(`Course ${course.course_code} is not eligible for ${slot_key} (${slotDef.name || slotDef.rule})`)
-    }
-
-    // F19: Prerequisite check
-    const { data: rules } = await this.supabase.admin
-      .from('course_prerequisite_rules')
-      .select('id, rule, target')
-      .eq('course_id', course_id)
-
-    const { data: priorRegs } = await this.supabase.admin
-      .from('student_registrations')
-      .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-      .eq('student_id', student_id)
-      .lt('semester', activeSemester)
-
-    const priorCourseIds = new Set<string>()
-    for (const pr of priorRegs ?? []) {
-      for (let s = 1; s <= 8; s++) {
-        const cid = (pr as any)[`slot_${s}_course_id`]
-        if (cid) priorCourseIds.add(cid)
-      }
-    }
-
-    let priorCodes = new Set<string>()
-    if (priorCourseIds.size > 0) {
-      const { data: codeData } = await this.supabase.admin
-        .from('courses')
-        .select('course_code')
-        .in('id', Array.from(priorCourseIds))
-
-      priorCodes = new Set((codeData ?? []).map((c) => normalizeCourseCode(c.course_code)))
-    }
-
-    const studentDeptCode = (student.departments as any)?.code || ''
-    const prereqEval = evaluateCoursePrerequisites(
-      course,
-      (rules || []) as PrerequisiteRule[],
-      {
-        department_code: studentDeptCode,
-        current_semester: student.current_semester,
-      },
-      priorCodes,
-      priorCourseIds,
-    )
-
-    if (!prereqEval.eligible) {
-      throw new BadRequestException(
-        `Student does not meet prerequisites for ${course.course_code}: ${prereqEval.reason}`,
-      )
     }
 
     // F21: Global capacity check across all campuses for this course (academic_year & semester, across all 8 slots)
@@ -1735,35 +1311,6 @@ export class AllocationService {
         if (updateErr) {
           this.logger.error(`Failed to update student registration: ${updateErr.message}`)
           throw new InternalServerErrorException(`Failed to persist manual allocation: ${updateErr.message}`)
-        }
-      }
-
-      // Also update registration_preferences allocation_metadata if pref row exists
-      const { data: prefRow } = await this.supabase.admin
-        .from('registration_preferences')
-        .select('id, allocation_metadata')
-        .eq('student_id', student_id)
-        .eq('semester', activeSemester)
-        .eq('academic_year', academicYear)
-        .maybeSingle()
-
-      if (prefRow) {
-        const updatedPrefMeta = {
-          ...(typeof prefRow.allocation_metadata === 'object' && prefRow.allocation_metadata ? prefRow.allocation_metadata : {}),
-          [slot_key]: allocMeta,
-        }
-
-        const { error: prefErr } = await this.supabase.admin
-          .from('registration_preferences')
-          .update({
-            allocation_metadata: updatedPrefMeta,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', prefRow.id)
-
-        if (prefErr) {
-          this.logger.error(`Failed to update registration preferences: ${prefErr.message}`)
-          throw new InternalServerErrorException(`Failed to persist preference metadata: ${prefErr.message}`)
         }
       }
 

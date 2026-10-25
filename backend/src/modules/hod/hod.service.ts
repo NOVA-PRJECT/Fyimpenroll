@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
+import { assertPasswordNotCompromised } from '../../core/security/password-security'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
@@ -217,23 +218,12 @@ export class HodService {
       }
     }
 
-    // Synchronize flat legacy slot columns with the first/default pathway's reordered slots
-    const defaultPathway = pathwaysWithIds[0]
-    const flatSlots: Record<string, any> = {}
-    for (let i = 1; i <= 6; i++) {
-      const s = defaultPathway?.slots?.[i - 1]
-      flatSlots[`slot_${i}_rule`] = s?.rule || null
-      flatSlots[`slot_${i}_target`] = s?.target || null
-      flatSlots[`slot_${i}_name`] = s?.name || null
-    }
-
     const payload = {
       department_id: user.department_id,
       semester,
       min_credits,
       max_credits,
       pathways: pathwaysWithIds,
-      ...flatSlots,
     }
 
     const { error } = await this.supabase.admin
@@ -321,7 +311,7 @@ export class HodService {
       practical_hours_per_week,
       category,
       seat_limit,
-      prerequisite_course_ids,
+      prerequisites,
     } = body
 
     if (!user.department_id) {
@@ -346,7 +336,7 @@ export class HodService {
         category,
         department_id: targetDeptId,
         seat_limit: seat_limit ? Number(seat_limit) : 60,
-        prerequisite_course_ids: Array.isArray(prerequisite_course_ids) ? prerequisite_course_ids : [],
+        prerequisites: Array.isArray(prerequisites) ? prerequisites : [],
       })
       .select('id')
       .single()
@@ -360,7 +350,7 @@ export class HodService {
         throw new BadRequestException(`Course constraint violation: ${error.message || 'Check category, semester, or credit values'}`)
       }
       if (error.code === '23503') {
-        throw new BadRequestException(`Foreign key violation: ${error.message || 'Department or prerequisite does not exist'}`)
+        throw new BadRequestException(`Foreign key violation: ${error.message || 'Department does not exist'}`)
       }
       if (error.code === '23502') {
         throw new BadRequestException(`Missing required field: ${error.message || 'Required field missing'}`)
@@ -390,7 +380,7 @@ export class HodService {
       practical_hours_per_week,
       category,
       seat_limit,
-      prerequisite_course_ids,
+      prerequisites,
     } = body
 
     const updatePayload: Record<string, any> = {
@@ -406,8 +396,8 @@ export class HodService {
     if (seat_limit !== undefined) {
       updatePayload.seat_limit = seat_limit ? Number(seat_limit) : 60
     }
-    if (prerequisite_course_ids !== undefined) {
-      updatePayload.prerequisite_course_ids = Array.isArray(prerequisite_course_ids) ? prerequisite_course_ids : []
+    if (prerequisites !== undefined) {
+      updatePayload.prerequisites = Array.isArray(prerequisites) ? prerequisites : []
     }
 
     if (!user.department_id) {
@@ -555,6 +545,7 @@ export class HodService {
       throw new BadRequestException('A password of at least 8 characters is required to create a student account')
     }
     const password = body.password.trim()
+    await assertPasswordNotCompromised(password)
 
     const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({
       email,
@@ -736,6 +727,7 @@ export class HodService {
       throw new BadRequestException('A batch default password of at least 8 characters is required for bulk creation')
     }
     const defaultPassword = batchPassword.trim()
+    await assertPasswordNotCompromised(defaultPassword)
     const results: any[] = []
 
     for (let i = 0; i < rows.length; i++) {
@@ -852,6 +844,8 @@ export class HodService {
     }
 
     const { full_name, email, password } = body
+
+    await assertPasswordNotCompromised(password)
 
     // 1. Create auth user with Supabase admin API
     const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({

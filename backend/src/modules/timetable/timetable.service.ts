@@ -4,13 +4,13 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
   OnModuleInit,
   OnModuleDestroy,
   UnprocessableEntityException,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { mutateTeacherAssignments } from '../../core/database/teacher-mutations'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
@@ -50,7 +50,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   private readonly fileConstraintStore = new FileConstraintStoreService()
 
   // ──────────────── Constraints (R19, R20) ────────────────
-  async getConstraints(semester: string | undefined, user?: AuthUser) {
+  async getConstraints(_semester: string | undefined, user?: AuthUser) {
     return { ...this.fileConstraintStore.getBaseConstraints(), campusId: user?.campus_id ?? user?.userId };
   }
 
@@ -442,115 +442,14 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ──────────────── Teacher Substitution (F33, F37, R08) ────────────────
-  async substituteTeacher(entryId: string, newTeacherId: string, user: AuthUser) {
-    const { data: entry, error: entryErr } = await this.supabase.admin
-      .from('timetable_entries')
-      .select(`
-        id,
-        academic_year,
-        semester,
-        department_id,
-        campus_id,
-        course_id,
-        time_slot_id,
-        status,
-        teacher_id,
-        time_slots (
-          id,
-          day_of_week,
-          period_number
-        ),
-        departments (
-          id,
-          campus_id
-        )
-      `)
-      .eq('id', entryId)
-      .single()
-
-    if (entryErr || !entry) {
-      throw new NotFoundException(`Timetable entry ${entryId} not found`)
-    }
-
-    const hostCampusId = (entry as any).campus_id || (entry as any).departments?.campus_id;
-
-    if (user.role === 'campus_director' && hostCampusId !== user.campus_id) {
-      throw new ForbiddenException('Campus directors can only assign teachers to entries within their own campus')
-    }
-    if (user.role === 'hod' && entry.department_id !== user.department_id) {
-      throw new ForbiddenException('HODs can only assign teachers to entries within their own department')
-    }
-
-    const slot = (entry as any).time_slots
-
-    // F37 & R08: Global Teacher Clash Check across all campuses and semesters for this academic year
-    if (newTeacherId) {
-      const { data: conflicts, error: clashErr } = await this.supabase.admin
-        .from('timetable_entries')
-        .select('id, course_id, academic_year, semester, department_id, campus_id, status')
-        .eq('teacher_id', newTeacherId)
-        .eq('academic_year', entry.academic_year)
-        .eq('time_slot_id', entry.time_slot_id)
-        .neq('id', entryId)
-
-      if (clashErr) {
-        this.serverLogger.warn(`[substituteTeacher clashErr]: ${clashErr.message}`)
-      }
-
-      if (conflicts && conflicts.length > 0) {
-        throw new BadRequestException(
-          `Teacher ${newTeacherId} already has a scheduled class at Day ${slot?.day_of_week} Period ${slot?.period_number} in Semester ${conflicts[0].semester} (F37 shared-teacher clash).`,
-        )
-      }
-    }
-
-    // F33 & R08: Update teacher_id in place, preserving entry identity, class identity and attendance
-    const { error: updateErr } = await this.supabase.admin
-      .from('timetable_entries')
-      .update({
-        teacher_id: newTeacherId || null,
-      })
-      .eq('id', entryId)
-
-    if (updateErr) {
-      throw new InternalServerErrorException(`Failed to update assigned teacher: ${updateErr.message}`)
-    }
-
-    // Atomically synchronize teacher assignment record so roster and attendance authorization match (R08)
-    if (newTeacherId && hostCampusId) {
-      const tcaTable = this.supabase.admin.from('teacher_course_assignments');
-      if (typeof tcaTable?.upsert === 'function') {
-        await tcaTable.upsert(
-          {
-            teacher_id: newTeacherId,
-            course_id: entry.course_id,
-            campus_id: hostCampusId,
-            academic_year: entry.academic_year,
-            semester: entry.semester,
-            assigned_by: user.userId,
-            assigned_at: new Date().toISOString(),
-          },
-          { onConflict: 'teacher_id,course_id,campus_id,academic_year,semester' }
-        );
-      }
-    }
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.TIMETABLE_GENERATED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `assigned teacher ${newTeacherId} to timetable entry ${entryId} (F33/F37)`,
-      resourceType: 'timetable',
-      status: 'success',
-      metadata: { entryId, newTeacherId, academicYear: entry.academic_year, semester: entry.semester },
+  async substituteTeacher(entryId: string, newTeacherId: string | null, user: AuthUser) {
+    const result = await mutateTeacherAssignments(this.supabase, {
+      p_actor_id: user.userId, p_operation: 'substitute', p_entry_id: entryId, p_teacher_id: newTeacherId || null,
     })
-
-    return {
-      success: true,
-      message: 'Teacher assigned successfully without modifying timetable session structure',
-      entryId,
-      teacherId: newTeacherId,
-    }
+    await this.auditLogger.log({ eventType: AuditEvents.TIMETABLE_GENERATED, userId: user.userId, userRole: user.role,
+      action: `assigned teacher ${newTeacherId || 'none'} to timetable entry ${entryId}`,
+      resourceType: 'timetable', resourceId: entryId, status: 'success', metadata: { entryId, newTeacherId } })
+    return { ...result, message: 'Teacher assignment saved successfully' }
   }
 
   // ──────────────── Job Status ────────────────
@@ -576,8 +475,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     }
 
     let query = this.supabase.admin
-      .from('timetable_generation_jobs')
+      .from('system_logs')
       .select('id, status, progress, error_message, created_at')
+      .eq('log_type', 'timetable_job')
       .eq('academic_year', academicYear)
       .eq('semester', semester)
       .order('created_at', { ascending: false })

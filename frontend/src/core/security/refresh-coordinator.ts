@@ -134,7 +134,8 @@ export async function apiFetch(
     urlStr.includes('/api/auth/login') ||
     urlStr.includes('/api/auth/logout')
 
-  if (response.status !== 401 || isAuthEndpoint || options?.skipRefreshRetry) {
+  const explicitAuthorization = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined)).has('Authorization')
+  if (response.status !== 401 || isAuthEndpoint || explicitAuthorization || init?.credentials === 'omit' || options?.skipRefreshRetry) {
     return response
   }
 

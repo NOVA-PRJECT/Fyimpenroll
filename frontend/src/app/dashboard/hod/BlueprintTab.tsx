@@ -3,11 +3,10 @@
 import { GLOBAL_BASKET_CATEGORIES, groupBlueprintCourses } from '@/core/blueprint-options'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
-import { BookOpen as UiBookOpen, Check as UiCheck, Info as UiInfo, Pencil as UiPencil, Trash2 as UiTrash2, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
+import { Check as UiCheck, Info as UiInfo, TriangleAlert as UiTriangleAlert, X as UiX, GripVertical } from 'lucide-react'
 
 import { useState, useEffect, useEffectEvent } from 'react'
 import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
-import { GripVertical, ChevronDown } from 'lucide-react'
 import styles from './hod-dashboard.module.css'
 
 const RULES = [
@@ -32,7 +31,7 @@ interface PathwayData {
   slots: SlotData[]
 }
 
-interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; prerequisite_course_ids?: string[]; id: string; course_code: string; title: string; credits: number; category: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
+interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; id: string; course_code: string; title: string; credits: number; category: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
 export default function BlueprintTab({ semester, onSemesterChange: setSemester }: { semester: number; onSemesterChange: (semester: number) => void }) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -221,7 +220,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
 
     try {
       const res = await fetch(`/api/hod/blueprint?semester=${sem}`, { signal })
-      let data: { id?: string; error?: string; message?: string; [key: `slot_${number}_rule`]: SlotData["rule"]; [key: `slot_${number}_target`]: string; [key: `slot_${number}_name`]: string; min_credits?: number; max_credits?: number; pathways?: PathwayData[] } | null = null
+      let data: { id?: string; error?: string; message?: string; min_credits?: number; max_credits?: number; pathways?: PathwayData[] } | null = null
       try {
         const text = await res.text()
         data = text ? JSON.parse(text) : null
@@ -243,7 +242,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
         setMaxCredits(nextMax)
 
         let loadedPathways: PathwayData[] = []
-        // Read from pathways JSONB if available, else create default pathway from flat columns
+        // Pathways are the sole persisted blueprint configuration.
         if (data.pathways && Array.isArray(data.pathways) && data.pathways.length > 0) {
           loadedPathways = data.pathways.map((p: PathwayData) => ({
             id: p.id,
@@ -255,20 +254,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
             }))
           }))
         } else {
-          // Legacy: build single pathway from flat columns
-          const flatSlots: SlotData[] = []
-          for (let i = 1; i <= 8; i++) {
-            const rule = data[`slot_${i}_rule`] ?? ''
-            const target = rule === 'POOL_RESTRICTED' ? 'POOLED' : data[`slot_${i}_target`] ?? ''
-            const name = data[`slot_${i}_name`] ?? ''
-            if (rule) {
-              flatSlots.push({ rule, target, name })
-            }
-          }
-          if (flatSlots.length === 0) {
-            flatSlots.push({ rule: '', target: '', name: '' })
-          }
-          loadedPathways = [{ name: 'Default', slots: flatSlots }]
+          loadedPathways = [{ name: 'Default', slots: [{ rule: '', target: '', name: '' }] }]
         }
         setPathways(loadedPathways)
         setInitialSnapshot({

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
-import { fetchAllPaginated } from '../../core/database/pagination.util'
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 import { AuthUser } from '../../core/auth/types'
 import { CampusAttendanceService } from '../campus-attendance/campus-attendance.service'
 import { NoticesService } from '../notices/notices.service'
@@ -47,18 +47,21 @@ export class StudentPortalService {
   private async coursesFor(context: Awaited<ReturnType<StudentPortalService['context']>>) {
     if (!context.courseIds.length) return []
     const [courseResult, assignments] = await Promise.all([
-      this.supabase.admin.from('courses').select('id, course_code, title, credits, category, prerequisite_course_ids')
+      this.supabase.admin.from('courses').select('id, course_code, title, credits, category, prerequisites')
         .in('id', context.courseIds).order('course_code'),
       fetchAllPaginated<any>(this.supabase.admin.from('teacher_course_assignments')
-        .select('id, course_id, faculty!teacher_course_assignments_teacher_id_fkey(full_name)')
+        .select('id, course_id, teacher_id')
         .in('course_id', context.courseIds).eq('campus_id', context.campusId)
         .eq('academic_year', context.academicYear).eq('semester', context.semester).order('id')),
     ])
     if (courseResult.error) throw new InternalServerErrorException('Unable to load enrolled courses.')
+    const faculty = await fetchByIdChunks<{ id: string; full_name: string }>(assignments.map(a => a.teacher_id), ids =>
+      this.supabase.admin.from('faculty').select('id, full_name').in('id', ids).order('id'))
+    const facultyNames = new Map(faculty.map(teacher => [teacher.id, teacher.full_name]))
     return (courseResult.data || []).map(course => ({
       id: course.id, code: course.course_code, title: course.title, credits: Number(course.credits), category: course.category,
-      faculty_name: [...new Set(assignments.filter(a => a.course_id === course.id).map(a => a.faculty?.full_name).filter(Boolean))].join(', ') || null,
-      prerequisite_course_ids: course.prerequisite_course_ids || [],
+      faculty_name: [...new Set(assignments.filter(a => a.course_id === course.id).map(a => facultyNames.get(a.teacher_id)).filter(Boolean))].join(', ') || null,
+      prerequisite_points: course.prerequisites || [],
     }))
   }
 
@@ -69,17 +72,7 @@ export class StudentPortalService {
   async course(user: AuthUser, courseId: string, semester?: string) {
     const course = (await this.courses(user, semester)).find(item => item.id === courseId)
     if (!course) throw new NotFoundException('Course is not in your selected semester registration.')
-    const [prerequisites, rules] = await Promise.all([
-      course.prerequisite_course_ids.length
-        ? this.supabase.admin.from('courses').select('course_code').in('id', course.prerequisite_course_ids)
-        : Promise.resolve({ data: [], error: null }),
-      this.supabase.admin.from('course_prerequisite_rules').select('rule, target').eq('course_id', courseId),
-    ])
-    if (prerequisites.error || rules.error) throw new InternalServerErrorException('Unable to load course prerequisites.')
-    return { ...course, prerequisites: [
-      ...(prerequisites.data || []).map(item => `Completed course: ${item.course_code}`),
-      ...(rules.data || []).map(item => `${item.rule.replaceAll('_', ' ').toLowerCase()}: ${item.target}`),
-    ].join('; ') || null }
+    return { ...course, prerequisites: course.prerequisite_points.join('; ') || null }
   }
 
   private async attendanceFor(user: AuthUser, context: Awaited<ReturnType<StudentPortalService['context']>>) {

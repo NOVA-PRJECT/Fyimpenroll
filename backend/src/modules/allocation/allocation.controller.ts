@@ -20,35 +20,6 @@ import { AuthUser } from '../../core/auth/types'
 export class AllocationController {
   constructor(private readonly allocationService: AllocationService) {}
 
-  // ──────────────── Prerequisite Rule Engine Endpoints ────────────────
-  @Get('config/prerequisites/:courseId')
-  @Roles('hod', 'superadmin')
-  async getPrerequisites(
-    @Param('courseId') courseId: string,
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.allocationService.getPrerequisites(courseId, user)
-  }
-
-  @Post('config/prerequisites/:courseId')
-  @Roles('hod', 'superadmin')
-  async addPrerequisite(
-    @Param('courseId') courseId: string,
-    @Body() body: { rule: string; target: string },
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.allocationService.addPrerequisite(courseId, body, user)
-  }
-
-  @Delete('config/prerequisites/:ruleId')
-  @Roles('hod', 'superadmin')
-  async deletePrerequisite(
-    @Param('ruleId') ruleId: string,
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.allocationService.deletePrerequisite(ruleId, user)
-  }
-
   // ──────────────── Campus Director: Run Allocation ────────────────
   @Post('run')
   @Roles('campus_director')

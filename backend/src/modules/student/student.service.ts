@@ -6,16 +6,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
-import { AuditLoggerService } from '../../core/logging/audit-logger.service'
-import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
 
 @Injectable()
 export class StudentService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly auditLogger: AuditLoggerService,
-    private readonly serverLogger: ServerLoggerService,
   ) {}
 
   async getDashboardSummary(user: AuthUser) {
@@ -79,7 +75,7 @@ export class StudentService {
 
     let prefQuery = this.supabase.admin
       .from('registration_preferences')
-      .select('id, preferences, allocation_metadata, submitted_at')
+      .select('id, preferences, submitted_at')
       .eq('student_id', user.userId)
       .eq('semester', student.current_semester)
 
@@ -90,8 +86,9 @@ export class StudentService {
     let allocRunPromise: Promise<any> = Promise.resolve({ data: null, error: null })
     if (effectiveCampusId) {
       let allocQuery = this.supabase.admin
-        .from('allocation_runs')
+        .from('system_logs')
         .select('id, status, completed_at')
+        .eq('log_type', 'allocation_run')
         .eq('campus_id', effectiveCampusId)
         .eq('semester', student.current_semester)
         .eq('status', 'completed')
@@ -179,7 +176,6 @@ export class StudentService {
       const slotCourseMap = new Map<number, { courseId: string; status: string; isConfirmed: boolean }>()
 
       const meta = {
-        ...(typeof pref?.allocation_metadata === 'object' && pref?.allocation_metadata ? pref.allocation_metadata : {}),
         ...(typeof reg?.allocation_metadata === 'object' && reg?.allocation_metadata ? reg.allocation_metadata : {}),
       }
 
@@ -219,21 +215,6 @@ export class StudentService {
               ? 'Unallocated (Pending HOD Resolution)'
               : 'Preference Choice 1 (Pending)'
             slotCourseMap.set(s, { courseId: rank1Id, status: statusText, isConfirmed: false })
-          }
-        }
-      }
-
-      // If flat slots were empty, check selections JSONB
-      if (courseIdsToFetch.size === 0 && (reg as any)?.selections) {
-        const rawSel = (reg as any).selections
-        const list = Array.isArray(rawSel) ? rawSel : Array.isArray(rawSel?.courses) ? rawSel.courses : []
-        let idx = 1
-        for (const item of list) {
-          const cid = typeof item === 'string' ? item : item?.id || item?.course_id
-          if (cid) {
-            courseIdsToFetch.add(cid)
-            slotCourseMap.set(idx, { courseId: cid, status: 'Enrolled Paper', isConfirmed: true })
-            idx++
           }
         }
       }

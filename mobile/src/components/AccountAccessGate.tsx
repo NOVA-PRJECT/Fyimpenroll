@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { supabase } from '../lib/supabase';
+import { ENV } from '../config/env';
 
 export function AccountAccessGate({ children }: { children: React.ReactNode }) {
   const { user, profile, refreshProfile, logout } = useAuth();
@@ -38,10 +39,10 @@ export function AccountAccessGate({ children }: { children: React.ReactNode }) {
     <Text style={{ fontSize: 24 }}>Data privacy and terms</Text>
     <Text>Policy version: {consent.data?.currentVersion}</Text>
     <Text>Your identity, course registrations, timetable and attendance records are used for institutional administration. Location is used to validate campus sign-in; raw GPS coordinates are not retained by the backend.</Text>
-    {process.env.EXPO_PUBLIC_PORTAL_URL && <><Button title="Read privacy policy" onPress={() => void Linking.openURL(`${process.env.EXPO_PUBLIC_PORTAL_URL}/privacy-policy`)} /><Button title="Read terms of use" onPress={() => void Linking.openURL(`${process.env.EXPO_PUBLIC_PORTAL_URL}/terms-of-use`)} /></>}
-    {!process.env.EXPO_PUBLIC_PORTAL_URL && <Text>The portal URL must be configured to read the full policies before consent.</Text>}
+    <Button title="Read privacy policy" onPress={() => void Linking.openURL(`${ENV.PORTAL_URL}/privacy-policy`)} />
+    <Button title="Read terms of use" onPress={() => void Linking.openURL(`${ENV.PORTAL_URL}/terms-of-use`)} />
     <Text>{error}</Text>
-    <Button title="I agree and continue" disabled={busy || !process.env.EXPO_PUBLIC_PORTAL_URL} onPress={() => void run(async () => {
+    <Button title="I agree and continue" disabled={busy} onPress={() => void run(async () => {
       await apiClient.post('/api/consent/accept', { policy_version: consent.data?.currentVersion });
       await supabase.auth.refreshSession(); await consent.refetch();
     })} />

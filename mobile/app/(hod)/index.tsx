@@ -15,7 +15,7 @@ import { ErrorView } from '../../src/components/common/ErrorView';
 
 export default function HodHomeScreen() {
   const { profile } = useAuth();
-  const { colors, typography, spacing } = useTheme();
+  const { colors, typography } = useTheme();
 
   const deptId = profile?.department_id || '';
   const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];

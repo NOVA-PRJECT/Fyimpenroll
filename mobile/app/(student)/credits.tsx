@@ -85,7 +85,7 @@ interface CreditLedgerResponse {
 
 export default function StudentCreditsScreen() {
   const { user } = useAuth();
-  const { colors, typography, spacing } = useTheme();
+  const { colors, typography } = useTheme();
 
   const userId = user?.id || '';
 

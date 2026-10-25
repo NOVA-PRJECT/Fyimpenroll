@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
+import { assertPasswordNotCompromised } from '../../core/security/password-security'
 import { AuditLoggerService, AuditEvents } from '../../core/logging/audit-logger.service'
 import { ServerLoggerService } from '../../core/logging/server-logger.service'
 import { AuthUser } from '../../core/auth/types'
@@ -364,6 +365,8 @@ export class AdminService {
 
     await this.checkAdministrativeFaculty(role, campus_id, department_id)
     const assignedDeptId = role === 'hod' ? department_id! : null
+
+    await assertPasswordNotCompromised(password)
 
     const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({
       email,

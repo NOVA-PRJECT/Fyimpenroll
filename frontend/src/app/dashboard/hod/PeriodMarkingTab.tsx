@@ -2,7 +2,7 @@
 
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Clock,
   Search,

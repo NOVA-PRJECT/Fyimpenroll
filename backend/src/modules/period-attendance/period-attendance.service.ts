@@ -9,7 +9,6 @@ import {
 import * as crypto from 'crypto';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
-import { ServerLoggerService } from '../../core/logging/server-logger.service';
 import { AuthUser } from '../../core/auth/types';
 import { AuthorizationPolicy } from '../../core/auth/authorization-policy';
 import { getISTDateTime } from '../../core/utils/date-time.util';
@@ -21,7 +20,6 @@ export class PeriodAttendanceService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
-    private readonly serverLogger?: ServerLoggerService,
   ) {}
 
   /**
@@ -633,7 +631,7 @@ export class PeriodAttendanceService {
   ) {
     let query = this.supabase.admin
       .from('student_registrations')
-      .select('student_id, campus_id, academic_year, semester, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id, selections')
+      .select('student_id, campus_id, academic_year, semester, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .or(
         `slot_1_course_id.eq.${courseId},slot_2_course_id.eq.${courseId},slot_3_course_id.eq.${courseId},slot_4_course_id.eq.${courseId},slot_5_course_id.eq.${courseId},slot_6_course_id.eq.${courseId},slot_7_course_id.eq.${courseId},slot_8_course_id.eq.${courseId}`
       );
@@ -657,28 +655,6 @@ export class PeriodAttendanceService {
     const studentIdSet = new Set<string>();
     for (const reg of registrations || []) {
       studentIdSet.add(reg.student_id);
-    }
-
-    if (academicYear || campusId) {
-      let jsonQuery = this.supabase.admin
-        .from('student_registrations')
-        .select('student_id, selections');
-
-      if (academicYear) jsonQuery = jsonQuery.eq('academic_year', academicYear);
-      if (campusId) jsonQuery = jsonQuery.eq('campus_id', campusId);
-      if (semester) jsonQuery = jsonQuery.eq('semester', semester);
-
-      const { data: jsonRegs } = await jsonQuery;
-      for (const reg of jsonRegs || []) {
-        const sel = reg.selections;
-        const arr = Array.isArray(sel) ? sel : Array.isArray(sel?.courses) ? sel.courses : [];
-        for (const item of arr) {
-          const cid = typeof item === 'string' ? item : item?.id || item?.course_id;
-          if (cid === courseId) {
-            studentIdSet.add(reg.student_id);
-          }
-        }
-      }
     }
 
     const studentIds = Array.from(studentIdSet);

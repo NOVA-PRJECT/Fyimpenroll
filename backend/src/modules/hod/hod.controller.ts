@@ -26,6 +26,8 @@ const CreateTeacherSchema = z.object({
 
 import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
 
+export const CoursePrerequisitesSchema = z.array(z.string().trim().min(1).max(500)).max(20)
+
 const CreateCourseSchema = z.object({
   course_code: z.string().min(1, 'Course code is required').max(30),
   title: z.string().min(1, 'Course title is required').max(200),
@@ -37,7 +39,7 @@ const CreateCourseSchema = z.object({
     errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
   seat_limit: z.coerce.number().int().min(1).max(500).optional().default(60),
-  prerequisite_course_ids: z.array(z.string()).optional().default([]),
+  prerequisites: CoursePrerequisitesSchema.optional().default([]),
   department_id: z.string().uuid().optional(),
 })
 
@@ -53,7 +55,7 @@ const UpdateCourseSchema = z.object({
     errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
   seat_limit: z.coerce.number().int().min(1).max(500).optional(),
-  prerequisite_course_ids: z.array(z.string()).optional(),
+  prerequisites: CoursePrerequisitesSchema.optional(),
   department_id: z.string().uuid().optional(),
 })
 

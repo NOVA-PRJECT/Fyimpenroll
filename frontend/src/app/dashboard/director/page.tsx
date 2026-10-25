@@ -902,7 +902,7 @@ export default function DirectorDashboard() {
 
             <div className={styles.windowCard}>
               <p className={styles.windowDescription}>
-                Trigger the 3-round allocation algorithm for this semester. The engine ranks student elective preferences based on prerequisite completion and semester proximity, taking into account fixed slot capacities.
+                Trigger the 3-round allocation algorithm for this semester. The engine ranks student elective preferences based on semester proximity and submission time, taking into account fixed slot capacities.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>

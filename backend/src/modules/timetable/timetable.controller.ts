@@ -18,6 +18,7 @@ import { AuthUser } from '../../core/auth/types'
 import { RateLimitGuard } from '../../core/security/rate-limit.guard'
 import { RateLimit } from '../../core/security/rate-limit.decorator'
 import { GenerateRequestSchema, PublishRequestSchema } from './solver/schemas'
+import { z } from 'zod'
 
 @Controller('api/timetable')
 @UseGuards(AuthGuard, RolesGuard)
@@ -45,10 +46,15 @@ export class TimetableController {
   @Roles('superadmin', 'campus_director', 'hod')
   async substituteTeacher(
     @Param('id') id: string,
-    @Body() body: { teacherId: string },
+    @Body() body: unknown,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.timetableService.substituteTeacher(id, body.teacherId, user)
+    const parsed = z.object({
+      id: z.string().uuid(),
+      teacherId: z.union([z.string().uuid(), z.literal(''), z.null()]),
+    }).safeParse({ ...(body && typeof body === 'object' ? body : {}), id })
+    if (!parsed.success) throw new BadRequestException('A valid entry and teacher ID (or null to unassign) are required')
+    return this.timetableService.substituteTeacher(parsed.data.id, parsed.data.teacherId || null, user)
   }
 
   // ──────────────── Entries ────────────────

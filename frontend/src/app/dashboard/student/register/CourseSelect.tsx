@@ -11,6 +11,7 @@ export interface Course {
   department_name?: string
   remaining_seats?: number
   seat_limit?: number
+  prerequisites?: string[]
 }
 
 export default function CustomSelect({
@@ -18,12 +19,14 @@ export default function CustomSelect({
   value,
   onChange,
   disabled,
+  unavailableReason,
   placeholder = '— Select a paper —',
 }: {
   options: Course[]
   value: string
   onChange: (val: string) => void
   disabled?: boolean
+  unavailableReason?: (course: Course) => string | undefined
   placeholder?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -84,16 +87,24 @@ export default function CustomSelect({
                   <span className={styles.placeholderOption}>{placeholder}</span>
                 </div>
               )}
-              {options.map((course) => (
+              {options.map((course) => {
+                const reason = unavailableReason?.(course)
+                return (
                 <div
                   key={course.id}
                   className={`${styles.customOption} ${value === course.id ? styles.selected : ''}`}
+                  role="button" tabIndex={reason ? -1 : 0} aria-disabled={!!reason}
+                  style={reason ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                  title={reason}
+                  onKeyDown={event => { if (!reason && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onChange(course.id); setIsOpen(false) } }}
                   onClick={() => {
+                    if (reason) return
                     onChange(course.id)
                     setIsOpen(false)
                   }}
                 >
                   <div className={styles.optionUpper}>{course.title}</div>
+                  {reason && <div style={{ fontSize: '0.75rem', whiteSpace: 'normal' }}>{reason}</div>}
                   <div className={styles.optionLower} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={styles.optionDept}>
                       {course.course_code ? `${course.course_code} • ` : ''}
@@ -119,7 +130,7 @@ export default function CustomSelect({
                     </span>
                   </div>
                 </div>
-              ))}
+              )})}
             </>
           )}
         </div>

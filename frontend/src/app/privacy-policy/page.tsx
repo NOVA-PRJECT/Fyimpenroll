@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
                   University Privacy Notice • FYIMP
                 </span>
                 <span className="text-xs text-[color:var(--portal-muted,#64748b)] bg-[color:var(--portal-info-bg,#f8fafc)] px-2 py-0.5 rounded border border-[color:var(--portal-strong-border,#e2e8f0)] font-mono">
-                  Version: 2026-09-08 • Effective: Sept 8, 2026
+                  Version: 2026-10-22 • Effective: Oct 22, 2026
                 </span>
               </div>
               <h1 className="font-serif text-2xl md:text-3xl font-bold text-[color:var(--portal-brand-text,#0f172a)] tracking-tight">
@@ -244,6 +244,9 @@ export default function PrivacyPolicyPage() {
               <p className="text-xs md:text-sm text-[color:var(--portal-info-text,#475569)] leading-relaxed">
                 Your information is protected with industry-standard encryption. Built-in privacy controls ensure students only see their own classes and teachers only access their assigned batches.
               </p>
+                <p className="text-xs md:text-sm text-[color:var(--portal-info-text,#475569)] leading-relaxed mt-3">
+                  When a password is created or changed, the server checks it against Pwned Passwords to reject known compromised passwords. Only the first five characters of a SHA-1 hash are sent to that service; your password, full hash and account identity are not sent. The server compares the returned hash suffixes locally.
+                </p>
             </section>
 
             {/* CLAUSE 11.0 */}

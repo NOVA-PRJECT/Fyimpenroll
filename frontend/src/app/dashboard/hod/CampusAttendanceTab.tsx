@@ -2,7 +2,7 @@
 
 import LoadingState from '@/components/LoadingState'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   MapPin,
   Calendar,

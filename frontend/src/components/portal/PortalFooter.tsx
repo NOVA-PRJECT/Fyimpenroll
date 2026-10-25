@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import UniversityLogo from '@/components/UniversityLogo'
-import React from 'react'
 import { usePwa } from '@/components/pwa/PwaProvider'
 
 export interface PortalFooterProps {

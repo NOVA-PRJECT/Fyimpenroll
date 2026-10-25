@@ -29,7 +29,7 @@ export default function ConsentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<Role | null>(null)
-  const [currentVersion, setCurrentVersion] = useState('2026-09-08')
+  const [currentVersion, setCurrentVersion] = useState('2026-10-22')
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {

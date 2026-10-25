@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../src/hooks/useAuth';
 import { useSemester } from '../../../src/hooks/useSemester';
-import { CourseSchema } from '../../../src/api/schemas/student.schema';
+import { CourseSchema, type Course } from '../../../src/api/schemas/student.schema';
 import { useTheme } from '../../../src/hooks/useTheme';
 import { apiClient } from '../../../src/api/client';
 import { API_ENDPOINTS } from '../../../src/api/endpoints';
@@ -23,7 +23,7 @@ export default function CourseDetailScreen() {
 
   const userId = user?.id || '';
 
-  const { data: course, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data: course, isLoading, error, refetch, isRefetching } = useQuery<Course>({
     queryKey: queryKeys.student.courseDetail(userId, id || '', activeSemester),
     queryFn: () => apiClient.get(`${API_ENDPOINTS.STUDENT_COURSES}/${id}?semester=${activeSemester}`, { schema: CourseSchema }),
     enabled: !!userId && !!id,
@@ -78,7 +78,7 @@ export default function CourseDetailScreen() {
               Prerequisites & Requirements
             </Text>
             <Text style={[typography.body, { color: colors.textSecondary }]}>
-              {course.prerequisites || 'None specified.'}
+              {course.prerequisite_points.length ? course.prerequisite_points.map((point, index) => `${index + 1}. ${point}`).join('\n') : course.prerequisites || 'None specified.'}
             </Text>
           </Card>
         </>

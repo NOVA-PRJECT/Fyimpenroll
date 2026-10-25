@@ -19,7 +19,7 @@ export class CreditLedgerService {
   deriveLevelBand(code: string, explicitLevel?: string | null): LevelBandKey {
     return parseKuCourseCode(code, explicitLevel).derivedLevelBand
   }
-  normalizeCategory(raw: string, code?: string, title?: string): string {
+  normalizeCategory(raw: string, code?: string, _title?: string): string {
     const category = (raw || '').trim().toUpperCase()
     return CANONICAL_CATEGORIES.includes(category as any) ? category : parseKuCourseCode(code || '').category || category || 'Other'
   }
