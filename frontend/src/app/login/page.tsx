@@ -223,11 +223,11 @@ function LoginForm() {
                 />
                 <label htmlFor="acceptTerms" className={styles.termsLabel}>
                   I accept the{' '}
-                  <Link href="/terms-of-use" target="_blank" className={styles.termsLink}>
+                  <Link href="/terms-of-use" className={styles.termsLink}>
                     Terms of Use
                   </Link>{' '}
                   and acknowledge the{' '}
-                  <Link href="/privacy-policy" target="_blank" className={styles.termsLink}>
+                  <Link href="/privacy-policy" className={styles.termsLink}>
                     Privacy Policy
                   </Link>
                   .

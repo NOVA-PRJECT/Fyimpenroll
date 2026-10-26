@@ -123,6 +123,9 @@ export async function middleware(request: NextRequest) {
   // Never send login HTML in response to a worker, manifest or image request.
   if (pathname === '/knrunilogo.png' || pathname === '/sw.js' || pathname === '/manifest.webmanifest' || pathname === '/offline.html' || pathname === '/install' || pathname.startsWith('/pwa/')) return NextResponse.next()
 
+  // Legal documents must remain readable before signing in and after logout.
+  if (pathname === '/terms-of-use' || pathname === '/privacy-policy') return NextResponse.next()
+
   // Browser API refreshes are coordinated in one place after an explicit guard
   // rejection. Refreshing here as well races cookie rotation during polling,
   // and can even rotate credentials before forwarding /api/auth/refresh itself.

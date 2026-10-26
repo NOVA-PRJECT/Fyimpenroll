@@ -236,12 +236,12 @@ export default function ConsentPage() {
                 You can review our complete institutional legal and privacy frameworks at any time:
               </p>
               <div className={styles.legalLinksRow}>
-                <Link href="/privacy-policy" target="_blank" className={styles.legalCardLink}>
+                <Link href="/privacy-policy" className={styles.legalCardLink}>
                   <FileText size={16} className={styles.legalIcon} />
                   <span className={styles.legalLinkText}>Read Full Privacy Policy</span>
                   <ExternalLink size={14} className={styles.extIcon} />
                 </Link>
-                <Link href="/terms-of-use" target="_blank" className={styles.legalCardLink}>
+                <Link href="/terms-of-use" className={styles.legalCardLink}>
                   <FileText size={16} className={styles.legalIcon} />
                   <span className={styles.legalLinkText}>Read Terms of Use</span>
                   <ExternalLink size={14} className={styles.extIcon} />
