@@ -261,7 +261,7 @@ export default function StudentAttendanceScreen() {
         />
       ) : null}
 
-      {loadingCourses ? (
+      {courseAttendanceData?.cleared ? <Text style={[typography.body, { color: colors.textSecondary }]}>{courseAttendanceData.message}</Text> : loadingCourses ? (
         <View style={{ gap: 8 }}>
           <Skeleton height={75} />
           <Skeleton height={75} />

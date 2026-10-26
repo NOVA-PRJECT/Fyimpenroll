@@ -33,8 +33,5 @@ export const API_ENDPOINTS = {
 
   // HOD
   HOD_ABSENCE_SUMMARY: '/api/attendance/campus/roster',
-  HOD_ANNOUNCEMENTS: '/api/notices',
 
-  // Notices
-  NOTICES: '/api/notices',
 };

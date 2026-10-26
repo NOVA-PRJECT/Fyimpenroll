@@ -197,62 +197,38 @@ export class AdminController {
   @Roles('campus_director')
   async promoteStudents(
     @CurrentUser() user: AuthUser,
-    @Body() body?: { idempotency_key?: string },
+    @Body() body: unknown,
   ) {
-    return this.adminService.promoteStudents(user, body?.idempotency_key)
+    const parsed = z.object({ expected_term: z.number().int().nonnegative() }).safeParse(body)
+    if (!parsed.success) throw new BadRequestException('Reload campus settings before promotion')
+    return this.adminService.promoteStudents(user, parsed.data.expected_term)
   }
 
-  // ──────────────── Graduate Students (F55 Retryable Cleanup) ────────────────
+  // Graduation is a separate, explicitly selected semester-11 account deletion.
   @Post('campus/graduate-students')
   @Roles('campus_director', 'superadmin')
   async graduateStudents(
-    @Body() body: { campus_id?: string; student_ids: string[] },
+    @Body() body: unknown,
     @CurrentUser() user: AuthUser,
   ) {
-    const campusId = body.campus_id || user.campus_id
+    const parsed = z.object({ campus_id: z.string().uuid().optional(), student_ids: z.array(z.string().uuid()).min(1).max(500) }).safeParse(body)
+    if (!parsed.success) throw new BadRequestException('Select between 1 and 500 valid student accounts')
+    const campusId = parsed.data.campus_id || user.campus_id
     if (!campusId) {
       throw new BadRequestException('Campus ID is required')
     }
     if (user.role === 'campus_director' && user.campus_id && user.campus_id !== campusId) {
       throw new ForbiddenException('Directors can only graduate students for their own campus')
     }
-    return this.adminService.graduateStudents(campusId, body.student_ids ?? [], user)
+    return this.adminService.graduateStudents(campusId, parsed.data.student_ids, user)
   }
 
-  @Get('campus/graduation-pending')
+  @Get('campus/graduation-candidates')
   @Roles('campus_director')
-  async pendingGraduations(@CurrentUser() user: AuthUser) {
-    return this.adminService.pendingGraduations(user)
+  async graduationCandidates(@CurrentUser() user: AuthUser) {
+    return this.adminService.graduationCandidates(user)
   }
 
-  // ──────────────── Concluded Attendance Cleanup (Retention Purge) ────────────────
-  @Post('campus/concluded-attendance-cleanup')
-  @Roles('campus_director', 'superadmin')
-  async cleanupConcludedAttendance(
-    @Body()
-    body: {
-      campus_id?: string
-      academic_year: string
-      semester: number
-    },
-    @CurrentUser() user: AuthUser,
-  ) {
-    const campusId = body.campus_id || user.campus_id
-    if (!campusId) {
-      throw new BadRequestException('Campus ID is required')
-    }
-    if (!body.academic_year || typeof body.semester !== 'number') {
-      throw new BadRequestException('academic_year and semester are required')
-    }
-    return this.adminService.cleanupConcludedSemesterAttendance(
-      campusId,
-      body.academic_year,
-      body.semester,
-      user,
-    )
-  }
-
-  // ──────────────── System & Audit Logs ────────────────
   @Get('logs')
   @Roles('superadmin')
   async getLogs(

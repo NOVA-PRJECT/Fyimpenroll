@@ -26,15 +26,6 @@ export default function HodLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="people-outline" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="notices"
-        options={{
-          title: 'Notices',
-          headerTitle: 'Manage Announcements',
-          tabBarLabel: 'Notices',
-          tabBarIcon: ({ color }) => <TabBarIcon name="megaphone-outline" color={color} />,
-        }}
-      />
     </Tabs>
   );
 }

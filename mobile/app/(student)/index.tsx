@@ -23,6 +23,7 @@ export default function StudentHomeScreen() {
   const { colors, typography } = useTheme();
 
   const userId = user?.id || '';
+  const completed = profile?.current_semester === 11;
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery<StudentDashboard>({
     queryKey: queryKeys.student.dashboard(userId, activeSemester, new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10)),
@@ -49,15 +50,16 @@ export default function StudentHomeScreen() {
           Hello, {profile?.full_name || 'Student'}
         </Text>
         <Text style={[typography.body, { color: colors.textSecondary }]}>
-          Semester {activeSemester} • {profile?.department_name || 'Academic Dept'}
+          {completed ? 'Programme completed (Semester 11)' : `Semester ${activeSemester}`} • {profile?.department_name || 'Academic Dept'}
         </Text>
+        {completed && <Text style={[typography.body, { color: colors.textSecondary, marginTop: 12 }]}>Your academic history and credit ledger remain available while your account awaits graduation deletion. New registrations and campus sign-ins are closed.</Text>}
       </View>
 
       <View style={styles.quickActions}>
         {([
           { label: 'Campus sign-in', hint: 'Verify your presence', icon: 'location-outline', path: '/(student)/attendance' },
           { label: 'My courses', hint: 'View your subjects', icon: 'book-outline', path: '/(student)/courses' },
-        ] as const).map((action) => (
+        ] as const).filter(action => !completed || action.path !== '/(student)/attendance').map((action) => (
           <TouchableOpacity key={action.label} accessibilityRole="button" accessibilityLabel={action.label}
             onPress={() => router.push(action.path)} activeOpacity={0.7}
             style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -191,32 +193,6 @@ export default function StudentHomeScreen() {
         </Card>
       )}
 
-      {/* Latest Announcement */}
-      <View style={styles.sectionHeader}>
-        <Text style={[typography.h3, { color: colors.textPrimary }]}>
-          Latest Announcement
-        </Text>
-      </View>
-
-      {isLoading ? (
-        <Skeleton height={80} />
-      ) : data?.latestAnnouncement ? (
-        <Card variant="outlined" style={styles.announcementCard}>
-          <Text style={[typography.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
-            {data.latestAnnouncement.title}
-          </Text>
-          <Text style={[typography.body, { color: colors.textSecondary, marginTop: 6 }]}>
-            {data.latestAnnouncement.content}
-          </Text>
-        </Card>
-      ) : (
-        <Card variant="flat" style={styles.emptyCard}>
-          <Ionicons name="notifications-outline" size={28} color={colors.textMuted} style={{ marginBottom: 12 }} />
-          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            No new announcements today.
-          </Text>
-        </Card>
-      )}
     </ScreenContainer>
   );
 }

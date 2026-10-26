@@ -36,14 +36,14 @@ export function createReviewDraft(result: OrtoolsSolverResult, courses: CourseNo
 /** Durable preview only: never touches timetable_entries or creates a publishable fingerprint. */
 export async function saveReviewDraft(db: SupabaseClient, jobId: string, fencingToken: string,
   campusId: string, draft: ReturnType<typeof createReviewDraft>) {
-  const { data: job, error } = await db.from('system_logs').select('metadata, updated_at')
+  const { data: job, error } = await db.from('current_system_logs').select('metadata, updated_at')
     .eq('id', jobId).eq('log_type', 'timetable_job').eq('campus_id', campusId)
     .eq('status', 'running').eq('metadata->>fencing_token', fencingToken).maybeSingle();
   if (error || !job) throw new Error('Missing or stale worker claim for review draft.');
   const metadata = { ...job.metadata, reviewDraft: draft };
   delete metadata.draft_hash;
   const cutoff = new Date(Date.now() - (Number(job.metadata?.lease_seconds) || 600) * 1000).toISOString();
-  const { data: saved, error: saveError } = await db.from('system_logs').update({
+  const { data: saved, error: saveError } = await db.from('current_system_logs').update({
     status: 'completed', progress: 100, error_message: null, metadata,
     completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }).eq('id', jobId).eq('log_type', 'timetable_job').eq('campus_id', campusId)
@@ -53,7 +53,7 @@ export async function saveReviewDraft(db: SupabaseClient, jobId: string, fencing
 }
 
 export async function readReviewDraft(db: SupabaseClient, campusId: string, academicYear: string, semester: number) {
-  const { data: job, error } = await db.from('system_logs').select('status, metadata')
+  const { data: job, error } = await db.from('current_system_logs').select('status, metadata')
     .eq('log_type', 'timetable_job').eq('campus_id', campusId).eq('academic_year', academicYear)
     .eq('semester', semester).order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error('Could not verify the current timetable review state.');

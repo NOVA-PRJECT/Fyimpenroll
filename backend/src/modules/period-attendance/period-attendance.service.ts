@@ -6,7 +6,7 @@ import {
   ConflictException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { AuthUser } from '../../core/auth/types';
@@ -108,28 +108,11 @@ export class PeriodAttendanceService {
     academicYear: string,
     semester: number
   ): Promise<void> {
-    // 1. Check explicit retired cohorts registry
-    const retiredQuery = this.supabase.admin.from('retired_cohorts');
-    if (typeof (retiredQuery as any)?.select === 'function') {
-      const { data: retired } = await retiredQuery
-        .select('id, reason, retired_at')
-        .eq('campus_id', campusId)
-        .eq('academic_year', academicYear)
-        .eq('semester', semester)
-        .maybeSingle();
-
-      if (retired) {
-        throw new BadRequestException(
-          `Cannot record attendance: cohort (${academicYear} Semester ${semester} for campus ${campusId}) is retired or concluded (R28).`
-        );
-      }
-    }
-
     // 2. Check campus_settings academic year
     const settingsQuery = this.supabase.admin.from('campus_settings');
     if (typeof (settingsQuery as any)?.select === 'function') {
       const { data: settings } = await settingsQuery
-        .select('academic_year')
+        .select('academic_year, term_started_at')
         .eq('campus_id', campusId)
         .maybeSingle();
 
@@ -139,41 +122,6 @@ export class PeriodAttendanceService {
         );
       }
     }
-  }
-
-  /**
-   * Records a cohort as retired in the registry (Plan 08 retention contract).
-   */
-  public async retireCohort(
-    campusId: string,
-    academicYear: string,
-    semester: number,
-    userId: string,
-    reason?: string
-  ): Promise<void> {
-    await this.supabase.admin.from('retired_cohorts').upsert(
-      {
-        campus_id: campusId,
-        academic_year: academicYear,
-        semester,
-        retired_by: userId,
-        retired_at: new Date().toISOString(),
-        reason: reason || 'Term concluded and attendance archived/purged',
-      },
-      { onConflict: 'campus_id,academic_year,semester' }
-    );
-  }
-
-  /**
-   * Retrieves list of all retired cohorts for a campus.
-   */
-  public async getRetiredCohorts(campusId?: string): Promise<any[]> {
-    let query = this.supabase.admin.from('retired_cohorts').select('*');
-    if (campusId) {
-      query = query.eq('campus_id', campusId);
-    }
-    const { data } = await query;
-    return data || [];
   }
 
   /**
@@ -188,7 +136,7 @@ export class PeriodAttendanceService {
 
     // 1. Fetch timetable entry and relations
     const { data: entry, error: entryError } = await this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         course_id,
@@ -245,6 +193,12 @@ export class PeriodAttendanceService {
       );
     }
 
+    const { data: termSettings, error: termError } = await this.supabase.admin.from('campus_settings')
+      .select('term_started_at').eq('campus_id', (entry as any).campus_id || (entry as any).departments?.campus_id).maybeSingle();
+    if (termError) throw new InternalServerErrorException('Unable to verify attendance term.');
+    if (termSettings?.term_started_at && attendanceDate < getISTDateTime(new Date(termSettings.term_started_at)).dateString) {
+      throw new BadRequestException('Attendance belongs to a concluded term.');
+    }
     // 5. Active cohort guard (R28)
     const hostCampusId = (entry as any).campus_id || (entry as any).departments?.campus_id;
     if (hostCampusId && entry.academic_year && entry.semester) {
@@ -287,7 +241,7 @@ export class PeriodAttendanceService {
 
       const hostCampusId = entry.campus_id || entry.departments?.campus_id;
       const { data: assignments } = await this.supabase.admin
-        .from('teacher_course_assignments')
+        .from('current_teacher_course_assignments')
         .select('id, course_id, campus_id, academic_year, semester')
         .eq('teacher_id', user.userId)
         .eq('course_id', entry.course_id);
@@ -319,7 +273,7 @@ export class PeriodAttendanceService {
    */
   async getCurrentPeriod(user: AuthUser) {
     const { data: assignments, error: assignError } = await this.supabase.admin
-      .from('teacher_course_assignments')
+      .from('current_teacher_course_assignments')
       .select('course_id, campus_id, academic_year, semester')
       .eq('teacher_id', user.userId);
 
@@ -341,7 +295,7 @@ export class PeriodAttendanceService {
     const currentMinutes = ist.totalMinutes;
 
     const { data: rawEntries, error: entriesError } = await this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         course_id,
@@ -462,7 +416,7 @@ export class PeriodAttendanceService {
       .maybeSingle();
 
     const { data: assignments, error: assignError } = await this.supabase.admin
-      .from('teacher_course_assignments')
+      .from('current_teacher_course_assignments')
       .select('course_id, campus_id, academic_year, semester, courses(id, course_code, title, category, semester, credits)')
       .eq('teacher_id', user.userId);
 
@@ -483,7 +437,7 @@ export class PeriodAttendanceService {
     }
 
     let scheduleQuery = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         course_id,
@@ -630,7 +584,7 @@ export class PeriodAttendanceService {
     semester?: number
   ) {
     let query = this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('student_id, campus_id, academic_year, semester, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .or(
         `slot_1_course_id.eq.${courseId},slot_2_course_id.eq.${courseId},slot_3_course_id.eq.${courseId},slot_4_course_id.eq.${courseId},slot_5_course_id.eq.${courseId},slot_6_course_id.eq.${courseId},slot_7_course_id.eq.${courseId},slot_8_course_id.eq.${courseId}`
@@ -895,111 +849,7 @@ export class PeriodAttendanceService {
       }
     }
 
-    // Fallback atomic handling for unit tests & in-memory mocks
-    // Check concurrency via existing marks / session
-    const [{ data: existingMarks }, { data: existingSession }] = await Promise.all([
-      this.supabase.admin
-        .from('period_attendance')
-        .select('student_id, marked_at')
-        .eq('timetable_slot_id', slotId)
-        .eq('attendance_date', resolved.attendanceDate),
-      (() => {
-        const sq = this.supabase.admin.from('period_attendance_sessions');
-        return typeof (sq as any)?.select === 'function'
-          ? sq.select('revision, revision_token, last_marked_at').eq('timetable_slot_id', slotId).eq('attendance_date', resolved.attendanceDate).maybeSingle()
-          : Promise.resolve({ data: null });
-      })(),
-    ]);
-
-    const isExistingMarked = (existingMarks || []).length > 0;
-    const currentRev = existingSession?.revision ?? (isExistingMarked ? 1 : 0);
-
-    // If caller provided an expected revision, enforce CAS token check
-    if (parsedExpectedRev !== null) {
-      if (parsedExpectedRev !== currentRev) {
-        throw new ConflictException(
-          `Attendance for this period was updated by another teacher (revision mismatch: current ${currentRev}, expected ${parsedExpectedRev}). Please refresh to inspect the latest marks.`
-        );
-      }
-    } else if (lastMarkedAtInput) {
-      // Legacy timestamp fallback check
-      const newer = (existingMarks || []).filter((m: any) => m.marked_at && m.marked_at > lastMarkedAtInput);
-      if (newer.length > 0) {
-        throw new ConflictException(
-          'Attendance for this period was updated by another teacher while you were editing. Please refresh to inspect the latest marks.'
-        );
-      }
-    }
-
-    const newRev = currentRev + 1;
-    const revToken = crypto.createHash('md5').update(`${slotId}_${resolved.attendanceDate}_${newRev}`).digest('hex');
-    const absentSet = new Set(absentStudentIds);
-
-    const rows = roster.map((student) => ({
-      timetable_slot_id: slotId,
-      student_id: student.id,
-      course_id: resolved.entry.course_id,
-      marked_by: user.userId,
-      status: absentSet.has(student.id) ? 'absent' : 'present',
-      marked_at: nowIso,
-      attendance_date: resolved.attendanceDate,
-      is_late_entry: false,
-    }));
-
-    const { error: upsertError } = await this.supabase.admin
-      .from('period_attendance')
-      .upsert(rows, { onConflict: 'timetable_slot_id,student_id,attendance_date' });
-
-    if (upsertError) {
-      throw new InternalServerErrorException(`Failed to record attendance: ${upsertError.message}`);
-    }
-
-    // Upsert session
-    const sessTable = this.supabase.admin.from('period_attendance_sessions');
-    if (typeof (sessTable as any)?.upsert === 'function') {
-      await sessTable.upsert(
-        {
-          timetable_slot_id: slotId,
-          attendance_date: resolved.attendanceDate,
-          revision: newRev,
-          revision_token: revToken,
-          marked_by: user.userId,
-          last_marked_at: nowIso,
-          total_students: roster.length,
-          present_count: rows.length - absentStudentIds.length,
-          absent_count: absentStudentIds.length,
-          updated_at: nowIso,
-        },
-        { onConflict: 'timetable_slot_id,attendance_date' }
-      );
-    }
-
-    await this.auditLogger.log({
-      eventType: 'period_attendance_marked',
-      userId: user.userId,
-      userRole: user.role,
-      action: `marked period attendance for slot ${slotId} on ${resolved.attendanceDate} (${absentStudentIds.length} absent, ${rows.length - absentStudentIds.length} present, revision ${newRev})`,
-      resourceType: 'period_attendance',
-      resourceId: slotId,
-      status: 'success',
-      ipAddress: ip,
-      metadata: {
-        attendance_date: resolved.attendanceDate,
-        revision: newRev,
-        marked_at: nowIso,
-      },
-    });
-
-    return {
-      success: true,
-      attendance_date: resolved.attendanceDate,
-      marked_at: nowIso,
-      revision: newRev,
-      revision_token: revToken,
-      total_students: roster.length,
-      present_count: rows.length - absentStudentIds.length,
-      absent_count: absentStudentIds.length,
-    };
+    throw new InternalServerErrorException('Atomic attendance service unavailable. No attendance changes were saved.');
   }
 
   /**
@@ -1140,112 +990,7 @@ export class PeriodAttendanceService {
       }
     }
 
-    const [{ data: existingTargetMarks }, { data: existingTargetSession }] = await Promise.all([
-      this.supabase.admin
-        .from('period_attendance')
-        .select('student_id')
-        .eq('timetable_slot_id', dto.target_slot_id)
-        .eq('attendance_date', dto.attendance_date),
-      (() => {
-        const sq = this.supabase.admin.from('period_attendance_sessions');
-        return typeof (sq as any)?.select === 'function'
-          ? sq.select('revision, revision_token').eq('timetable_slot_id', dto.target_slot_id).eq('attendance_date', dto.attendance_date).maybeSingle()
-          : Promise.resolve({ data: null });
-      })(),
-    ]);
-
-    const isTargetMarked = (existingTargetMarks || []).length > 0;
-    const currentTargetRev = existingTargetSession?.revision ?? (isTargetMarked ? 1 : 0);
-
-    // Overwrite guard & revision CAS
-    if (parsedExpectedTargetRev !== null) {
-      if (parsedExpectedTargetRev !== currentTargetRev) {
-        throw new ConflictException(
-          `Target period revision mismatch (current ${currentTargetRev}, expected ${parsedExpectedTargetRev}). Please inspect current target marks before copying (R29).`
-        );
-      }
-    } else if (isTargetMarked && !dto.overwrite) {
-      throw new ConflictException(
-        `Target period already has ${existingTargetMarks.length} attendance marks recorded for ${dto.attendance_date}. Set overwrite to true or provide expected target revision to proceed (F49/R29).`
-      );
-    }
-
-    const nowIso = new Date().toISOString();
-    const newTargetRev = currentTargetRev + 1;
-    const targetRevToken = crypto
-      .createHash('md5')
-      .update(`${dto.target_slot_id}_${dto.attendance_date}_${newTargetRev}`)
-      .digest('hex');
-
-    const targetRows = sourceMarks.map((m: any) => ({
-      timetable_slot_id: dto.target_slot_id,
-      student_id: m.student_id,
-      course_id: m.course_id,
-      marked_by: user.userId,
-      status: m.status,
-      marked_at: nowIso,
-      attendance_date: dto.attendance_date,
-      is_late_entry: false,
-    }));
-
-    const { error: insertError } = await this.supabase.admin
-      .from('period_attendance')
-      .upsert(targetRows, { onConflict: 'timetable_slot_id,student_id,attendance_date' });
-
-    if (insertError) {
-      throw new InternalServerErrorException(
-        `Failed to copy practical attendance: ${insertError.message}`
-      );
-    }
-
-    // Upsert target session
-    const presentCount = targetRows.filter((r) => r.status === 'present').length;
-    const absentCount = targetRows.filter((r) => r.status === 'absent').length;
-
-    const targetSessTable = this.supabase.admin.from('period_attendance_sessions');
-    if (typeof (targetSessTable as any)?.upsert === 'function') {
-      await targetSessTable.upsert(
-        {
-          timetable_slot_id: dto.target_slot_id,
-          attendance_date: dto.attendance_date,
-          revision: newTargetRev,
-          revision_token: targetRevToken,
-          marked_by: user.userId,
-          last_marked_at: nowIso,
-          total_students: targetRows.length,
-          present_count: presentCount,
-          absent_count: absentCount,
-          updated_at: nowIso,
-        },
-        { onConflict: 'timetable_slot_id,attendance_date' }
-      );
-    }
-
-    await this.auditLogger.log({
-      eventType: 'period_attendance_copied',
-      userId: user.userId,
-      userRole: user.role,
-      action: `copied practical attendance from slot ${dto.source_slot_id} to ${dto.target_slot_id} on ${dto.attendance_date} (${targetRows.length} records, revision ${newTargetRev})`,
-      resourceType: 'period_attendance',
-      resourceId: dto.target_slot_id,
-      status: 'success',
-      ipAddress: ip,
-      metadata: {
-        source_slot_id: dto.source_slot_id,
-        target_slot_id: dto.target_slot_id,
-        attendance_date: dto.attendance_date,
-        target_revision: newTargetRev,
-      },
-    });
-
-    return {
-      success: true,
-      copied_count: targetRows.length,
-      present_count: presentCount,
-      absent_count: absentCount,
-      target_revision: newTargetRev,
-      attendance_date: dto.attendance_date,
-    };
+    throw new InternalServerErrorException('Atomic attendance copy unavailable. No changes were saved.');
   }
 
   /**
@@ -1253,7 +998,7 @@ export class PeriodAttendanceService {
    */
   async getSlotRosterForHod(user: AuthUser, slotId: string, queryDate?: string) {
     const { data: entry, error: entryError } = await this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         course_id,
@@ -1365,7 +1110,7 @@ export class PeriodAttendanceService {
     }
 
     let query = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         course_id,

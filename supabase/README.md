@@ -1,5 +1,7 @@
 # Database setup and recovery
 
+This branch adds the [semester lifecycle release](SEMESTER_LIFECYCLE_ROLLOUT.md). The final fresh-project bootstrap applies `changes/semester_lifecycle.sql`, resulting in 20 application tables and four backend-only current-term views. For an existing project, the owner runs that SQL file in the SQL Editor during the coordinated release after taking a recovery backup; the new change has not been applied to production. No CLI installation is required for this workflow. The historical snapshot and historical release notes below remain a record of their original schemas.
+
 The historical migration directory contains changes to an existing database. **Do not apply that history to an empty database.** `baseline/schema.sql` is the complete application schema as of migration `20261020135038`: 27 tables, 42 routines, 3 compatibility views, constraints, indexes, triggers, RLS policies, service-role grants and legacy migration receipts. The snapshot includes no student, faculty, password, campus, registration or attendance rows.
 
 For a **fresh Supabase project**, use its standard Auth installation and run as the database `postgres` user:

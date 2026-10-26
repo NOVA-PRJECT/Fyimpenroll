@@ -6,6 +6,7 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   UseGuards,
   Req,
   BadRequestException,
@@ -24,6 +25,15 @@ import { ReassignTeacherSchema } from './dto/reassign-teacher.dto';
 @UseGuards(AuthGuard, RolesGuard)
 export class AssignmentsController {
   constructor(private readonly assignmentsService: AssignmentsService) {}
+
+  @Get('history')
+  @Roles('hod', 'campus_director', 'teacher', 'superadmin')
+  async history(@CurrentUser() user: AuthUser, @Query('academic_year') year: string, @Query('semester') semester: string) {
+    if (!/^\d{4}-\d{2}$/.test(year || '') || !Number.isInteger(Number(semester)) || Number(semester)<1 || Number(semester)>10) {
+      throw new BadRequestException('Select an academic year and a semester from 1 to 10')
+    }
+    return this.assignmentsService.history(user, year, Number(semester))
+  }
 
   @Get('courses')
   @Roles('hod', 'superadmin')

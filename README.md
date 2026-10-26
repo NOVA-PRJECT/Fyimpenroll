@@ -1,5 +1,7 @@
 # FYIMP course registration
 
+The `codex/semester-lifecycle-cleanup` implementation separates promotion from semester-11 account deletion and preserves registration/credit-ledger, timetable and teacher-assignment history. Its database change is prepared locally and has not been applied to production. Follow [the semester lifecycle rollout](supabase/SEMESTER_LIFECYCLE_ROLLOUT.md), including the owner-run SQL file, before deploying this branch. No Supabase CLI installation is required for this workflow.
+
 This repository contains the NestJS backend, Next.js web portal, Expo mobile app and shared contracts. The public portal is https://fyimpenroll.vercel.app.
 
 Use Node 24.19.x and npm 11.17.x. Configure the workspace environment files from their examples, then run:

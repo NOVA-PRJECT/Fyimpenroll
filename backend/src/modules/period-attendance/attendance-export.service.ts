@@ -36,7 +36,7 @@ export class AttendanceExportService {
       .select('id, full_name, cap_application_number, current_semester').eq('department_id',deptId)
       .eq('campus_id',department.campus_id).eq('current_semester',semester).order('id'));
     const studentIds = studentList.map(s => s.id);
-    const registrations = studentIds.length ? await fetchByIdChunks<any>(studentIds, chunk => this.supabase.admin.from('student_registrations')
+    const registrations = studentIds.length ? await fetchByIdChunks<any>(studentIds, chunk => this.supabase.admin.from('current_student_registrations')
       .select('*').eq('semester',semester).eq('academic_year',settings.academic_year).in('student_id',chunk).order('id')) : [];
     const enrolledCourseSet = new Set<string>();
     const ids = new Set<string>();

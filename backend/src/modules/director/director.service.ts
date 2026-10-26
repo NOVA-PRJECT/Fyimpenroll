@@ -7,6 +7,7 @@ import {
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuditLoggerService } from '../../core/logging/audit-logger.service'
 import { AuthUser } from '../../core/auth/types'
+import { termOperation } from '../../core/database/term-operation'
 import { attendanceSettings, CampusAttendanceSettingsSchema, campusSetupError } from '../campus-attendance/campus-settings'
 
 @Injectable()
@@ -55,7 +56,7 @@ export class DirectorService {
 
     const { data: settings } = await this.supabase.admin
       .from('campus_settings')
-      .select('deadline, min_credits, max_credits, academic_year, last_promoted_at')
+      .select('deadline, min_credits, max_credits, academic_year, last_promoted_at, term_version, term_started_at')
       .eq('campus_id', faculty.campus_id)
       .maybeSingle()
 
@@ -102,11 +103,7 @@ export class DirectorService {
     }
 
     // F54: Verify that a row was actually affected; never silently succeed on 0 rows
-    const { data: updated, error } = await this.supabase.admin
-      .from('campus_settings')
-      .update(updatePayload)
-      .eq('campus_id', campusId)
-      .select('id')
+    const { data: updated, error } = await termOperation(this.supabase.admin, user, 'update_campus_settings', { ...updatePayload, p_actor_id: user.userId })
 
     if (error) {
       throw new InternalServerErrorException(`Failed to update campus settings: ${error.message}`)

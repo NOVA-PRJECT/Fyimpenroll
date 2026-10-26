@@ -69,11 +69,12 @@ const AddStudentSchema = z.object({
 })
 
 const UpdateStudentSchema = z.object({
+  expected_semester: z.coerce.number().int().min(1).max(11),
   id: z.string().optional(),
   student_id: z.string().optional(),
   full_name: z.string().min(1, 'Full name is required').max(100),
   cap_application_number: z.string().min(1, 'CAP Application Number cannot be empty').optional(),
-  current_semester: z.coerce.number().int().min(1).max(10),
+  current_semester: z.coerce.number().int().min(1).max(11),
 }).refine(data => data.id || data.student_id, {
   message: 'Student ID is required',
 }).transform(data => ({
@@ -81,6 +82,7 @@ const UpdateStudentSchema = z.object({
   full_name: data.full_name,
   cap_application_number: data.cap_application_number?.trim(),
   current_semester: data.current_semester,
+  expected_semester: data.expected_semester,
 }))
 
 const BlueprintSchema = z.object({

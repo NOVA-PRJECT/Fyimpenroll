@@ -53,7 +53,7 @@ test('enrolled courses remain available when no teacher is assigned', async () =
 test('a failed atomic teacher change is propagated without direct table fallbacks', async () => {
   for (const [code, status] of [['23514',400], ['P4030',403], ['P4040',404], ['23P01',409], ['XX000',500]]) {
     const db = { admin: { rpc: async () => ({ data: null, error: { code, message: 'synthetic failure' } }), from() { assert.fail('must never use partial table writes') } } }
-    await assert.rejects(mutateTeacherAssignments(db, { p_actor_id: 'actor', p_operation: 'substitute' }), error => error.getStatus() === status)
+    await assert.rejects(mutateTeacherAssignments(db, { userId: 'actor', role: 'hod', campus_id: 'campus', term_version: 0 }, { p_actor_id: 'actor', p_operation: 'substitute' }), error => error.getStatus() === status)
   }
 })
 

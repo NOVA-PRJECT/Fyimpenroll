@@ -158,6 +158,13 @@ export class AuthGuard implements CanActivate {
       mustChangePassword = false
     }
 
+    let termVersion: number | undefined
+    if (campusId) {
+      const { data: term, error: termError } = await this.supabaseService.admin.from('campus_settings')
+        .select('term_version').eq('campus_id', campusId).maybeSingle()
+      if (termError) throw new InternalServerErrorException('Could not verify the current campus term')
+      termVersion = term?.term_version
+    }
     const authUser: AuthUser = {
       userId: user.id,
       email: user.email ?? '',
@@ -166,6 +173,7 @@ export class AuthGuard implements CanActivate {
       campus_id: campusId ?? null,
       must_change_password: mustChangePassword ?? false,
       current_semester: currentSemester,
+      term_version: termVersion,
       full_name: fullName,
       token,
     }

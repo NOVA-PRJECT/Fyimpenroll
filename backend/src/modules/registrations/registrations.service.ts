@@ -1,3 +1,4 @@
+import { termOperation } from '../../core/database/term-operation'
 import { fetchAllPaginated } from '../../core/database/pagination.util'
 import {
   BadRequestException,
@@ -309,14 +310,14 @@ export class RegistrationsService {
         .eq('academic_year', settings.academic_year)
         .maybeSingle(),
       this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select('id, pathway_id, selections, allocation_metadata, submitted_at, total_credits, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
         .eq('student_id', user.userId)
         .eq('semester', semester)
         .eq('academic_year', settings.academic_year)
         .maybeSingle(),
       this.supabase.admin
-        .from('system_logs')
+        .from('current_system_logs')
         .select('id, status, completed_at')
         .eq('log_type', 'allocation_run')
         .eq('campus_id', campusId)
@@ -337,7 +338,7 @@ export class RegistrationsService {
     // Gracefully handle if slot_7/slot_8 columns are not yet in DB schema
     if (regResWith8.error && (regResWith8.error.message?.includes('slot_7_course_id') || regResWith8.error.message?.includes('slot_8_course_id'))) {
       const { data: fallbackReg } = await this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select('id, pathway_id, selections, allocation_metadata, submitted_at, total_credits, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id')
         .eq('student_id', user.userId)
         .eq('semester', semester)
@@ -443,7 +444,7 @@ export class RegistrationsService {
     const availableSeats: Record<string, number> = {}
     if (allocationCompleted) {
       const { data: allRegs } = await this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
         .eq('campus_id', campusId)
         .eq('academic_year', settings.academic_year)
@@ -686,7 +687,7 @@ export class RegistrationsService {
 
     // Post-allocation guard: Block preference submissions once allocation has completed for this semester
     const { data: completedRun } = await this.supabase.admin
-      .from('system_logs')
+      .from('current_system_logs')
       .select('id')
       .eq('log_type', 'allocation_run')
       .eq('campus_id', campusId)
@@ -723,7 +724,7 @@ export class RegistrationsService {
         .eq('academic_year', settings.academic_year)
         .maybeSingle(),
       this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select('id, submitted_at, allocation_metadata')
         .eq('student_id', user.userId)
         .eq('semester', semester)
@@ -995,7 +996,7 @@ export class RegistrationsService {
       throw new InternalServerErrorException('Database RPC submit_student_registration is required')
     }
 
-    const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('submit_student_registration', {
+    const { data: rpcRes, error: rpcErr } = await termOperation(this.supabase.admin, user, 'submit_student_registration', {
       p_student_id: user.userId,
       p_campus_id: campusId || user.campus_id,
       p_semester: semester,
@@ -1253,7 +1254,7 @@ export class RegistrationsService {
 
     // F30 & R15: Enforce unpublished cohort state (scoped to student's host campus)
     let pubQuery = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select('id')
       .eq('academic_year', settings.academic_year)
       .eq('semester', currentSemester)
@@ -1273,7 +1274,7 @@ export class RegistrationsService {
 
     // Step 2: Fetch student's existing registration record
     const { data: reg, error: regErr } = await this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('*')
       .eq('student_id', user.userId)
       .eq('semester', currentSemester)
@@ -1370,7 +1371,7 @@ export class RegistrationsService {
     // Step 5: Global capacity check across ALL campuses for active academic year (F21)
     const seatLimit = course.seat_limit ? Number(course.seat_limit) : 60
     const { count: enrolledCount } = await this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', settings.academic_year)
       .eq('semester', currentSemester)
@@ -1389,7 +1390,7 @@ export class RegistrationsService {
       throw new InternalServerErrorException('Database RPC execute_student_course_change is required')
     }
 
-    const { data: rpcRes, error: rpcErr } = await this.supabase.admin.rpc('execute_student_course_change', {
+    const { data: rpcRes, error: rpcErr } = await termOperation(this.supabase.admin, user, 'execute_student_course_change', {
       p_student_id: user.userId,
       p_campus_id: campusId,
       p_semester: currentSemester,

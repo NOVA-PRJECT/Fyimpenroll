@@ -13,6 +13,7 @@ import { AuthUser } from '../../core/auth/types';
 import { CampusAttendanceStatus, formatCampusTime } from '@fyimp/contracts';
 import { attendanceSettings, campusSetupError, timeMinutes } from './campus-settings';
 import { CampusSignInSchema } from './dto/campus-attendance.dto';
+import { termOperation } from '../../core/database/term-operation';
 
 interface CampusRecord {
   id: string;
@@ -116,7 +117,7 @@ export class CampusAttendanceService {
     // 1. Resolve student and their assigned campus
     const { data: student, error: studentError } = await this.supabase.admin
       .from('students')
-      .select('id, full_name, department_id, campus_id, campuses(*)')
+      .select('id, full_name, department_id, campus_id, current_semester, campuses(*)')
       .eq('id', studentId)
       .maybeSingle();
 
@@ -124,6 +125,7 @@ export class CampusAttendanceService {
     if (!student) {
       throw new NotFoundException('Student profile not found.');
     }
+    if (student.current_semester === 11) throw new BadRequestException('Your programme is completed. Campus sign-ins are closed.');
 
     const campus = (student as any).campuses as CampusRecord;
     if (!campus) {
@@ -197,9 +199,7 @@ export class CampusAttendanceService {
     }
 
     // 5. Insert Record (ZERO COORDINATE RETENTION: lat/lon are NOT saved)
-    const { data: inserted, error: insertError } = await this.supabase.admin
-      .from('campus_sign_ins')
-      .insert({
+    const { data: inserted, error: insertError } = await termOperation(this.supabase.admin, user, 'record_campus_sign_in', {
         student_id: studentId,
         campus_id: campus.id,
         session_type: sessionType,
@@ -207,9 +207,7 @@ export class CampusAttendanceService {
         location_accuracy_meters: Math.round(accuracy * 10) / 10,
         status: status,
         source: 'gps',
-      })
-      .select('id, session_type, status, signed_in_at, location_accuracy_meters')
-      .single();
+      });
 
     if (insertError?.code === '23505') throw new ConflictException(`Your ${sessionType} campus sign-in is already recorded. Refresh your status.`);
     if (insertError || !inserted) throw new InternalServerErrorException('Failed to record campus sign-in. Please refresh your status before trying again.');
@@ -261,7 +259,7 @@ export class CampusAttendanceService {
 
     const { data: student, error: studentError } = await this.supabase.admin
       .from('students')
-      .select('id, full_name, campus_id, department_id, campuses(*)')
+      .select('id, full_name, campus_id, department_id, current_semester, campuses(*)')
       .eq('id', studentId)
       .maybeSingle();
 
@@ -342,8 +340,8 @@ export class CampusAttendanceService {
       date: ist.dateString,
       current_time_ist: ist.timeString,
       active_session: activeSession,
-      can_sign_in: !setupError && activeSession !== 'closed' && !completed,
-      unavailable_reason: setupError || (activeSession === 'closed' ? `Campus checkpoints closed at ${formatCampusTime(settings.day_end_time)} IST.` : completed ? 'This session is already recorded.' : null),
+      can_sign_in: student.current_semester !== 11 && !setupError && activeSession !== 'closed' && !completed,
+      unavailable_reason: student.current_semester === 11 ? 'Programme completed; campus sign-ins are closed.' : setupError || (activeSession === 'closed' ? `Campus checkpoints closed at ${formatCampusTime(settings.day_end_time)} IST.` : completed ? 'This session is already recorded.' : null),
       campus: {
         id: campus?.id ?? null,
         name: campus?.name ?? null,
@@ -386,6 +384,7 @@ export class CampusAttendanceService {
     let studentsQuery = this.supabase.admin
       .from('students')
       .select('id, full_name, cap_application_number, current_semester, department_id, campus_id, campuses(*)')
+      .lt('current_semester', 11)
       .order('full_name', { ascending: true });
 
     if (user.role === 'hod') {
@@ -426,6 +425,12 @@ export class CampusAttendanceService {
 
     // 2. Fetch scoped students
     const students = await fetchAllPaginated<any>(studentsQuery.order('id'));
+
+    const campusTerms = await fetchByIdChunks<any>([...new Set<string>(students.map(s => s.campus_id))], ids =>
+      this.supabase.admin.from('campus_settings').select('id, campus_id, term_started_at').in('campus_id', ids).order('id'));
+    if (campusTerms.some(term => term.term_started_at && targetDate < this.getISTDateTime(new Date(term.term_started_at)).dateString)) {
+      throw new BadRequestException('Campus attendance for this concluded term has been cleared.');
+    }
 
     const studentIds = (students || []).map((s) => s.id);
 

@@ -41,10 +41,10 @@ export class CreditLedgerService {
     if (user.role === 'teacher') {
       if (!user.campus_id) throw new ForbiddenException('Teacher has no campus affiliation')
       deliveries = await fetchAllPaginated<any>(this.supabase.admin.from('teacher_course_assignments')
-        .select('id, course_id, campus_id, academic_year, semester').eq('teacher_id', user.userId).eq('campus_id', student.campus_id).order('id'))
+        .select('id, course_id, campus_id, academic_year, semester, term_version').eq('teacher_id', user.userId).eq('campus_id', student.campus_id).order('id'))
     }
     const enrollments = registrations.flatMap(reg => registrationSlots(reg).map(slot => ({ ...slot, reg })))
-      .filter(item => deliveries === null || deliveries.some(d => d.course_id === item.courseId && d.semester === item.reg.semester && d.academic_year === item.reg.academic_year))
+      .filter(item => deliveries === null || deliveries.some(d => d.course_id === item.courseId && d.semester === item.reg.semester && d.academic_year === item.reg.academic_year && d.term_version === item.reg.term_version))
     if (deliveries !== null && !enrollments.length) throw new ForbiddenException('No assigned class enrollment for this student')
     const ids = [...new Set(enrollments.map(item => item.courseId))]
     const courses = ids.length ? await fetchAllPaginated<any>(this.supabase.admin.from('courses')

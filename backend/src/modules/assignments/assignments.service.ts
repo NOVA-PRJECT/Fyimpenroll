@@ -9,6 +9,7 @@ import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { AuthUser } from '../../core/auth/types';
 import { BatchAssignmentItem } from './dto/assign-teacher.dto';
+import { fetchAllPaginated } from '../../core/database/pagination.util';
 
 @Injectable()
 export class AssignmentsService {
@@ -16,6 +17,18 @@ export class AssignmentsService {
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService
   ) {}
+
+  async history(user: AuthUser, academicYear: string, semester: number) {
+    let query = this.supabase.admin.from('teacher_course_assignments')
+      .select('*, courses!inner(id, course_code, title, department_id)').eq('academic_year', academicYear).eq('semester', semester)
+    if (user.role !== 'superadmin' && user.role !== 'teacher') {
+      if (!user.campus_id) throw new ForbiddenException('Campus affiliation required')
+      query = query.eq('campus_id', user.campus_id)
+    }
+    if (user.role === 'hod') query = query.eq('courses.department_id', user.department_id)
+    if (user.role === 'teacher') query = query.eq('teacher_id', user.userId)
+    return { assignments: await fetchAllPaginated<any>(query.order('id')) }
+  }
 
   /**
    * Returns all courses in the HOD's department, each with their currently assigned teachers,
@@ -55,7 +68,7 @@ export class AssignmentsService {
     let assignments: any[] = [];
     if (courseIds.length > 0) {
       const { data: assignData, error: assignError } = await this.supabase.admin
-        .from('teacher_course_assignments')
+        .from('current_teacher_course_assignments')
         .select('id, teacher_id, course_id, assigned_at, assigned_by, campus_id, academic_year, semester')
         .in('course_id', courseIds);
 
@@ -119,7 +132,7 @@ export class AssignmentsService {
     user: AuthUser, teacherId: string, courseId: string, ip: string,
     opts?: { campus_id?: string; academic_year?: string; semester?: number },
   ) {
-    const result = await mutateTeacherAssignments(this.supabase, {
+    const result = await mutateTeacherAssignments(this.supabase, user, {
       p_actor_id: user.userId, p_operation: 'assign',
       p_items: [{ teacher_id: teacherId, course_id: courseId, ...opts }],
     });
@@ -133,7 +146,7 @@ export class AssignmentsService {
     if (!Array.isArray(assignments) || !assignments.length || assignments.length > 100) {
       throw new BadRequestException('Provide between 1 and 100 assignments.');
     }
-    const result = await mutateTeacherAssignments(this.supabase, {
+    const result = await mutateTeacherAssignments(this.supabase, user, {
       p_actor_id: user.userId, p_operation: 'batch', p_items: assignments,
     });
     await this.auditLogger.log({ eventType: 'teachers_batch_assigned', userId: user.userId, userRole: user.role,
@@ -143,7 +156,7 @@ export class AssignmentsService {
   }
 
   async reassignTeacher(user: AuthUser, assignmentId: string, newTeacherId: string, ip: string) {
-    const result = await mutateTeacherAssignments(this.supabase, {
+    const result = await mutateTeacherAssignments(this.supabase, user, {
       p_actor_id: user.userId, p_operation: 'reassign', p_assignment_id: assignmentId, p_teacher_id: newTeacherId,
     });
     await this.auditLogger.log({ eventType: 'teacher_reassigned', userId: user.userId, userRole: user.role,
@@ -153,7 +166,7 @@ export class AssignmentsService {
   }
 
   async removeAssignment(user: AuthUser, assignmentId: string, ip: string) {
-    const result = await mutateTeacherAssignments(this.supabase, {
+    const result = await mutateTeacherAssignments(this.supabase, user, {
       p_actor_id: user.userId, p_operation: 'remove', p_assignment_id: assignmentId,
     });
     await this.auditLogger.log({ eventType: 'teacher_assignment_removed', userId: user.userId, userRole: user.role,

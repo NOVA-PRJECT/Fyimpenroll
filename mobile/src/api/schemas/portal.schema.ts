@@ -1,9 +1,5 @@
 import { z } from 'zod';
 
-export const NoticesSchema = z.array(z.object({
-  id: z.string(), title: z.string(), content: z.string(), created_at: z.string(),
-}));
-
 export const TeacherScheduleSchema = z.object({ periods: z.array(z.object({
   timetable_slot_id: z.string(), course_code: z.string(), course_title: z.string(),
   period_number: z.number(), start_time: z.string(), end_time: z.string(), is_marked: z.boolean(),

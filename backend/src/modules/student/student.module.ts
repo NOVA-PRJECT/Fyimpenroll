@@ -4,10 +4,9 @@ import { StudentController } from './student.controller'
 import { AuthCoreModule } from '../../core/auth/auth-core.module'
 import { StudentPortalService } from './student-portal.service'
 import { CampusAttendanceModule } from '../campus-attendance/campus-attendance.module'
-import { NoticesModule } from '../notices/notices.module'
 
 @Module({
-  imports: [AuthCoreModule, CampusAttendanceModule, NoticesModule],
+  imports: [AuthCoreModule, CampusAttendanceModule],
   controllers: [StudentController],
   providers: [StudentService, StudentPortalService],
   exports: [StudentService],

@@ -1,3 +1,4 @@
+import { termOperation } from '../../core/database/term-operation'
 import {
   BadRequestException,
   ConflictException,
@@ -102,7 +103,7 @@ export class AllocationService {
 
     // F22 & R15: Verify timetable has not already been published for this campus cohort
     let timetablePubQuery = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', body.academicYear)
       .eq('semester', sem)
@@ -126,8 +127,7 @@ export class AllocationService {
     // F23 & R16: Atomically claim allocation run via claim_allocation_run RPC with worker fencing token
     const fencingToken = crypto.randomUUID()
     let runId: string
-    const { data: claimedRunId, error: claimErr } = await this.supabase.admin.rpc(
-      'claim_allocation_run',
+    const { data: claimedRunId, error: claimErr } = await termOperation(this.supabase.admin, user, 'claim_allocation_run',
       {
         p_campus_id: campusId,
         p_academic_year: body.academicYear,
@@ -272,7 +272,7 @@ export class AllocationService {
 
       // F21 & R36: Baseline capacity calculation across all campuses for active academic year & semester
       const existingRegQuery = this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select('student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
         .eq('academic_year', body.academicYear)
         .eq('semester', body.semester)
@@ -626,7 +626,7 @@ export class AllocationService {
     }
 
     const { data: run, error } = await this.supabase.admin
-      .from('system_logs')
+      .from('current_system_logs')
       .select('id,status,academic_year,semester,campus_id,user_id,started_at,completed_at,created_at,error_message,metadata')
       .eq('log_type', 'allocation_run')
       .eq('campus_id', campusId)
@@ -655,7 +655,7 @@ export class AllocationService {
 
     // Fetch the run to verify it belongs to this campus and is actually failed (F25)
     const { data: run, error: fetchErr } = await this.supabase.admin
-      .from('system_logs')
+      .from('current_system_logs')
       .select('id, campus_id, academic_year, semester, status')
       .eq('log_type', 'allocation_run')
       .eq('id', runId)
@@ -678,7 +678,7 @@ export class AllocationService {
 
     // F25 & R15: Published cohorts cannot be reallocated or cleared (scoped to campus)
     let publishedTimetableQuery = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', run.academic_year)
       .eq('semester', run.semester)
@@ -701,7 +701,7 @@ export class AllocationService {
 
     // Delete only the verified failed allocation log.
     const { error: delErr } = await this.supabase.admin
-      .from('system_logs')
+      .from('current_system_logs')
       .delete()
       .eq('id', runId)
       .eq('log_type', 'allocation_run')
@@ -759,7 +759,7 @@ export class AllocationService {
     const prefList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('registration_preferences')
       .select('id, student_id, preferences').in('student_id',ids)
       .eq('semester',sem).eq('academic_year',academicYear).order('id'))
-    const regList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('student_registrations')
+    const regList = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('current_student_registrations')
       .select('id, student_id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id, allocation_metadata')
       .in('student_id',ids).eq('semester',sem).eq('academic_year',academicYear).order('id'))
 
@@ -911,7 +911,7 @@ export class AllocationService {
       const [studentRes, registrationRes, blueprintRes] = await Promise.all([
         this.supabase.admin.from('students').select('id, campus_id, department_id, current_semester')
           .eq('id', studentId).eq('department_id', departmentId).eq('campus_id', campusId).maybeSingle(),
-        this.supabase.admin.from('student_registrations').select('*')
+        this.supabase.admin.from('current_student_registrations').select('*')
           .eq('student_id', studentId).eq('campus_id', campusId).eq('semester', sem).eq('academic_year', academicYear).maybeSingle(),
         this.supabase.admin.from('semester_blueprints').select('*')
           .eq('department_id', departmentId).eq('semester', sem).maybeSingle(),
@@ -963,7 +963,7 @@ export class AllocationService {
 
     // Fetch registrations across all campuses for this academic_year and semester (F21 global capacity across 8 slots)
     const registrations = await fetchAllPaginated<any>(this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .eq('academic_year', academicYear).eq('semester', sem).order('id'))
 
@@ -1074,7 +1074,7 @@ export class AllocationService {
       }
     } else if (user.role === 'teacher') {
       const { data: teacherAssignment } = await this.supabase.admin
-        .from('teacher_course_assignments')
+        .from('current_teacher_course_assignments')
         .select('id')
         .eq('teacher_id', user.userId)
         .eq('course_id', course_id)
@@ -1112,7 +1112,7 @@ export class AllocationService {
 
     // Fetch existing registration record if any
     const { data: reg } = await this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('id, allocation_metadata, pathway_id, campus_id, academic_year, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
       .eq('student_id', student_id)
       .eq('semester', activeSemester)
@@ -1158,7 +1158,7 @@ export class AllocationService {
     // F21: Global capacity check across all campuses for this course (academic_year & semester, across all 8 slots)
     const seatLimit = course.seat_limit == null ? 60 : Number(course.seat_limit)
     const { count: allocatedCount } = await this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select('*', { count: 'exact', head: true })
       .eq('academic_year', academicYear)
       .eq('semester', activeSemester)
@@ -1213,7 +1213,7 @@ export class AllocationService {
     let rpcHandled = false
     if (typeof (this.supabase.admin as any).rpc === 'function') {
       try {
-        const { data: rpcRes, error: rpcErr } = await (this.supabase.admin as any).rpc('execute_manual_course_allocation', {
+        const { data: rpcRes, error: rpcErr } = await termOperation(this.supabase.admin, user, 'execute_manual_course_allocation', {
           p_student_id: student_id,
           p_campus_id: student.campus_id,
           p_semester: activeSemester,
@@ -1271,76 +1271,6 @@ export class AllocationService {
       }
     }
 
-    if (!rpcHandled) {
-      // R09: Store breakdown inside allocation_metadata.credit_breakdown, NOT nonexistent columns
-      const updatedMeta = {
-        ...regMeta,
-        [slot_key]: allocMeta,
-        credit_breakdown: {
-          core_credits: coreCredits,
-          additional_credits: additionalCredits,
-          total_credits: totalCredits,
-        },
-      }
-
-      if (!reg) {
-        const { error: insertErr } = await this.supabase.admin.from('student_registrations').insert({
-          student_id,
-          campus_id: student.campus_id,
-          semester: activeSemester,
-          academic_year: academicYear,
-          [`${slot_key}_course_id`]: course_id,
-          allocation_metadata: updatedMeta,
-          total_credits: totalCredits,
-        })
-
-        if (insertErr) {
-          this.logger.error(`Failed to insert student registration: ${insertErr.message}`)
-          throw new InternalServerErrorException(`Failed to persist manual allocation: ${insertErr.message}`)
-        }
-      } else {
-        const { error: updateErr } = await this.supabase.admin
-          .from('student_registrations')
-          .update({
-            [`${slot_key}_course_id`]: course_id,
-            allocation_metadata: updatedMeta,
-            total_credits: totalCredits,
-          })
-          .eq('id', reg.id)
-
-        if (updateErr) {
-          this.logger.error(`Failed to update student registration: ${updateErr.message}`)
-          throw new InternalServerErrorException(`Failed to persist manual allocation: ${updateErr.message}`)
-        }
-      }
-
-      // R09: Audit log ONLY after authoritative enrollment write commits
-      await this.auditLogger.log({
-        eventType: AuditEvents.MANUAL_ALLOCATION,
-        userId: user.userId,
-        userRole: user.role,
-        action: `manually allocated ${course.course_code} to student ${student_id} for ${slot_key}`,
-        resourceType: 'registration',
-        resourceId: reg?.id || student_id,
-        status: 'success',
-        metadata: {
-          student_id,
-          slot_key,
-          course_id,
-          course_code: course.course_code,
-          core_credits: coreCredits,
-          additional_credits: additionalCredits,
-          total_credits: totalCredits,
-        },
-      })
-
-      return {
-        success: true,
-        message: `Course ${course.course_code} successfully allocated to student`,
-        core_credits: coreCredits,
-        additional_credits: additionalCredits,
-        total_credits: totalCredits,
-      }
-    }
+    throw new InternalServerErrorException('Atomic allocation service unavailable. No allocation changes were saved.')
   }
 }

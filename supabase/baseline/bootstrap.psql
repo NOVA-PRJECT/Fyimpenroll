@@ -5,4 +5,5 @@
 \ir ../migrations/20261025044031_plain_course_prerequisites.sql
 \ir ../migrations/20261025044158_retire_legacy_course_prerequisites.sql
 \ir ../migrations/20261025062135_consolidate_application_schema.sql
+\ir ../changes/semester_lifecycle.sql
 SELECT public.production_readiness();

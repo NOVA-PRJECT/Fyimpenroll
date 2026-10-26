@@ -31,13 +31,13 @@ export class ExportService {
     return new Map(rows.map(r => [r.id,r.full_name]))
   }
   private async deliveries(user: AuthUser, courseId?: string) {
-    let q = this.supabase.admin.from('teacher_course_assignments').select('id,teacher_id,course_id,campus_id,academic_year,semester')
+    let q = this.supabase.admin.from('teacher_course_assignments').select('id,teacher_id,course_id,campus_id,academic_year,semester,term_version')
     if (user.role === 'teacher') q = q.eq('teacher_id',user.userId)
     if (courseId) q = q.eq('course_id',courseId)
     return this.all(q)
   }
   private deliveryMatches(delivery: any, reg: any, courseId: string) {
-    return delivery.course_id === courseId && delivery.campus_id === reg.students?.campus_id && delivery.academic_year === reg.academic_year && delivery.semester === reg.semester
+    return delivery.course_id === courseId && delivery.campus_id === reg.campus_id && delivery.academic_year === reg.academic_year && delivery.semester === reg.semester && delivery.term_version === reg.term_version
   }
   private async registrations(query: Query, user: AuthUser, roster = false) {
     this.assertRole(user, roster ? ['teacher','teaching_staff','hod','campus_director','superadmin'] : ['student','teacher','hod','campus_director','superadmin'])
@@ -65,7 +65,7 @@ export class ExportService {
       (!query.semester || query.semester === d.semester))
     const cohorts = new Map<string,any[]>()
     for (const d of deliveries) {
-      const key = [d.campus_id,d.academic_year,d.semester].join('|')
+      const key = [d.campus_id,d.academic_year,d.semester,d.term_version].join('|')
       if (!cohorts.has(key)) cohorts.set(key,[])
       cohorts.get(key)!.push(d)
     }
@@ -76,15 +76,15 @@ export class ExportService {
       for (let offset=0;offset<courseIds.length;offset+=8) {
         const predicates = courseIds.slice(offset,offset+8).flatMap(id=>Array.from({length:8},(_,i)=>'slot_'+(i+1)+'_course_id.eq.'+id))
         const page = await this.all(buildQuery().eq('students.campus_id',d.campus_id).eq('academic_year',d.academic_year)
-          .eq('semester',d.semester).or(predicates.join(',')))
+          .eq('semester',d.semester).eq('term_version',d.term_version).or(predicates.join(',')))
         for (const row of page) rows.set(row.id || [row.student_id,row.academic_year,row.semester].join('|'),row)
         if (rows.size>20000) throw new BadRequestException('Export exceeds the row limit. Select a narrower term or class.')
       }
     }
-    const keys = new Set(deliveries.map(d=>[d.course_id,d.campus_id,d.academic_year,d.semester].join('|')))
+    const keys = new Set(deliveries.map(d=>[d.course_id,d.campus_id,d.academic_year,d.semester,d.term_version].join('|')))
     return [...rows.values()].map(r => {
       const scoped = {...r}
-      for (let i=1;i<=8;i++) if (!keys.has([r['slot_'+i+'_course_id'],r.students?.campus_id,r.academic_year,r.semester].join('|'))) scoped['slot_'+i+'_course_id'] = null
+      for (let i=1;i<=8;i++) if (!keys.has([r['slot_'+i+'_course_id'],r.campus_id,r.academic_year,r.semester,r.term_version].join('|'))) scoped['slot_'+i+'_course_id'] = null
       scoped.selections = (Array.isArray(r.selections) ? r.selections : r.selections?.courses || []).filter((s:any) => registrationSlots(scoped).some(slot => slot.courseId === (s.course_id || s.id)))
       return scoped
     }).filter(r => registrationSlots(r).length > 0)
@@ -149,7 +149,7 @@ export class ExportService {
   }
   async exportTimetable(query: Query,user: AuthUser) {
     this.assertRole(user,['student','teacher','teaching_staff','hod','campus_director','superadmin'])
-    let q=this.supabase.admin.from('timetable_entries').select('id,campus_id,course_id,teacher_id,semester,academic_year,status,time_slots(day_of_week,period_number),courses(id,course_code,title),departments(id,name),campuses(id,name)')
+    let q=this.supabase.admin.from('timetable_entries').select('id,campus_id,course_id,teacher_id,semester,academic_year,term_version,status,time_slots(day_of_week,period_number),courses(id,course_code,title),departments(id,name),campuses(id,name)')
     if(user.role==='teacher') q=q.eq('teacher_id',user.userId)
     if(['student','teaching_staff','hod','campus_director'].includes(user.role)) q=q.eq('campus_id',user.campus_id)
     if(user.role==='hod') q=q.eq('department_id',user.department_id)
@@ -160,8 +160,8 @@ export class ExportService {
     if(query.academic_year) q=q.eq('academic_year',query.academic_year)
     let entries=await this.all(q)
     if(user.role==='student') {
-      const regs=await this.registrations({...query,semester:query.semester||user.current_semester},user)
-      entries=entries.filter(e=>regs.some(r=>r.semester===e.semester && r.academic_year===e.academic_year && registrationSlots(r).some(s=>s.courseId===e.course_id)))
+      const regs=await this.registrations(query,user)
+      entries=entries.filter(e=>regs.some(r=>r.semester===e.semester && r.academic_year===e.academic_year && r.term_version===e.term_version && registrationSlots(r).some(s=>s.courseId===e.course_id)))
     }
     const names=await this.names(entries.map(e=>e.teacher_id)), days=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
     const rows=entries.map(e=>({'Campus':e.campuses?.name,'Department':e.departments?.name,'Academic Year':e.academic_year,'Semester':e.semester,

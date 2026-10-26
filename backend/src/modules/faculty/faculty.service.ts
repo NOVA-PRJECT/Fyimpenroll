@@ -27,7 +27,7 @@ export class FacultyService {
 
     if (user.role === 'teacher') {
       const assignments = await fetchAllPaginated<any>(this.supabase.admin
-        .from('teacher_course_assignments')
+        .from('current_teacher_course_assignments')
         .select('id, course_id, campus_id, academic_year, semester, courses(id, course_code, title, semester, department_id, credits, category)')
         .eq('teacher_id', user.userId).order('id'))
       const settings = await fetchByIdChunks<any>(assignments.map(a => a.campus_id).filter(Boolean), ids =>
@@ -70,7 +70,7 @@ export class FacultyService {
       const year = course.academic_year || academicYear
       if (!host || !year) continue
       const slots = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id.eq.${course.id}`).join(',')
-      const { count, error } = await this.supabase.admin.from('student_registrations')
+      const { count, error } = await this.supabase.admin.from('current_student_registrations')
         .select('id', { count: 'exact', head: true }).eq('campus_id', host)
         .eq('academic_year', year).eq('semester', course.semester).or(slots)
       if (error) throw new InternalServerErrorException('Failed to count course enrollment')
@@ -96,7 +96,7 @@ export class FacultyService {
     let delivery: any;
     if (user.role === 'teacher') {
       if (!deliveryId) throw new BadRequestException('Select an assigned course delivery');
-      const { data, error } = await this.supabase.admin.from('teacher_course_assignments')
+      const { data, error } = await this.supabase.admin.from('current_teacher_course_assignments')
         .select('id, campus_id, academic_year, semester').eq('id', deliveryId)
         .eq('teacher_id', user.userId).eq('course_id', courseId).maybeSingle();
       if (error) throw new InternalServerErrorException('Could not verify teaching assignment');
@@ -140,7 +140,7 @@ export class FacultyService {
     const orClause = slotFields.map((field) => `${field}.eq.${courseId}`).join(',');
 
     let regQuery = this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select(`
         student_id,
         pathway_id,
@@ -227,6 +227,7 @@ export class FacultyService {
     let studentsQuery = this.supabase.admin
       .from('students')
       .select('id, full_name, current_semester')
+      .lt('current_semester', 11)
       .eq('department_id', departmentId)
       .eq('campus_id', campusId)
       .order('current_semester', { ascending: true })
@@ -259,7 +260,7 @@ export class FacultyService {
     }
 
     const registrations = await fetchByIdChunks<any>(students.map(s => s.id), ids => this.supabase.admin
-      .from('student_registrations').select('id, student_id, semester, academic_year, submitted_at, slot_1_course_id')
+      .from('current_student_registrations').select('id, student_id, semester, academic_year, submitted_at, slot_1_course_id')
       .in('student_id', ids).eq('academic_year', academicYear).eq('campus_id', campusId).order('id'))
 
     // A registration is valid if submitted_at is set or slot_1 is filled

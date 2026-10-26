@@ -91,7 +91,7 @@ export async function runGenerationJob(
 
     // F33 & R06: Immutable publication guard — NEVER regenerate if published schedule exists for this campus!
     let pubCheckQuery = dbClient
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select('id')
       .eq('academic_year', academicYear)
       .eq('semester', semester)
@@ -319,7 +319,7 @@ export async function runGenerationJob(
 
     // Verify worker lease hasn't expired before committing entries
     const { data: jobCheck } = await dbClient
-      .from('system_logs')
+      .from('current_system_logs')
       .select('status, error_message')
       .eq('log_type', 'timetable_job')
       .eq('id', jobId)

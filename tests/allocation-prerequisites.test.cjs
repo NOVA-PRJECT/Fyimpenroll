@@ -16,6 +16,7 @@ async function allocate(students, preferences, courses, existing = []) {
   const queried = []
   const admin = {
     from(table) {
+      table = ({ current_timetable_entries: 'timetable_entries', current_student_registrations: 'student_registrations' })[table] || table
       assert.ok(rows[table], `Unexpected table query: ${table}`)
       queried.push(table)
       const filters = []; let single = false, bounds
@@ -35,13 +36,17 @@ async function allocate(students, preferences, courses, existing = []) {
       return query
     },
     async rpc(name, args) {
+      if (name === 'run_current_term_operation') {
+        assert.equal(args.p_expected_term, 0)
+        name = args.p_operation; args = args.p_payload
+      }
       if (name === 'claim_allocation_run') return { data: 'run', error: null }
       if (name === 'apply_course_allocation') { committed = args; return { data: { success: true }, error: null } }
       assert.fail(`Unexpected RPC ${name}`)
     },
   }
   const service = new AllocationService({ admin }, { log: async () => {} }, {})
-  await service.runAllocation({ academicYear: '2026-27', semester: 3 }, { userId: 'director', role: 'campus_director', campus_id: 'campus' })
+  await service.runAllocation({ academicYear: '2026-27', semester: 3 }, { userId: 'director', role: 'campus_director', campus_id: 'campus', term_version: 0 })
   assert.equal(queried.includes('course_prerequisite_rules'), false)
   return committed
 }

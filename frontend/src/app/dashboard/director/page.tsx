@@ -1,5 +1,7 @@
 'use client'
 
+import GraduationPanel from './GraduationPanel'
+
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
 import { Check as UiCheck, Info as UiInfo, TriangleAlert as UiTriangleAlert } from 'lucide-react'
@@ -55,8 +57,7 @@ export default function DirectorDashboard() {
   const [promoteStep, setPromoteStep] = useState<0 | 1 | 2>(0)
   const [loggingOut, setLoggingOut] = useState(false)
   const [lastPromotedAt, setLastPromotedAt] = useState<string | null>(null)
-  const [failedGraduations, setFailedGraduations] = useState<string[]>([])
-  const [retryingGraduation, setRetryingGraduation] = useState(false)
+  const [termVersion, setTermVersion] = useState<number | null>(null)
 
   // Auto-clear promotion success message after 5 s
   useEffect(() => {
@@ -111,6 +112,7 @@ export default function DirectorDashboard() {
       if (data.settings) {
         setCurrentDeadline(data.settings.deadline)
         setLastPromotedAt(data.settings.last_promoted_at ?? null)
+        setTermVersion(data.settings.term_version ?? null)
       }
     } catch (error) {
       setSettingsReady(false)
@@ -135,6 +137,7 @@ export default function DirectorDashboard() {
         if (data.settings) {
           setCurrentDeadline(data.settings.deadline)
           setLastPromotedAt(data.settings.last_promoted_at ?? null)
+        setTermVersion(data.settings.term_version ?? null)
         }
         setLoadingDirector(false)
       } catch {}
@@ -353,9 +356,6 @@ export default function DirectorDashboard() {
 
   // Promote students (F60)
   async function handlePromoteStudents() {
-    const requestKeyStorage = 'fyimp:promotion:' + campusId
-    const promotionKey = sessionStorage.getItem(requestKeyStorage) || crypto.randomUUID()
-    sessionStorage.setItem(requestKeyStorage, promotionKey)
     setPromoting(true)
     setPromoteError('')
     setPromoteSuccess('')
@@ -364,7 +364,7 @@ export default function DirectorDashboard() {
       const response = await fetch('/api/admin/campus/promote-students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: promotionKey }),
+        body: JSON.stringify({ expected_term: termVersion }),
       })
 
       const data = await response.json().catch(() => ({}))
@@ -375,67 +375,19 @@ export default function DirectorDashboard() {
         return
       }
 
-      const nowIso = new Date().toISOString()
-      const countDisplay = typeof data.promoted_count === 'number' ? data.promoted_count : ''
-      const rawMsg = typeof data.message === 'string' && !data.message.includes('[object')
-        ? data.message
-        : `${countDisplay ? `${countDisplay} ` : ''}Students promoted to next semester successfully.`
-      if (Array.isArray(data.failed_graduations) && data.failed_graduations.length > 0) {
-        setFailedGraduations(data.failed_graduations)
-      } else {
-        setFailedGraduations([])
-      }
-      setPromoteSuccess(`${rawMsg}${data.graduated_count > 0 ? ` (${data.graduated_count} students graduated and removed)` : ''}`)
-      if (data.success) sessionStorage.removeItem(requestKeyStorage)
-      setLastPromotedAt(nowIso)
+      setPromoteSuccess(data.message || 'Students promoted. Academic history preserved.')
+      setLastPromotedAt(data.last_promoted_at)
+      setTermVersion(data.term_version)
       invalidateDirectorCache()
     } catch (err: unknown) {
       setPromoteError((err instanceof Error ? err.message : '') || 'Network error during promotion. Please check connection and retry.')
     } finally {
+      await loadSettingsData(true)
       setPromoting(false)
       setPromoteStep(0)
     }
   }
 
-  useEffect(() => {
-    let active = true
-    fetch('/api/admin/campus/graduation-pending').then(async response => {
-      if (!response.ok) return
-      const result = await response.json()
-      if (active) setFailedGraduations(result.failed_student_ids || [])
-    }).catch(() => { if (active) setPromoteError('Pending graduation status could not be loaded. Retry after reconnecting.') })
-    return () => { active = false }
-  }, [])
-
-  // Retry graduation cleanup for pending students (R27)
-  async function handleRetryGraduation() {
-    if (!failedGraduations.length) return
-    setRetryingGraduation(true)
-    setPromoteError('')
-    try {
-      const response = await fetch('/api/admin/campus/graduate-students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_ids: failedGraduations }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setPromoteError(data.message || 'Failed to retry graduation cleanup.')
-        return
-      }
-      if (data.failed_student_ids && data.failed_student_ids.length > 0) {
-        setFailedGraduations(data.failed_student_ids)
-        setPromoteError(`Graduation retry incomplete: ${data.failed_student_ids.length} student accounts still pending Auth cleanup.`)
-      } else {
-        setFailedGraduations([])
-        setPromoteSuccess(`Graduation cleanup successfully completed for all ${data.graduated_count || failedGraduations.length} students.`)
-      }
-    } catch (err: unknown) {
-      setPromoteError((err instanceof Error ? err.message : '') || 'Network error retrying graduation cleanup.')
-    } finally {
-      setRetryingGraduation(false)
-    }
-  }
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -716,43 +668,17 @@ export default function DirectorDashboard() {
         )}
 
         {/* ── TAB 3: SEMESTER PROMOTION ── */}
+        {activeTab === 'graduation' && <GraduationPanel />}
         {activeTab === 'promotion' && (
           <div>
             <p className={styles.sectionTitle}>Semester Promotion</p>
 
             {promoteError && <div className={styles.errorBanner}>{promoteError}</div>}
             {promoteSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {promoteSuccess}</div>}
-            {failedGraduations.length > 0 && (
-              <div style={{
-                background: "var(--portal-warning-bg,#fff3cd)",
-                color: "var(--portal-warning-text,#856404)",
-                padding: '0.75rem 1rem',
-                borderRadius: '6px',
-                marginBottom: '1rem',
-                border: "1px solid var(--portal-warning-border,#ffeeba)",
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.88rem'
-              }}>
-                <span>
-                  <UiTriangleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> <strong>{failedGraduations.length}</strong> graduating student account(s) pending Auth cleanup.
-                </span>
-                <button
-                  className={styles.secondaryBtn}
-                  onClick={handleRetryGraduation}
-                  disabled={retryingGraduation}
-                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
-                >
-                  {retryingGraduation ? <LoadingIndicator message="Retrying…" /> : 'Retry Cleanup Now'}
-                </button>
-              </div>
-            )}
-
             <div className={styles.windowCard}>
               <p style={{ fontSize: '0.82rem', color: "var(--portal-muted,#44474e)", margin: '0 0 1rem 0' }}>
                 Promote all students in this campus to the next semester.
-                Students in their final semester (10) will be removed from the system.
+                Semester 10 moves to semester 11. Student accounts, registrations, timetables and teacher assignments are preserved. Temporary preferences, attendance and campus sign-ins are cleared.
                 This action cannot be undone.
               </p>
 
@@ -857,7 +783,7 @@ export default function DirectorDashboard() {
                         Has the next semester officially started?
                       </p>
                       <p style={{ fontSize: '0.78rem', color: "var(--portal-muted,#44474e)", margin: '0.35rem 0 0' }}>
-                        This will increment every student&apos;s semester by 1 and permanently remove Semester 10 graduates.
+                        Students in semesters 1–10 advance by one semester. Semester-11 students remain at 11. Temporary term data is cleared; registration, timetable and teaching history stays available. Account deletion is a separate action.
                       </p>
                     </div>
 
@@ -865,7 +791,7 @@ export default function DirectorDashboard() {
                       <button
                         className={styles.primaryBtn}
                         onClick={handlePromoteStudents}
-                        disabled={promoting}
+                        disabled={promoting || termVersion === null}
                         style={{
                           background: '#c0392b',
                           cursor: promoting ? 'wait' : 'pointer',
@@ -879,7 +805,7 @@ export default function DirectorDashboard() {
                       <button
                         className={styles.primaryBtn}
                         onClick={() => setPromoteStep(0)}
-                        disabled={promoting}
+                        disabled={promoting || termVersion === null}
                         style={{ background: '#9ba1ab' }}
                       >
                         No, Cancel

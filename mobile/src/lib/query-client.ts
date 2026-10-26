@@ -52,13 +52,11 @@ export const queryKeys = {
       ['teacher', 'scheduled-periods', teacherId, dateStr] as const,
     slotRoster: (teacherId: string, slotId: string, dateStr: string) =>
       ['teacher', 'slot-roster', teacherId, slotId, dateStr] as const,
-    notices: (deptId?: string) => ['teacher', 'notices', deptId ?? 'all'] as const,
   },
   hod: {
     absenceSummary: (deptId: string, dateStr: string) =>
       ['hod', 'absence-summary', deptId, dateStr] as const,
     signInRoster: (deptId: string, dateStr: string) =>
       ['hod', 'sign-in-roster', deptId, dateStr] as const,
-    notices: (deptId: string) => ['hod', 'notices', deptId] as const,
   },
 };

@@ -1,3 +1,4 @@
+import { termOperation } from '../../core/database/term-operation'
 import {
   BadRequestException,
   ConflictException,
@@ -59,7 +60,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async publicationState(campusId: string, academicYear: string, semester: number) {
-    const { data, error, count } = await this.supabase.admin.from('timetable_entries')
+    const { data, error, count } = await this.supabase.admin.from('current_timetable_entries')
       .select('id, published_at', { count: 'exact' })
       .eq('campus_id', campusId).eq('academic_year', academicYear).eq('semester', semester)
       .eq('status', 'published').order('published_at', { ascending: false }).limit(1)
@@ -149,7 +150,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     let teacherAssignedCourseIds: string[] = []
     if (user.role === 'teacher') {
       const { data: assignments } = await this.supabase.admin
-        .from('teacher_course_assignments')
+        .from('current_teacher_course_assignments')
         .select('course_id')
         .eq('teacher_id', user.userId)
       teacherAssignedCourseIds = (assignments || []).map((a: any) => a.course_id)
@@ -158,7 +159,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     let studentCourseIds: string[] = []
     if (user.role === 'student') {
       const fields = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id`)
-      const registrations = await fetchAllPaginated<any>(this.supabase.admin.from('student_registrations')
+      const registrations = await fetchAllPaginated<any>(this.supabase.admin.from('current_student_registrations')
         .select(fields.join(',')).eq('student_id', user.userId).eq('campus_id', scope.campusId)
         .eq('academic_year', academicYear).eq('semester', semester).order('id'))
       studentCourseIds = [...new Set<string>(registrations.flatMap(row => fields.map(field => row[field]).filter(Boolean)))]
@@ -172,7 +173,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     const { data: allDepartmentsData } = audience ? { data: campusDepartments } : await deptsFetchQuery
 
     let query = this.supabase.admin
-      .from('timetable_entries')
+      .from('current_timetable_entries')
       .select(`
         id,
         academic_year,
@@ -380,7 +381,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     const fencingToken = crypto.randomUUID()
     let newJobId: string | undefined
 
-    const { data: claim, error: claimError } = await this.supabase.admin.rpc('claim_timetable_generation_job', {
+    const { data: claim, error: claimError } = await termOperation(this.supabase.admin, user, 'claim_timetable_generation_job', {
       p_campus_id: user.campus_id, p_academic_year: academicYear, p_semester: semester,
       p_user_id: user.userId, p_lease_seconds: 600, p_fencing_token: fencingToken,
     })
@@ -443,7 +444,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
 
   // ──────────────── Teacher Substitution (F33, F37, R08) ────────────────
   async substituteTeacher(entryId: string, newTeacherId: string | null, user: AuthUser) {
-    const result = await mutateTeacherAssignments(this.supabase, {
+    const result = await mutateTeacherAssignments(this.supabase, user, {
       p_actor_id: user.userId, p_operation: 'substitute', p_entry_id: entryId, p_teacher_id: newTeacherId || null,
     })
     await this.auditLogger.log({ eventType: AuditEvents.TIMETABLE_GENERATED, userId: user.userId, userRole: user.role,
@@ -454,28 +455,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
 
   // ──────────────── Job Status ────────────────
   async getJobStatus(academicYear: string, semester: number, user: AuthUser) {
-    const redisKey = `timetable:job:${academicYear}:${semester}${user.campus_id ? `:${user.campus_id}` : ''}`
-    const redis = getRedisClient()
-
-    try {
-      const cached = await redis.get(redisKey)
-      if (cached) {
-        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached
-        return {
-          status: parsed.status,
-          progress: parsed.progress || 0,
-          jobId: parsed.jobId || null,
-          errorMessage: parsed.errorMessage || parsed.error || null,
-          stepMessage: parsed.stepMessage || null,
-          stats: parsed.stats || null,
-        }
-      }
-    } catch {
-      // Fall through to DB
-    }
-
+    // Database term scope is authoritative; cached jobs may belong to a concluded term.
     let query = this.supabase.admin
-      .from('system_logs')
+      .from('current_system_logs')
       .select('id, status, progress, error_message, created_at')
       .eq('log_type', 'timetable_job')
       .eq('academic_year', academicYear)
@@ -507,14 +489,14 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     if (await readReviewDraft(this.supabase.admin, user.campus_id, academicYear, semester)) {
       throw new UnprocessableEntityException('This review draft has unscheduled sessions. Resolve them and generate a complete verified timetable before publication.')
     }
-    const { data, error } = await this.supabase.admin.rpc('publish_timetable_cohort', {
+    const { data, error } = await termOperation(this.supabase.admin, user, 'publish_timetable_cohort', {
       p_campus_id: user.campus_id, p_academic_year: academicYear, p_semester: semester,
     })
     if (error) throw new BadRequestException(`Publication rejected: ${error.message}`)
     if (data?.success !== true || !Number.isInteger(data.published_count) || data.published_count < 1) {
       throw new InternalServerErrorException('Publication did not commit any timetable sessions.')
     }
-    const { count, error: verificationError } = await this.supabase.admin.from('timetable_entries')
+    const { count, error: verificationError } = await this.supabase.admin.from('current_timetable_entries')
       .select('id', { count: 'exact', head: true }).eq('campus_id', user.campus_id)
       .eq('academic_year', academicYear).eq('semester', semester).eq('status', 'published')
     if (verificationError || count !== data.published_count) {

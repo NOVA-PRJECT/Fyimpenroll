@@ -26,6 +26,8 @@ export const CourseAttendanceItemSchema = z.object({
 });
 
 export const StudentAttendanceListSchema = z.object({
+  cleared: z.boolean().optional(),
+  message: z.string().optional(),
   overall_percentage: z.number().nullable(),
   courses: z.array(CourseAttendanceItemSchema),
 });

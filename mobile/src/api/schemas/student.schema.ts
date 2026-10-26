@@ -37,14 +37,6 @@ export const StudentDashboardSchema = z.object({
           evening: z.enum(['completed', 'pending', 'absent']),
         }),
     }),
-  latestAnnouncement: z
-    .object({
-      id: z.string(),
-      title: z.string(),
-      content: z.string(),
-      created_at: z.string(),
-    })
-    .nullable(),
 });
 
 export type StudentDashboard = z.infer<typeof StudentDashboardSchema>;

@@ -29,15 +29,6 @@ export default function TeacherLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="checkbox-outline" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="notices"
-        options={{
-          title: 'Notices',
-          headerTitle: 'Department Notices',
-          tabBarLabel: 'Notices',
-          tabBarIcon: ({ color }) => <TabBarIcon name="notifications-outline" color={color} />,
-        }}
-      />
     </Tabs>
   );
 }

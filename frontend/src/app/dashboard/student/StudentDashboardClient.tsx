@@ -190,6 +190,12 @@ export default function StudentDashboardClient({
     }
   }
 
+  if (studentInfo.current_semester === 11) {
+    regStatusBadge = 'Programme completed'
+    regDescription = 'You have completed semester 10. Your academic history remains available while your account awaits the separate graduation deletion action.'
+    regCtaText = 'View academic history →'
+    regNotificationStatus = 'Programme completed'
+  }
   return (
     <div className={styles.pageWrapper}>
       {/* ── UNIFIED EXECUTIVE TOP BAR (Matched to Director & HOD) ── */}
@@ -282,7 +288,7 @@ export default function StudentDashboardClient({
               <span className={`${styles.tabBadgeDot} ${registrationWindow.isClosingSoon ? styles.tabBadgeDotAlert : ''}`} />
             )}
           </div>
-          <span className={styles.tabText}>Notices</span>
+          <span className={styles.tabText}>Registration updates</span>
           {registrationWindow?.isOpen && (
             <span
               className={`${styles.tabBadge} ${
@@ -390,12 +396,12 @@ export default function StudentDashboardClient({
 
                       <p className={styles.regDescription}>{regDescription}</p>
 
-                      <NavigationLink
+                      {studentInfo.current_semester === 11 ? <button className={styles.regCtaBtn} onClick={() => setActiveTab('credits')}>View credit ledger →</button> : <NavigationLink
                         href="/dashboard/student/register"
                         className={styles.regCtaBtn}
                       >
                         {regCtaText}
-                      </NavigationLink>
+                      </NavigationLink>}
 
                       <p className={styles.regHintText}>
                         {isWindowOpen

@@ -15,12 +15,12 @@ export const SemesterProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { profile } = useAuth();
-  const defaultSem = profile?.current_semester || 1;
+  const defaultSem = Math.min(profile?.current_semester || 1, 10);
   const [activeSemester, setActiveSemesterState] = useState<number>(defaultSem);
 
   useEffect(() => {
     if (profile?.current_semester) {
-      setActiveSemesterState(profile.current_semester);
+      setActiveSemesterState(Math.min(profile.current_semester, 10));
     } else {
       AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_SEMESTER).then((stored) => {
         if (stored) {
@@ -40,7 +40,7 @@ export const SemesterProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  const availableSemesters = [1, 2, 3, 4, 5, 6, 7, 8];
+  const availableSemesters = Array.from({ length: Math.min(profile?.current_semester || 1, 10) }, (_, i) => i + 1);
 
   return (
     <SemesterContext.Provider

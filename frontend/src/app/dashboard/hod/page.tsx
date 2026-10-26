@@ -439,6 +439,7 @@ export default function HodDashboard() {
           full_name: editName.trim(),
           cap_application_number: editCap.trim(),
           current_semester: editSemester,
+          expected_semester: editStudent.current_semester,
         }),
       })
       const result = await response.json()
@@ -924,8 +925,9 @@ export default function HodDashboard() {
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label}>Current Semester *</label>
-                      <select className={styles.input} value={editSemester} onChange={e => setEditSemester(Number(e.target.value))}>
-                        {[1,2,3,4,5,6,7,8,9,10].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      <select className={styles.input} value={editSemester} disabled={editStudent?.current_semester === 11} onChange={e => setEditSemester(Number(e.target.value))}>
+                        {editStudent?.current_semester === 11 && <option value={11}>Programme completed (Semester 11)</option>}
+                          {[1,2,3,4,5,6,7,8,9,10].map(s => <option key={s} value={s}>Semester {s}</option>)}
                       </select>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ const sections = [
   { id: 'registration', label: 'Registration Window' },
   { id: 'timetable', label: 'Timetable Generator' },
   { id: 'promotion', label: 'Semester Promotion' },
+  { id: 'graduation', label: 'Graduation Deletion' },
   { id: 'allocation', label: 'Course Allocation' },
   { id: 'campus-signin', label: 'Campus Sign-In' },
 ] as const

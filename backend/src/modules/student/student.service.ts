@@ -51,7 +51,7 @@ export class StudentService {
     const academicYear = settings?.academic_year || null
 
     let regQuery = this.supabase.admin
-      .from('student_registrations')
+      .from('current_student_registrations')
       .select(`
         id,
         total_credits,
@@ -86,7 +86,7 @@ export class StudentService {
     let allocRunPromise: Promise<any> = Promise.resolve({ data: null, error: null })
     if (effectiveCampusId) {
       let allocQuery = this.supabase.admin
-        .from('system_logs')
+        .from('current_system_logs')
         .select('id, status, completed_at')
         .eq('log_type', 'allocation_run')
         .eq('campus_id', effectiveCampusId)
@@ -112,7 +112,7 @@ export class StudentService {
     let reg: any = regResWith8.data
     if (regResWith8.error && (regResWith8.error.message?.includes('slot_7_course_id') || regResWith8.error.message?.includes('slot_8_course_id'))) {
       let fallbackQuery = this.supabase.admin
-        .from('student_registrations')
+        .from('current_student_registrations')
         .select(`
           id,
           total_credits,
@@ -143,7 +143,7 @@ export class StudentService {
 
     const deadline = settings?.deadline ? new Date(settings.deadline) : null
     const now = new Date()
-    const isOpen = deadline ? now < deadline : false
+    const isOpen = student.current_semester <= 10 && deadline ? now < deadline : false
     const msRemaining = deadline && isOpen ? deadline.getTime() - now.getTime() : null
     const hoursRemaining = msRemaining !== null ? Math.max(0, Math.floor(msRemaining / (1000 * 60 * 60))) : null
     const isClosingSoon = isOpen && hoursRemaining !== null && hoursRemaining <= 24

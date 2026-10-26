@@ -17,6 +17,7 @@ function fixture() {
   }
   const writes = []
   const admin = { from(table) {
+    table = ({ current_student_registrations: 'student_registrations', current_system_logs: 'system_logs' })[table] || table
     assert.ok(Object.hasOwn(records, table), `Retired or unexpected table/view ${table}`)
     const filters = []
     let limit = Infinity, sorting, single = false, bounds

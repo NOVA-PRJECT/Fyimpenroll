@@ -9,6 +9,7 @@ export interface AuthUser {
   campus_id?: string | null
   must_change_password?: boolean
   current_semester?: number
+  term_version?: number
   full_name?: string
   token?: string
   consent?: { accepted: boolean; currentVersion: string }

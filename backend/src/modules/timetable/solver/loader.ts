@@ -167,7 +167,7 @@ export async function loadGenerationInput(
 
   // Query 1: Fetch student registrations
   let regQuery = supabase
-    .from('student_registrations')
+    .from('current_student_registrations')
     .select(`
       student_id,
       campus_id,
@@ -273,7 +273,7 @@ export async function loadGenerationInput(
 
   // Query 3b: Load teacher assignments for current cohort (F37)
   let teacherQuery = supabase
-    .from('teacher_course_assignments')
+    .from('current_teacher_course_assignments')
     .select('course_id, teacher_id')
     .eq('academic_year', academicYear)
     .eq('semester', semester);
@@ -445,7 +445,7 @@ export async function loadGenerationInput(
   // F37 & R08: Load published reservations across all other semesters & campuses for current academic year
   const teacherReservations: TeacherReservation[] = [];
   const publishedEntries = await fetchAllPaginated<any>(supabase
-    .from('timetable_entries')
+    .from('current_timetable_entries')
     .select(`
       id,
       academic_year,
@@ -465,7 +465,7 @@ export async function loadGenerationInput(
 
   // Also fetch all teacher course assignments for the academic year to resolve teachers
   const allYearTeacherAssignments = await fetchAllPaginated<any>(supabase
-    .from('teacher_course_assignments')
+    .from('current_teacher_course_assignments')
     .select('course_id, campus_id, semester, teacher_id')
     .eq('academic_year', academicYear).order('id'));
 

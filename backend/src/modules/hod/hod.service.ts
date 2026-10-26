@@ -1,3 +1,4 @@
+import { termOperation } from '../../core/database/term-operation'
 import {
   BadRequestException,
   ConflictException,
@@ -529,6 +530,11 @@ export class HodService {
     return data ?? []
   }
 
+  private async insertStudentForTerm(payload: Record<string, unknown>, user: AuthUser) {
+    try { return await termOperation(this.supabase.admin, user, 'insert_student', { ...payload, p_actor_id: user.userId }) }
+    catch (error) { return { data: null, error: { message: error instanceof Error ? error.message : 'Student creation failed' } } }
+  }
+
   async addStudent(
     body: {
       full_name: string
@@ -559,9 +565,7 @@ export class HodService {
 
     const studentId = authData.user.id
 
-    const { error: insertError } = await this.supabase.admin
-      .from('students')
-      .insert({
+    const { error: insertError } = await this.insertStudentForTerm({
         id: studentId,
         full_name,
         cap_application_number: cap_application_number.trim(),
@@ -570,7 +574,7 @@ export class HodService {
         department_id: user.department_id,
         campus_id: user.campus_id,
         must_change_password: true,
-      })
+      }, user)
 
     if (insertError) {
       await this.supabase.admin.auth.admin.deleteUser(studentId)
@@ -600,7 +604,7 @@ export class HodService {
   }
 
   async updateStudent(
-    body: { id: string; full_name: string; cap_application_number?: string; current_semester: number },
+    body: { id: string; full_name: string; cap_application_number?: string; current_semester: number; expected_semester: number },
     user: AuthUser,
   ) {
     const { id, full_name, cap_application_number, current_semester } = body
@@ -629,11 +633,7 @@ export class HodService {
       updates.cap_application_number = cleanCap
     }
 
-    const { error } = await this.supabase.admin
-      .from('students')
-      .update(updates)
-      .eq('id', id)
-      .eq('department_id', user.department_id)
+    const { error } = await termOperation(this.supabase.admin, user, 'update_student', { ...updates, id, department_id: user.department_id, expected_semester: body.expected_semester, p_actor_id: user.userId })
 
     if (error) {
       if (error.code === '23505') {
@@ -744,6 +744,10 @@ export class HodService {
         `CAP${Date.now().toString().slice(-6)}${i + 1}`
       ).trim()
 
+      if (!Number.isInteger(semester) || semester < 1 || semester > 10) {
+        results.push({ row: i + 1, email: email || '', status: 'error', issues: ['New students must be in semesters 1–10. Semester 11 is assigned by promotion.'] })
+        continue
+      }
       if (!fullName || !email) {
         results.push({ row: i + 1, email: email || '', status: 'error', issues: ['Missing name or email'] })
         continue
@@ -762,7 +766,7 @@ export class HodService {
         }
 
         const sid = authData.user.id
-        const { error: dbErr } = await this.supabase.admin.from('students').insert({
+        const { error: dbErr } = await this.insertStudentForTerm({
           id: sid,
           full_name: fullName,
           cap_application_number: capNumber,
@@ -771,7 +775,7 @@ export class HodService {
           department_id: user.department_id,
           campus_id: user.campus_id,
           must_change_password: true,
-        })
+        }, user)
 
         if (dbErr) {
           await this.supabase.admin.auth.admin.deleteUser(sid)
@@ -944,13 +948,13 @@ export class HodService {
 
     // Clear any assigned_by references pointing to this teacher
     await this.supabase.admin
-      .from('teacher_course_assignments')
+      .from('current_teacher_course_assignments')
       .update({ assigned_by: null })
       .eq('assigned_by', teacherId)
 
     // Delete any course assignments for this teacher
     await this.supabase.admin
-      .from('teacher_course_assignments')
+      .from('current_teacher_course_assignments')
       .delete()
       .eq('teacher_id', teacherId)
 

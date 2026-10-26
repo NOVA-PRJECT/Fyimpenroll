@@ -5,7 +5,7 @@ const SLOT_FIELDS = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id
 
 /** Course ownership is distinct from the home departments of enrolled students. */
 export async function loadTimetableAudience(db: SupabaseClient, campusId: string, academicYear: string, semester: number) {
-  const registrations = await fetchAllPaginated<any>(db.from('student_registrations')
+  const registrations = await fetchAllPaginated<any>(db.from('current_student_registrations')
     .select(`student_id,${SLOT_FIELDS.join(',')}`)
     .eq('campus_id', campusId).eq('academic_year', academicYear).eq('semester', semester).order('id'));
   // Resolve by IDs rather than embedding: legacy databases may have duplicate
