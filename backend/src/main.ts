@@ -1,7 +1,7 @@
 ﻿import { NestFactory } from '@nestjs/core'
 import { randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
-import { json } from 'express'
+import { configureManualTimetableBodyParser } from './core/http/manual-timetable-body-parser'
 import { AppModule } from './app.module'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const cookieParser = require('cookie-parser')
@@ -11,7 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
   // A campus draft contains every scheduled period and can exceed Express's
   // default 100 KB. Keep the larger bound specific to the manual editor API.
-  app.use('/api/timetable/manual', json({ limit: '2mb' }))
+  configureManualTimetableBodyParser(app)
 
   // Match the actual ingress. Do not accept arbitrary leftmost forwarded headers.
   const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0)
