@@ -22,9 +22,9 @@ import { getRedisClient } from './solver/redisClient'
 import { FileConstraintStoreService } from './solver/file-constraint-store.service'
 import * as crypto from 'crypto'
 import { RuleDefinitionSchema } from './solver/schemas'
-import { readReviewDraft } from './solver/review-draft'
+import { readReviewDraft, readManualDraft } from './solver/review-draft'
 import { loadTimetableAudience, belongsToCohort } from './timetable-audience'
-import { fetchAllPaginated } from '../../core/database/pagination.util'
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 
 @Injectable()
 export class TimetableService implements OnModuleInit, OnModuleDestroy {
@@ -119,6 +119,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     }
 
     let audience: Awaited<ReturnType<typeof loadTimetableAudience>> | undefined
+    let manual: any = null
     if (user.role === 'campus_director' && scope.campusId) {
       try {
         audience = await loadTimetableAudience(this.supabase.admin, scope.campusId, academicYear, semester)
@@ -129,6 +130,32 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         .map(d => ({ ...d, registeredStudentCount: audience!.departmentCounts.get(d.id) }))
       if (campusDepartments.length === 0 || (departmentId && !audience.departmentCounts.has(departmentId))) {
         return { academicYear, semester, publication, departments: campusDepartments, entries: [], conflicts: [] }
+      }
+      manual = await readManualDraft(this.supabase.admin, scope.campusId, academicYear, semester)
+      if (manual && !publication?.published) {
+        const courseIds = [...new Set<string>(manual.entries.map((entry: any) => entry.courseId))]
+        const catalogue = await fetchByIdChunks<any>(courseIds, ids => this.supabase.admin.from('courses')
+          .select('id,title,course_code,category,department_id').in('id', ids).order('id'))
+        const assignments = await fetchAllPaginated<any>(this.supabase.admin.from('current_teacher_course_assignments').select('course_id,teacher_id')
+          .eq('campus_id', scope.campusId).eq('academic_year', academicYear).eq('semester', semester).order('id'))
+        const teachers = new Map(assignments.map((assignment: any) => [assignment.course_id, assignment.teacher_id]))
+        const entries = manual.entries.map((entry: any, index: number) => {
+          const course = catalogue.find((course: any) => course.id === entry.courseId)
+          return { ...entry, id: `manual-${index}`, courseName: course?.title, courseCode: course?.course_code,
+            category: course?.category, departmentId: course?.department_id,
+            departmentName: campusDepartments.find(department => department.id === course?.department_id)?.name,
+            teacherId: teachers.get(entry.courseId) ?? null,
+            enrolledDepartmentIds: audience!.courseDepartments.get(entry.courseId) || [],
+            status: publication?.published ? 'published' : 'draft' }
+        })
+        const conflicts = (manual.report?.remaining || []).map((item: any) => ({ ...item,
+          reason: `${item.periods} ${item.sessionType} period(s) remain unscheduled.`,
+          enrolledDepartmentIds: audience!.courseDepartments.get(item.courseId) || [], conflictingStudentCount: 0 }))
+        return { academicYear, semester, publication, departments: campusDepartments, manualDraft: true,
+          manualMode: manual.mode, overrideReason: manual.reason, violations: manual.report?.violations || [],
+          unscheduledPeriods: manual.report?.unscheduledPeriods || 0,
+          entries: departmentId ? entries.filter((entry: any) => belongsToCohort(entry, departmentId)) : entries,
+          conflicts: departmentId ? conflicts.filter((entry: any) => belongsToCohort(entry, departmentId)) : conflicts }
       }
       const review = publication?.published ? null : await readReviewDraft(this.supabase.admin, scope.campusId, academicYear, semester)
       if (review) {
@@ -332,10 +359,21 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       formattedConflicts = formattedConflicts.filter((c: any) => audience ? belongsToCohort(c, departmentId) : c.departmentId === departmentId)
     }
 
+    // Published manual timetables use real delivery IDs and current HOD-assigned
+    // teachers. The publication's recorded exceptions remain visible separately.
+    if (manual) {
+      formattedConflicts = (manual.report?.remaining || []).map((item: any) => ({ ...item,
+        reason: `${item.periods} ${item.sessionType} period(s) remain unscheduled.`,
+        enrolledDepartmentIds: audience?.courseDepartments.get(item.courseId) || [], conflictingStudentCount: 0 }))
+      if (departmentId) formattedConflicts = formattedConflicts.filter((entry: any) => belongsToCohort(entry, departmentId))
+    }
+
     return {
       academicYear,
       semester,
       publication,
+      ...(manual ? { manualDraft: true, manualMode: manual.mode, overrideReason: manual.reason,
+        violations: manual.report?.violations || [], unscheduledPeriods: manual.report?.unscheduledPeriods || 0 } : {}),
       departments: allDepartmentsData || [],
       entries: audience && departmentId ? formattedEntries.filter(entry => belongsToCohort(entry, departmentId)) : formattedEntries,
       conflicts: formattedConflicts,
@@ -486,6 +524,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   // ──────────────── Publish ────────────────
   async publish(academicYear: string, semester: number, user: AuthUser, force = false) {
     if (!user.campus_id) throw new BadRequestException('Select an explicit campus before publication')
+    if (await readManualDraft(this.supabase.admin, user.campus_id, academicYear, semester)) {
+      throw new UnprocessableEntityException('Review and publish this timetable from the manual editor.')
+    }
     if (await readReviewDraft(this.supabase.admin, user.campus_id, academicYear, semester)) {
       throw new UnprocessableEntityException('This review draft has unscheduled sessions. Resolve them and generate a complete verified timetable before publication.')
     }

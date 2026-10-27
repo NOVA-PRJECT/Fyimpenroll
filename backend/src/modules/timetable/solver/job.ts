@@ -69,6 +69,19 @@ export async function runGenerationJob(
     if (!fencingToken) throw new Error('A worker fencing token is required');
     await reportProgress(5, 'Initializing OR-Tools CP-SAT timetable generation job...');
 
+    // Preserve the exact rules even if input loading or the solver subsequently fails.
+    const effectiveDoc = fileConstraintStore.getBaseConstraints();
+    effectiveDoc.rules = [...(campusConstraints?.rules ?? effectiveDoc.rules), ...dynamicConstraints.map(c => c.typedRule).filter(Boolean)]
+      .filter((rule: any) => !rule.targetSemester || rule.targetSemester === semester);
+    const ruleHash = fileConstraintStore.computeRuleHash(effectiveDoc);
+    const { data: ruleJob, error: ruleReadError } = await dbClient.from('current_system_logs').select('metadata')
+      .eq('id', jobId).eq('metadata->>fencing_token', fencingToken).eq('status', 'running').maybeSingle();
+    if (ruleReadError || !ruleJob) throw new Error('Could not capture generation rules for the current worker.');
+    const { data: ruleSaved, error: ruleSaveError } = await dbClient.from('current_system_logs')
+      .update({ metadata: { ...ruleJob.metadata, effectiveRules: effectiveDoc.rules, ruleHash } })
+      .eq('id', jobId).eq('metadata->>fencing_token', fencingToken).eq('status', 'running').select('id').maybeSingle();
+    if (ruleSaveError || !ruleSaved) throw new Error('Could not save generation rules for the current worker.');
+
     // Resolve campus departments
     let deptIds: string[] = [];
     if (campusId) {
@@ -134,11 +147,6 @@ export async function runGenerationJob(
     );
 
     // R19 & R20: Load effective typed rules and schedule config from durable file store
-    const effectiveDoc = fileConstraintStore.getBaseConstraints();
-    effectiveDoc.rules = [...(campusConstraints?.rules ?? effectiveDoc.rules), ...dynamicConstraints.map(c => c.typedRule).filter(Boolean)]
-      .filter((rule: any) => !rule.targetSemester || rule.targetSemester === semester);
-    const ruleHash = fileConstraintStore.computeRuleHash(effectiveDoc);
-
     await reportProgress(
       25,
       `Loaded ${courses.length} courses across ${parallelGroups.length} parallel baskets. Compiling OR-Tools model (Rule hash: ${ruleHash.slice(0, 12)})...`,

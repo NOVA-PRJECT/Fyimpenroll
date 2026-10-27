@@ -81,3 +81,31 @@ export type DynamicConstraintItem = z.infer<typeof DynamicConstraintSchema>;
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 export type PublishRequest = z.infer<typeof PublishRequestSchema>;
 export type ValidateRequest = z.infer<typeof ValidateRequestSchema>;
+
+// Teacher identity is deliberately absent: manual scheduling cannot change HOD assignments.
+export const ManualEntrySchema = z.object({
+  courseId: z.string().uuid(),
+  day: z.number().int().min(1).max(5),
+  period: z.number().int().min(1).max(6),
+  sessionType: z.enum(['theory', 'practical']),
+  isLabBlock: z.boolean(),
+}).strict();
+
+export const ManualTimetableSchema = z.object({
+  academicYear: z.string().regex(/^\d{4}-\d{2}$/),
+  semester: z.number().int().min(1).max(10),
+  revision: z.string().regex(/^[a-f0-9]{32}$/),
+  entries: z.array(ManualEntrySchema).max(10000),
+  mode: z.enum(['follow_rules', 'allow_overrides']),
+  reason: z.string().trim().max(2000).default(''),
+}).strict();
+
+export const ManualPublishSchema = z.object({
+  academicYear: z.string().regex(/^\d{4}-\d{2}$/),
+  semester: z.number().int().min(1).max(10),
+  revision: z.string().regex(/^[a-f0-9]{32}$/),
+  acknowledgeOverrides: z.boolean().default(false),
+}).strict();
+
+export type ManualEntry = Required<z.infer<typeof ManualEntrySchema>>;
+export type ManualTimetableRequest = Omit<z.infer<typeof ManualTimetableSchema>, 'entries'> & { entries: ManualEntry[] };

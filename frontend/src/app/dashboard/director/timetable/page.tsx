@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic';
 import type { SchedulingRule } from './BrowserRulesEditor';
 import { appliesToSemester, restoreBrowserRules, validateSchedulingRules } from '@/core/utils/schedulingRules';
 const BrowserRulesEditor = dynamic(() => import('./BrowserRulesEditor'));
+const ManualTimetableEditor = dynamic(() => import('./ManualTimetableEditor'));
 import { downloadBlob } from '@/core/utils/downloadFile';
 import { entriesForDepartment } from '@/core/utils/campusTimetable';
 import styles from './timetable.module.css';
@@ -115,6 +116,10 @@ export default function CampusDirectorTimetablePage() {
   const [allEntries, setAllEntries] = useState<TimetableEntry[]>([]);
   const [allConflicts, setAllConflicts] = useState<ConflictItem[]>([]);
   const [reviewDraft, setReviewDraft] = useState(false);
+  const [manualDraft, setManualDraft] = useState(false);
+  const [showManualEditor, setShowManualEditor] = useState(false);
+  const [manualEditing, setManualEditing] = useState(false);
+  const [manualSummary, setManualSummary] = useState<{ mode: string; reason: string; violations: { detail: string }[] } | null>(null);
   const [unscheduledPeriods, setUnscheduledPeriods] = useState(0);
   const [timetableDiagnostics, setTimetableDiagnostics] = useState<string[]>([]);
   const [publication, setPublication] = useState<{ published: boolean; publishedAt: string | null; publishedCount: number } | null>(null);
@@ -223,6 +228,8 @@ export default function CampusDirectorTimetablePage() {
         setPublication(data.publication ?? { published: entriesList.some((e: TimetableEntry) => e.status === 'published'), publishedAt: null, publishedCount: entriesList.filter((e: TimetableEntry) => e.status === 'published').length });
         setAllConflicts(conflictsList);
         setReviewDraft(data.reviewDraft === true);
+        setManualDraft(data.manualDraft === true);
+        setManualSummary(data.manualDraft ? { mode: data.manualMode, reason: data.overrideReason, violations: data.violations || [] } : null);
         setUnscheduledPeriods(data.unscheduledPeriods || 0);
         setTimetableDiagnostics(Array.isArray(data.diagnostics) ? data.diagnostics.filter((value: unknown): value is string => typeof value === 'string') : []);
         setDepartments(deptList);
@@ -477,6 +484,7 @@ export default function CampusDirectorTimetablePage() {
 
   async function handlePublish() {
     if (!settingsReady || loading || error || publishing || publication?.published) return;
+    if (manualDraft) { setShowManualEditor(true); return; }
     if (reviewDraft || allConflicts.length > 0) {
       setErrorMsg('Resolve unscheduled sessions and generate a complete verified timetable before publication.');
       return;
@@ -718,12 +726,12 @@ export default function CampusDirectorTimetablePage() {
         {!reviewDraft && unassignedCourses > 0 && <div role="status" className={styles.bannerWarning}>
           <strong>{unassignedCourses} courses have no assigned teacher in this timetable.</strong>
           <p>{publication?.published
-            ? 'Assign teachers to the published sessions so they appear in the teachers’ schedules.'
-            : `Assign teachers for ${academicYear}, Semester ${semester}, then generate again before publishing to include them in teacher schedules and clash checks.`}</p>
+            ? 'Ask the HOD to assign teachers to these sessions so they appear in the teachers’ schedules.'
+            : `Ask the HOD to assign teachers for ${academicYear}, Semester ${semester}, then reload the manual editor or generate again before publishing.`}</p>
         </div>}
         {reviewDraft && <div role="status" className={styles.bannerWarning}>
           <strong>Incomplete review draft — {unscheduledPeriods} periods across {affectedCourseCount} courses remain unscheduled.</strong>
-          <p>The displayed sessions satisfy the scheduling rules. Review the unscheduled sessions, adjust the catalogue or rules as appropriate, then generate again. This draft cannot be published.</p>
+          <p>The displayed sessions satisfy the scheduling rules. Use the manual fallback to place the remaining sessions, or adjust the catalogue or rules and generate again.</p>
           {timetableDiagnostics.length > 0 && <details open style={{ margin: '0.75rem 0' }}>
             <summary style={{ fontWeight: 700 }}>Why this draft is incomplete</summary>
             <ul style={{ margin: '0.5rem 0', paddingLeft: '1.25rem', lineHeight: 1.6 }}>
@@ -731,6 +739,14 @@ export default function CampusDirectorTimetablePage() {
             </ul>
           </details>}
           <button onClick={() => setSelectedDeptId('VIEW_ALL_CONFLICTS')}>View unscheduled sessions</button>
+        </div>}
+        {manualSummary && <div role="status" className={styles.bannerWarning}>
+          <strong>Manual timetable {publication?.published ? 'published' : 'draft'} · {manualSummary.mode === 'allow_overrides' ? 'Rule overrides allowed' : 'Following scheduling rules'}</strong>
+          <p>{unscheduledPeriods} periods missing · {manualSummary.violations.length} recorded rule violations.</p>
+          {manualSummary.reason && <p>Override reason: {manualSummary.reason}</p>}
+          {!!manualSummary.violations.length && <details><summary>Recorded scheduling violations</summary><ul>
+            {manualSummary.violations.map((violation, index) => <li key={index}>{violation.detail}</li>)}
+          </ul></details>}
         </div>}
         {!rulesReady && !rulesError && <LoadingState layout="list" rows={2} compact message="Loading scheduling rules…" />}
         {rulesError && <div role="alert" className="flex items-center gap-3 rounded-lg bg-[color:var(--portal-danger-bg,#fef2f2)] p-4 text-[color:var(--portal-danger-text,#991b1b)]">{rulesError}<button onClick={() => fetchBaseConstraints()}>Try again</button>{baseConstraints && <button onClick={resetBrowserRules}>Restore default rules</button>}</div>}
@@ -770,7 +786,7 @@ export default function CampusDirectorTimetablePage() {
                   id="timetable-academic-year"
                   className={styles.select}
                   value={academicYear}
-                  disabled={publishing}
+                  disabled={publishing || manualEditing}
                   onChange={(e) => setAcademicYear(e.target.value)}
                 >
                   <option value="2026-27">2026-27</option>
@@ -785,7 +801,7 @@ export default function CampusDirectorTimetablePage() {
                   id="timetable-semester"
                   className={styles.select}
                   value={semester}
-                  disabled={publishing}
+                  disabled={publishing || manualEditing}
                   onChange={(e) => setSemester(Number(e.target.value))}
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
@@ -801,7 +817,7 @@ export default function CampusDirectorTimetablePage() {
                 className={styles.rulesTriggerBtn}
                 onClick={() => setShowRulesModal(true)}
                 title="Manage custom and base scheduling constraints"
-                disabled={!rulesReady || publishing}
+                disabled={!rulesReady || publishing || manualEditing}
               >
                 <span>Scheduling Rules</span>
                 <span className={styles.rulesBadge}>{baseConstraints?.rules.filter(rule => appliesToSemester(rule, semester)).length ?? 0} Rules</span>
@@ -812,7 +828,7 @@ export default function CampusDirectorTimetablePage() {
               <button
                 className={styles.generateBtn}
                 onClick={handleGenerate}
-                disabled={!settingsReady || !rulesReady || !baseConstraints || loading || !!error || !publication || publication.published || publishing || jobStatus === 'running' || jobStatus === 'queued'}
+                disabled={!settingsReady || !rulesReady || !baseConstraints || loading || !!error || !publication || publication.published || publishing || manualEditing || jobStatus === 'running' || jobStatus === 'queued'}
                 title={
                   publication?.published ? 'Published timetables cannot be regenerated' : !registrationClosed
                     ? 'Registration window must be closed before generation'
@@ -845,15 +861,16 @@ export default function CampusDirectorTimetablePage() {
                   <button
                     className={styles.exportExcelBtn}
                     onClick={() => {
+                      if (manualDraft) { setShowManualEditor(true); return; }
                       setPublishModalError(null);
                       setPublishConflicts(null);
                       setShowPublishModal(true);
                     }}
-                    disabled={!settingsReady || loading || !!error || publication?.published || publishing || jobStatus === 'running' || jobStatus === 'queued' || reviewDraft || allConflicts.length > 0}
+                    disabled={!settingsReady || loading || !!error || publication?.published || publishing || jobStatus === 'running' || jobStatus === 'queued' || reviewDraft || (!manualDraft && allConflicts.length > 0)}
                     title="Publish timetable for students and faculty"
                     style={{ background: '#059669' }}
                   >
-                    {publication?.published ? 'Published' : 'Publish Timetable'}
+                    {publication?.published ? 'Published' : manualDraft ? 'Review manual publication' : 'Publish Timetable'}
                   </button>
                 </>
               )}
@@ -862,6 +879,16 @@ export default function CampusDirectorTimetablePage() {
         </div>
 
         {/* Feedback Banners */}
+        {(reviewDraft || manualDraft || jobStatus === 'failed') && <div className={styles.bannerWarning}>
+          <strong>{manualDraft ? 'Continue the manual timetable' : 'Manual scheduling is available'}</strong>
+          <p>Place sessions by department, follow scheduling rules or record explicit overrides. Teacher assignments remain with the HOD.</p>
+          <button type="button" className={styles.rulesTriggerBtn} disabled={!settingsReady || loading || !!error || (!publication?.published && !registrationClosed) || jobStatus === 'running' || jobStatus === 'queued'}
+            onClick={() => { setShowGenerationOverlay(false); setShowManualEditor(true); }}>
+            {publication?.published ? 'Review manual timetable' : 'Open manual editor'}
+          </button>
+        </div>}
+        {showManualEditor && <ManualTimetableEditor key={`${academicYear}:${semester}`} academicYear={academicYear} semester={semester}
+          onSaved={() => void fetchEntries(true)} onClose={() => setShowManualEditor(false)} onDirtyChange={setManualEditing} />}
         {errorMsg && <div className={styles.bannerError}><UiCircleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {errorMsg}</div>}
         {successMsg && <div className={styles.bannerSuccess}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {successMsg}</div>}
 

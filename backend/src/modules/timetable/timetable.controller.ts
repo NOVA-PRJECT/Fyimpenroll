@@ -17,13 +17,46 @@ import { CurrentUser } from '../../core/auth/decorators/current-user.decorator'
 import { AuthUser } from '../../core/auth/types'
 import { RateLimitGuard } from '../../core/security/rate-limit.guard'
 import { RateLimit } from '../../core/security/rate-limit.decorator'
-import { GenerateRequestSchema, PublishRequestSchema } from './solver/schemas'
+import { GenerateRequestSchema, PublishRequestSchema, ManualTimetableSchema, ManualPublishSchema, ManualTimetableRequest, TimetableQuerySchema } from './solver/schemas'
+import { ManualTimetableService } from './manual-timetable.service'
 import { z } from 'zod'
 
 @Controller('api/timetable')
 @UseGuards(AuthGuard, RolesGuard)
 export class TimetableController {
-  constructor(private readonly timetableService: TimetableService) {}
+  constructor(private readonly timetableService: TimetableService, private readonly manualTimetable: ManualTimetableService) {}
+
+  @Get('manual')
+  @Roles('campus_director')
+  async getManual(@Query() query: unknown, @CurrentUser() user: AuthUser) {
+    const parsed = TimetableQuerySchema.safeParse(query)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.manualTimetable.get(parsed.data.academicYear, parsed.data.semester, user)
+  }
+
+  @Post('manual/preview')
+  @Roles('campus_director')
+  async previewManual(@Body() body: unknown, @CurrentUser() user: AuthUser) {
+    const parsed = ManualTimetableSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.manualTimetable.preview(parsed.data as ManualTimetableRequest, user)
+  }
+
+  @Put('manual')
+  @Roles('campus_director')
+  async saveManual(@Body() body: unknown, @CurrentUser() user: AuthUser) {
+    const parsed = ManualTimetableSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.manualTimetable.save(parsed.data as ManualTimetableRequest, user)
+  }
+
+  @Post('manual/publish')
+  @Roles('campus_director')
+  async publishManual(@Body() body: unknown, @CurrentUser() user: AuthUser) {
+    const parsed = ManualPublishSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.manualTimetable.publish(parsed.data, user)
+  }
 
   // ──────────────── Constraints (F39) ────────────────
   @Get('constraints')
@@ -43,7 +76,7 @@ export class TimetableController {
 
   // ──────────────── Teacher Substitution (F33, F37) ────────────────
   @Put('entries/:id/teacher')
-  @Roles('superadmin', 'campus_director', 'hod')
+  @Roles('hod')
   async substituteTeacher(
     @Param('id') id: string,
     @Body() body: unknown,

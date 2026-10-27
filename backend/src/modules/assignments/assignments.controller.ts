@@ -42,7 +42,7 @@ export class AssignmentsController {
   }
 
   @Post('assign')
-  @Roles('hod', 'superadmin')
+  @Roles('hod')
   async assignTeacher(
     @CurrentUser() user: AuthUser,
     @Body() body: unknown,
@@ -68,7 +68,7 @@ export class AssignmentsController {
   }
 
   @Post('batch-assign')
-  @Roles('hod', 'superadmin')
+  @Roles('hod')
   async batchAssignTeachers(
     @CurrentUser() user: AuthUser,
     @Body() body: unknown,
@@ -85,7 +85,7 @@ export class AssignmentsController {
 
 
   @Patch(':id/reassign')
-  @Roles('hod', 'superadmin')
+  @Roles('hod')
   async reassignTeacher(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -102,7 +102,7 @@ export class AssignmentsController {
   }
 
   @Delete(':id')
-  @Roles('hod', 'superadmin')
+  @Roles('hod')
   async removeAssignment(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,

@@ -91,7 +91,11 @@ export function validateTimetable(
 
       // R19: Enforce dynamic time limit rules (e.g. limiting to Friday P6)
       for (const tRule of timeLimitRules) {
-        if (tRule.isHard) {
+        if (tRule.isHard &&
+          (!tRule.targetCourseId || tRule.targetCourseId === course.courseId) &&
+          (!tRule.targetDepartmentId || tRule.targetDepartmentId === course.departmentId) &&
+          (!tRule.targetCategory || tRule.targetCategory.toUpperCase().trim() === category) &&
+          (!tRule.parameters?.courseCodes || tRule.parameters.courseCodes.includes(course.courseCode))) {
           const params = tRule.parameters || {};
           const allowedDays: number[] | undefined = params.days || params.allowed_days;
           const allowedPeriods: number[] | undefined = params.periods || params.allowed_periods;
@@ -270,6 +274,16 @@ export function validateTimetable(
             detail: `Semester 1 MDC course ${course.courseCode} must have 1 single session on one day and a 2-hour continuous block on another day.`,
           });
         }
+      }
+    }
+
+    if (semester === 1 && category === 'MDC' && course.theoryHours === 3 && course.practicalHours === 0 && theoryCount === 3) {
+      for (const day of new Set(assignment.slots.map(slot => slot.day))) {
+        const periods = assignment.slots.filter(slot => slot.day === day).map(slot => slot.period).sort((a, b) => a - b);
+        if (periods.length === 2 && (periods[1] !== periods[0] + 1 || periods[0] === 3)) violations.push({
+          type: 'invalid_window', courseId: course.courseId, day,
+          detail: `Semester 1 MDC course ${course.courseCode} must use two consecutive periods without crossing lunch for its 2-hour theory block.`,
+        });
       }
     }
 

@@ -59,3 +59,11 @@ export async function readReviewDraft(db: SupabaseClient, campusId: string, acad
   if (error) throw new Error('Could not verify the current timetable review state.');
   return job?.status === 'completed' && job.metadata?.reviewDraft?.kind === 'review_draft' ? job.metadata.reviewDraft : null;
 }
+
+export async function readManualDraft(db: SupabaseClient, campusId: string, academicYear: string, semester: number) {
+  const { data: job, error } = await db.from('current_system_logs').select('status, metadata')
+    .eq('log_type', 'timetable_job').eq('campus_id', campusId).eq('academic_year', academicYear)
+    .eq('semester', semester).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error('Could not verify the current manual timetable state.');
+  return job && ['completed', 'failed'].includes(job.status) ? job.metadata?.manualDraft ?? null : null;
+}

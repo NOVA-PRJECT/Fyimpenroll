@@ -5,6 +5,7 @@ import { termOperation } from './term-operation'
 
 /** A single database transaction owns validation and every affected record. */
 export async function mutateTeacherAssignments(supabase: SupabaseService, user: AuthUser, args: Record<string, unknown>) {
+  if (user.role !== 'hod') throw new ForbiddenException('Only HODs can change teacher-course assignments.')
   const { data, error } = await termOperation(supabase.admin, user, 'mutate_teacher_assignments', args)
   if (error) {
     if (error.code === 'P4030') throw new ForbiddenException(error.message)
