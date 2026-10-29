@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets, invalidateData } from '@/core/data-cache'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { Building2 as UiBuilding2, CalendarCheck as UiCalendarCheck, Check as UiCheck, CircleAlert as UiCircleAlert, Settings2 as UiSettings2, Timer as UiTimer, TriangleAlert as UiTriangleAlert, X as UiX } from 'lucide-react'
@@ -84,6 +87,8 @@ const PERIODS = [
 export default function CampusDirectorTimetablePage() {
   const router = useRouter();
 
+  const [observedJobId, setObservedJobId] = useState<string | null>(null);
+  const dataRevision = useDataRevision(["catalogue","people","enrollment","assignments","timetable","settings","jobs"])
   const [academicYear, setAcademicYear] = useState('2026-27');
   const [semester, setSemester] = useState(1);
   const [registrationClosed, setRegistrationClosed] = useState(false);
@@ -206,8 +211,9 @@ export default function CampusDirectorTimetablePage() {
       setError(null);
 
       try {
-        const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
-        const res = await fetch(`/api/timetable/entries?academicYear=${academicYear}&semester=${semester}${cacheBuster}`, { cache: 'no-store' });
+        const res = await fetch(`/api/timetable/entries?academicYear=${academicYear}&semester=${semester}`, {
+          cache: 'no-store', ...(forceRefresh ? { headers: { 'X-Refresh-Data': '1' } } : {}),
+        });
         if (!res.ok) throw new Error(`Failed to load timetable (${res.status})`);
         const data = await res.json();
         if (request !== entriesRequest.current || cohort !== cohortRef.current) return;
@@ -235,7 +241,6 @@ export default function CampusDirectorTimetablePage() {
         setDepartments(deptList);
       } catch (err: unknown) {
         if (request === entriesRequest.current && cohort === cohortRef.current) {
-          setPublication(null);
           setError((err instanceof Error ? err.message : 'Failed to load timetable'));
         }
       } finally {
@@ -246,8 +251,14 @@ export default function CampusDirectorTimetablePage() {
   );
 
   const invalidateCache = useCallback(() => {
-    fetchEntries(true);
-  }, [fetchEntries]);
+    void refreshDatasets([`/api/timetable/entries?academicYear=${academicYear}&semester=${semester}`,
+      `/api/timetable/job-status?academicYear=${academicYear}&semester=${semester}`,
+    ], async () => {
+      await fetchEntries();
+      const res = await fetch(`/api/timetable/job-status?academicYear=${academicYear}&semester=${semester}`);
+      if (res.ok) { const job = await res.json(); setJobStatus(job.status); setObservedJobId(job.jobId || null); setJobProgress(job.progress || 0); }
+    }).catch(error => { if (!(error instanceof Error && error.name === 'AbortError')) setError('Unable to refresh the timetable. Please retry.'); });
+  }, [academicYear, semester, fetchEntries]);
 
   // Selector change effect: Reset banners & fetch job status
   useEffect(() => {
@@ -272,6 +283,7 @@ export default function CampusDirectorTimetablePage() {
       .then((data) => {
         if (data && data.status && data.status !== 'idle') {
           setJobStatus(data.status);
+          setObservedJobId(data.jobId || null);
           setJobProgress(data.progress || 0);
           if (data.stepMessage) setStepMessage(data.stepMessage);
           if (data.status === 'failed') {
@@ -280,14 +292,14 @@ export default function CampusDirectorTimetablePage() {
         }
       })
       .catch(() => {});
-  }, [academicYear, semester]);
+  }, [academicYear, semester, dataRevision]);
 
   // Single fetch on mount / selector change
   useEffect(() => {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Fetch the selected cohort from the API.
-    fetchEntries(true);
-  }, [fetchEntries]);
+    void fetchEntries();
+  }, [fetchEntries, dataRevision]);
 
   // Check live registration status from campus settings
   useEffect(() => {
@@ -312,7 +324,7 @@ export default function CampusDirectorTimetablePage() {
     }
     loadSettings();
     return () => controller.abort();
-  }, [router, settingsRetry]);
+  }, [router, settingsRetry, dataRevision]);
 
   // Set default selected department once data loads (prefer first department with active entries)
   useEffect(() => {
@@ -330,58 +342,41 @@ export default function CampusDirectorTimetablePage() {
     }
   }, [allEntries, departments, selectedDeptId]);
 
-  // Poll job status when running or queued
   useEffect(() => {
-    if (jobStatus !== 'running' && jobStatus !== 'queued') return;
-
-    let consecutiveErrors = 0;
-
-    const interval = setInterval(async () => {
+    if (!observedJobId || (jobStatus !== 'running' && jobStatus !== 'queued')) return;
+    const controller = new AbortController();
+    async function stream() {
       try {
-        const res = await fetch(`/api/timetable/job-status?academicYear=${academicYear}&semester=${semester}`);
-        if (!res.ok) {
-          consecutiveErrors++;
-          if (consecutiveErrors >= 6) {
-            clearInterval(interval);
-            setJobStatus('failed');
-            setJobError('Unable to reach server to check generation progress. Please check your network connection and retry.');
+        const response = await fetch(`/api/timetable/progress?academicYear=${encodeURIComponent(academicYear)}&semester=${semester}&jobId=${observedJobId}`, { signal: controller.signal });
+        if (!response.ok || !response.body) throw new Error('Progress could not be connected. Use Refresh to check the job.');
+        const reader = response.body.getReader(), decoder = new TextDecoder();
+        let pending = '';
+        while (!controller.signal.aborted) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          pending += decoder.decode(chunk.value, { stream: true });
+          let boundary: number;
+          while ((boundary = pending.indexOf('\n\n')) >= 0) {
+            const event = pending.slice(0, boundary); pending = pending.slice(boundary + 2);
+            if (!event.startsWith('data: ')) continue;
+            const data = JSON.parse(event.slice(6));
+            if (data.status === 'unavailable') throw new Error(data.message);
+            setJobProgress(data.progress || 0);
+            if (data.stepMessage) setStepMessage(data.stepMessage);
+            if (data.status === 'completed' || data.status === 'failed') {
+              setJobStatus(data.status);
+              if (data.status === 'failed') setJobError(data.errorMessage || 'Generation failed.');
+              else { setSuccessMsg(data.stepMessage || 'Timetable generated successfully.'); setShowGenerationOverlay(false); }
+              await invalidateData(['jobs', 'timetable']);
+              return;
+            }
           }
-          return;
         }
-        consecutiveErrors = 0;
-        const data = await res.json();
-
-        setJobStatus(data.status);
-        setJobProgress(data.progress || 0);
-        if (data.stepMessage) setStepMessage(data.stepMessage);
-
-        if (data.status === 'completed') {
-          clearInterval(interval);
-          setSuccessMsg(data.stepMessage || 'Timetable generated successfully!');
-          const storageKey = `fyimp:constraints:${academicYear}:${semester}`;
-          sessionStorage.removeItem(storageKey);
-          invalidateCache();
-
-          setTimeout(() => {
-            setShowGenerationOverlay(false);
-          }, 1500);
-        } else if (data.status === 'failed') {
-          clearInterval(interval);
-          setJobError(data.errorMessage || data.error || 'Generation job failed');
-        }
-      } catch (err) {
-        consecutiveErrors++;
-        console.error('Job status polling error:', err);
-        if (consecutiveErrors >= 6) {
-          clearInterval(interval);
-          setJobStatus('failed');
-          setJobError('Network connection to server timed out. Please check your internet connection and try clicking "Retry Generation".');
-        }
-      }
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [jobStatus, academicYear, semester, invalidateCache]);
+      } catch (error) { if (!controller.signal.aborted) setJobError((error as Error).message); }
+    }
+    void stream();
+    return () => controller.abort();
+  }, [observedJobId, academicYear, semester, jobStatus]);
 
   // ETC Countdown: starts at 3:00 when overlay opens, counts down, stops when overlay closes
   useEffect(() => {
@@ -472,6 +467,7 @@ export default function CampusDirectorTimetablePage() {
         return;
       }
 
+      setObservedJobId(data.jobId);
       setJobStatus('queued');
       setJobProgress(5);
     } catch {
@@ -520,7 +516,7 @@ export default function CampusDirectorTimetablePage() {
         setPublishModalError(null);
         setPublishConflicts(null);
         setPublication({ published: true, publishedAt: data.publishedAt ?? null, publishedCount: data.publishedCount });
-        await fetchEntries(true);
+        await fetchEntries();
       } else {
         const message = 'Publication was not confirmed by the server. Refresh the timetable and try again.';
         setPublishModalError(message);
@@ -888,7 +884,7 @@ export default function CampusDirectorTimetablePage() {
           </button>
         </div>}
         {showManualEditor && <ManualTimetableEditor key={`${academicYear}:${semester}`} academicYear={academicYear} semester={semester}
-          onSaved={() => void fetchEntries(true)} onClose={() => setShowManualEditor(false)} onDirtyChange={setManualEditing} />}
+          onSaved={() => void fetchEntries()} onClose={() => setShowManualEditor(false)} onDirtyChange={setManualEditing} />}
         {errorMsg && <div className={styles.bannerError}><UiCircleAlert size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {errorMsg}</div>}
         {successMsg && <div className={styles.bannerSuccess}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {successMsg}</div>}
 

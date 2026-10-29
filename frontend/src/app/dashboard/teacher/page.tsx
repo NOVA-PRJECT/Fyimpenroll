@@ -1,5 +1,9 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+import { refreshDatasets } from '@/core/data-cache'
+
 import AccessibleModal from '@/components/AccessibleModal'
 import { attendanceCopySource, copiedAbsences } from '@/core/attendance-copy'
 import { apiErrorMessage } from '@/core/api-error'
@@ -11,7 +15,7 @@ import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useEffectEvent, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import styles from './teacher-dashboard.module.css'
@@ -226,6 +230,7 @@ export default function TeacherDashboard() {
   const router = useRouter()
 
   // Tab State
+  const dataRevision = useDataRevision(["catalogue","people","enrollment","assignments","timetable","attendance"])
   const [activeTab, setActiveTab] = useState<'schedule' | 'timetable' | 'rosters'>('schedule')
 
   // Teacher Profile State
@@ -250,6 +255,7 @@ export default function TeacherDashboard() {
 
   // Attendance Marking Modal State
   const [activeSlotForMarking, setActiveSlotForMarking] = useState<PeriodSlot | null>(null)
+  useDataRevision([], !!activeSlotForMarking)
   const [markingRoster, setMarkingRoster] = useState<Student[]>([])
   const [loadingMarkingRoster, setLoadingMarkingRoster] = useState(false)
   const [absentStudentIds, setAbsentStudentIds] = useState<Set<string>>(new Set())
@@ -281,6 +287,8 @@ export default function TeacherDashboard() {
   const [selectedCourseId, setSelectedCourseId] = useState('')
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [rosterData, setRosterData] = useState<RosterData | null>(null)
+  const rosterRequest = useRef(0)
+  const scheduleRequest = useRef(0)
   const [tableDeptFilter, setTableDeptFilter] = useState('all')
 
   // PDF Export Modal State
@@ -309,11 +317,13 @@ export default function TeacherDashboard() {
 
   // 2. Fetch Teacher Schedule for target date
   const fetchTeacherSchedule = useCallback(async (dateToFetch: string) => {
+    const request = ++scheduleRequest.current
     setLoadingSchedule(true)
     setGlobalError('')
     try {
       const res = await fetch(`/api/attendance/period/teacher-schedule?date=${dateToFetch}`)
       const data: TeacherScheduleResponse = await res.json()
+      if (request !== scheduleRequest.current) return
       if (res.ok) {
         if (data.teacherName) setTeacherName(data.teacherName)
         if (data.departmentName) setDepartmentName(data.departmentName)
@@ -325,28 +335,19 @@ export default function TeacherDashboard() {
         setGlobalError((data as {message?: string}).message || 'Failed to fetch schedule for the selected date.')
       }
     } catch {
-      setGlobalError('Network error while fetching teacher schedule.')
+      if (request === scheduleRequest.current) setGlobalError('Network error while fetching teacher schedule.')
     } finally {
-      setLoadingSchedule(false)
+      if (request === scheduleRequest.current) setLoadingSchedule(false)
     }
   }, [])
 
   useEffect(() => {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
-    fetchTeacherCourses()
     fetchTeacherSchedule(scheduleDate)
-  }, [fetchTeacherCourses, fetchTeacherSchedule, scheduleDate])
+  }, [fetchTeacherSchedule, scheduleDate, dataRevision])
 
-  useEffect(() => {
-    if (activeTab !== 'timetable') return
-    void fetchTeacherSchedule(scheduleDate)
-    const refresh = () => { if (document.visibilityState === 'visible') void fetchTeacherSchedule(scheduleDate) }
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    const interval = setInterval(refresh, 30000)
-    return () => { clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
-  }, [activeTab, fetchTeacherSchedule, scheduleDate])
+  useEffect(() => { void fetchTeacherCourses() }, [fetchTeacherCourses, dataRevision])
 
   // Available semesters from assigned courses
   const availableSemesters = useMemo(() => {
@@ -384,6 +385,7 @@ export default function TeacherDashboard() {
 
   // Fetch Class Roster for Tab 3
   async function handleFetchRoster(courseId: string) {
+    const request = ++rosterRequest.current
     if (!courseId) {
       setRosterData(null)
       return
@@ -396,17 +398,22 @@ export default function TeacherDashboard() {
       if (!selected) throw new Error('Select an assigned delivery')
       const res = await fetch(`/api/faculty/attendance?course_id=${selected.id}&delivery_id=${selected.delivery_id}`)
       const data = await res.json()
+      if (request !== rosterRequest.current) return
       if (res.ok) {
         setRosterData(data)
       } else {
         setGlobalError(data.error || 'Failed to fetch class roster.')
       }
     } catch {
-      setGlobalError('Network error while fetching class roster.')
+      if (request === rosterRequest.current) setGlobalError('Network error while fetching class roster.')
     } finally {
-      setLoadingRoster(false)
+      if (request === rosterRequest.current) setLoadingRoster(false)
     }
   }
+  const reloadVisibleRoster = useEffectEvent(() => {
+    if (activeTab === 'rosters' && selectedCourseId) void handleFetchRoster(selectedCourseId)
+  })
+  useEffect(() => { reloadVisibleRoster() }, [activeTab, dataRevision])
 
   // Open Marking Modal for a slot (F47, F48, R29: Loads persisted marks and session revision for scheduleDate)
   async function handleOpenMarkingModal(slot: PeriodSlot) {
@@ -427,7 +434,7 @@ export default function TeacherDashboard() {
     setConflictRevision(null)
 
     try {
-      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`, { signal: controller.signal })
+      const res = await fetch(`/api/attendance/period/slot-marks?slotId=${slot.timetable_slot_id}&date=${scheduleDate}`, { signal: controller.signal, headers: { 'X-Refresh-Data': '1' } })
       const data = await res.json()
       if (controller.signal.aborted || markingContext.current !== context) return
       if (res.ok && data.students) {
@@ -774,8 +781,8 @@ export default function TeacherDashboard() {
                   <button
                     type="button"
                     className={styles.refreshScheduleBtn}
-                    onClick={() => fetchTeacherSchedule(scheduleDate)}
-                    disabled={loadingSchedule}
+                    onClick={() => void refreshDatasets([`/api/attendance/period/teacher-schedule?date=${scheduleDate}`], () => fetchTeacherSchedule(scheduleDate))}
+                    disabled={loadingSchedule || !!activeSlotForMarking}
                     title="Refresh schedule"
                   >
                     <UiRefreshCw size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" />
@@ -886,6 +893,9 @@ export default function TeacherDashboard() {
               <h2 className={styles.timetableTitle}>
                 <span><UiCalendarDays size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span> Weekly Teaching Schedule (Periods 1 to 6)
               </h2>
+              <SectionRefreshButton className={styles.todayQuickBtn} label="Refresh timetable"
+                endpoints={[`/api/attendance/period/teacher-schedule?date=${scheduleDate}`]}
+                onRefresh={() => fetchTeacherSchedule(scheduleDate)} disabled={loadingSchedule} />
 
               <div className={styles.timetableControlsGroup}>
                 {/* Day Filter Pills */}
@@ -1128,6 +1138,8 @@ export default function TeacherDashboard() {
             <div className={styles.filterCard}>
               <div className={styles.filterCardHeader}>
                 <p className={styles.filterCardTitle}>Assigned Papers & Course Selection</p>
+                <SectionRefreshButton className={styles.todayQuickBtn} label="Refresh assigned papers"
+                  endpoints={['/api/faculty/courses']} onRefresh={fetchTeacherCourses} disabled={loadingProfile} />
               </div>
 
               <div className={styles.filterControlsGrid}>
@@ -1151,6 +1163,9 @@ export default function TeacherDashboard() {
                   <label className={styles.filterLabel}>
                     Select Assigned Paper ({filteredAssignedCourses.length} available)
                   </label>
+                  <SectionRefreshButton label="Refresh roster" className={styles.todayQuickBtn}
+                    endpoints={selectedCourseId ? [`/api/faculty/attendance?course_id=${assignedCourses.find(course => course.delivery_id === selectedCourseId)?.id}&delivery_id=${selectedCourseId}`] : []}
+                    onRefresh={() => handleFetchRoster(selectedCourseId)} disabled={!selectedCourseId || loadingRoster} />
                   <CustomPaperSelect
                     courses={filteredAssignedCourses}
                     selectedCourseId={selectedCourseId}

@@ -43,7 +43,7 @@ export class AttendanceExportService {
     for (const reg of registrations) for (const slot of registrationSlots(reg)) {
       enrolledCourseSet.add(reg.student_id + '_' + slot.courseId); ids.add(slot.courseId!);
     }
-    const courseList = await fetchByIdChunks<any>([...ids], chunk => this.supabase.admin.from('courses').select('id, course_code, title').in('id',chunk).order('id'));
+    const courseList = await fetchByIdChunks<any>([...ids], chunk => this.supabase.admin.from('courses').select('id, course_code, title').in('id',chunk).order('id'), true);
     const courseConductedMap = new Map<string, number>();
     const studentCoursePresentMap = new Map<string, number>();
     // Denominator = this student's explicitly marked published dated periods.

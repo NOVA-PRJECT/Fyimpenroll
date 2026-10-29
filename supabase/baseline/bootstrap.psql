@@ -7,4 +7,6 @@
 \ir ../migrations/20261025062135_consolidate_application_schema.sql
 \ir ../changes/semester_lifecycle.sql
 \ir ../changes/manual_timetable.sql
+\ir ../changes/data_read_optimization.sql
+\ir ../changes/preferences_before_allocation.sql
 SELECT public.production_readiness();

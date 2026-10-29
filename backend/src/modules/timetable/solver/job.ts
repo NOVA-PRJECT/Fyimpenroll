@@ -6,6 +6,7 @@ import { loadGenerationInput } from './loader';
 import { validateTimetable, violationsToText } from './validator';
 import { DynamicConstraint, AIAssignment, AIGeneratorResponse } from './types';
 import { createReviewDraft, saveReviewDraft } from './review-draft';
+import { timetableProgressKey } from './progress-key';
 
 function formatSolverErrorMessage(raw: string): string {
   if (raw.includes('timetable_entries_unique')) {
@@ -38,9 +39,10 @@ export async function runGenerationJob(
   campusId?: string,
   dynamicConstraints: DynamicConstraint[] = [],
   campusConstraints?: Record<string, any>,
-  fencingToken?: string
+  fencingToken?: string,
+  termVersion = 0
 ): Promise<void> {
-  const redisKey = `timetable:job:${academicYear}:${semester}${campusId ? `:${campusId}` : ''}`;
+  const redisKey = timetableProgressKey(campusId || '', termVersion, jobId);
   const dbClient = supabase;
 
   let currentStats: Record<string, any> = {};
@@ -375,28 +377,15 @@ export async function runGenerationJob(
 
     const friendlyError = formatSolverErrorMessage(err.message || String(err));
 
-    // 1. Attempt Redis update first (fast in-memory notification for frontend polling)
+    // Publish a terminal event only after the database accepts the worker claim.
     try {
-      const failPayload = {
-        status: 'failed',
-        progress: 0,
-        stepMessage: `Generation failed: ${friendlyError}`,
-        errorMessage: friendlyError,
-        stats: currentStats,
-        jobId,
-      };
-      await redis.set(redisKey, JSON.stringify(failPayload), { ex: 3600 });
-    } catch (redisErr) {
-      console.error('Warning: Failed to update Redis job failure status:', redisErr);
-    }
-
-    // 2. Attempt Database record update
-    try {
-      await dbClient.rpc('update_timetable_worker', {
+      const { error } = await dbClient.rpc('update_timetable_worker', {
         p_job_id: jobId, p_fencing_token: fencingToken, p_status: 'failed', p_progress: 0, p_error: friendlyError,
       });
-    } catch (dbErr) {
-      console.error('Warning: Failed to update DB job failure status:', dbErr);
-    }
+      if (error) throw error;
+      await redis.set(redisKey, JSON.stringify({ status: 'failed', progress: 0,
+        stepMessage: `Generation failed: ${friendlyError}`, errorMessage: friendlyError, stats: currentStats, jobId,
+      }), { ex: 3600 }).catch(() => {});
+    } catch (dbErr) { console.error('Warning: Failed to confirm DB job failure status:', dbErr); }
   }
 }

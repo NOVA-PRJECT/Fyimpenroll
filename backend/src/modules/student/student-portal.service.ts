@@ -15,7 +15,9 @@ export class StudentPortalService {
   ) {}
 
   private async context(user: AuthUser, requestedSemester?: string) {
-    const { data: student, error } = await this.supabase.admin.from('students')
+    const { data: student, error } = user.role === 'student' && user.campus_id && user.department_id && user.current_semester
+      ? { data: { id: user.userId, campus_id: user.campus_id, department_id: user.department_id, current_semester: user.current_semester }, error: null }
+      : await this.supabase.admin.from('students')
       .select('id, campus_id, department_id, current_semester').eq('id', user.userId).maybeSingle()
     if (error) throw new InternalServerErrorException('Unable to load student profile.')
     if (!student) throw new NotFoundException('Student profile not found.')
@@ -23,7 +25,8 @@ export class StudentPortalService {
     if (!Number.isInteger(semester) || semester < 1 || semester > 10) {
       throw new BadRequestException('Semester must be an integer between 1 and 10.')
     }
-    const { data: settings, error: settingsError } = await this.supabase.admin.from('campus_settings')
+    const { data: settings, error: settingsError } = user.verifiedCampusSettings
+      ? { data: user.verifiedCampusSettings, error: null } : await this.supabase.admin.from('campus_settings')
       .select('academic_year, term_version').eq('campus_id', student.campus_id).maybeSingle()
     if (settingsError || !settings?.academic_year) throw new InternalServerErrorException('Campus academic year is not configured.')
     let query = this.supabase.admin.from('student_registrations')
@@ -43,19 +46,20 @@ export class StudentPortalService {
     }
   }
 
-  private async coursesFor(context: Awaited<ReturnType<StudentPortalService['context']>>) {
-    if (!context.courseIds.length) return []
+  private async coursesFor(context: Awaited<ReturnType<StudentPortalService['context']>>, selectedCourse?: string) {
+    const courseIds = selectedCourse ? context.courseIds.filter(id => id === selectedCourse) : context.courseIds
+    if (!courseIds.length) return []
     const [courseResult, assignments] = await Promise.all([
       this.supabase.admin.from('courses').select('id, course_code, title, credits, category, prerequisites')
-        .in('id', context.courseIds).order('course_code'),
+        .in('id', courseIds).order('course_code'),
       fetchAllPaginated<any>(this.supabase.admin.from('teacher_course_assignments')
         .select('id, course_id, teacher_id')
-        .in('course_id', context.courseIds).eq('campus_id', context.campusId)
+        .in('course_id', courseIds).eq('campus_id', context.campusId)
         .eq('academic_year', context.academicYear).eq('term_version', context.termVersion).eq('semester', context.semester).order('id')),
     ])
     if (courseResult.error) throw new InternalServerErrorException('Unable to load enrolled courses.')
     const faculty = await fetchByIdChunks<{ id: string; full_name: string }>(assignments.map(a => a.teacher_id), ids =>
-      this.supabase.admin.from('faculty').select('id, full_name').in('id', ids).order('id'))
+      this.supabase.admin.from('faculty').select('id, full_name').in('id', ids).order('id'), true)
     const facultyNames = new Map(faculty.map(teacher => [teacher.id, teacher.full_name]))
     return (courseResult.data || []).map(course => ({
       id: course.id, code: course.course_code, title: course.title, credits: Number(course.credits), category: course.category,
@@ -69,7 +73,7 @@ export class StudentPortalService {
   }
 
   async course(user: AuthUser, courseId: string, semester?: string) {
-    const course = (await this.courses(user, semester)).find(item => item.id === courseId)
+    const course = (await this.coursesFor(await this.context(user, semester), courseId)).find(item => item.id === courseId)
     if (!course) throw new NotFoundException('Course is not in your selected semester registration.')
     return { ...course, prerequisites: course.prerequisite_points.join('; ') || null }
   }

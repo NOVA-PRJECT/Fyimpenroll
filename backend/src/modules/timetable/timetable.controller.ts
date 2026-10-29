@@ -7,6 +7,8 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common'
 import { TimetableService } from './timetable.service'
@@ -20,6 +22,7 @@ import { RateLimit } from '../../core/security/rate-limit.decorator'
 import { GenerateRequestSchema, PublishRequestSchema, ManualTimetableSchema, ManualPublishSchema, ManualTimetableRequest, TimetableQuerySchema } from './solver/schemas'
 import { ManualTimetableService } from './manual-timetable.service'
 import { z } from 'zod'
+import type { Request, Response } from 'express'
 
 @Controller('api/timetable')
 @UseGuards(AuthGuard, RolesGuard)
@@ -128,6 +131,14 @@ export class TimetableController {
   }
 
   // ──────────────── Publish ────────────────
+  @Get('progress')
+  @Roles('campus_director')
+  async progress(@Query() query: unknown, @CurrentUser() user: AuthUser, @Req() req: Request, @Res() res: Response) {
+    const parsed = TimetableQuerySchema.extend({ jobId: z.string().uuid() }).safeParse(query)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.timetableService.progress(parsed.data.academicYear, parsed.data.semester, parsed.data.jobId, user, req, res)
+  }
+
   @Post('publish')
   @Roles('superadmin', 'campus_director')
   async publish(

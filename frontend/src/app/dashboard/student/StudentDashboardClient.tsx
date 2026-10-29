@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { CalendarDays as UiCalendarDays, Check as UiCheck, Clock as UiClock, FileText as UiFileText, Info as UiInfo, TriangleAlert as UiTriangleAlert } from 'lucide-react'
@@ -25,6 +28,8 @@ import { useBfcacheGuard } from '@/core/hooks/useBfcacheGuard'
 import CampusSignInCard from './CampusSignInCard'
 import CreditLedgerView from '@/components/credit-ledger/CreditLedgerView'
 import { RegistrationWindow } from './page'
+import { projectReadData } from '@fyimp/contracts'
+import { useCurrentTime } from '@/core/hooks/useCurrentTime'
 
 interface StudentInfo {
   id?: string
@@ -90,9 +95,12 @@ export default function StudentDashboardClient({
   allocationCompleted = false,
   enrolledCourses = [],
   totalRegisteredCredits = 0,
-  registrationWindow,
+  registrationWindow: storedWindow,
 }: StudentDashboardClientProps) {
   useBfcacheGuard()
+  const clock = useCurrentTime(60000, storedWindow?.deadline)
+  const registrationWindow = projectReadData('/api/student/dashboard-summary', { registrationWindow: storedWindow }, clock).registrationWindow
+  const dataRevision = useDataRevision(["timetable","enrollment","assignments"])
   const [activeTab, setActiveTab] = useState<StudentTab>('overview')
   const [selectedDay, setSelectedDay] = useState<number | 'all'>('all')
   const [loggingOut, setLoggingOut] = useState(false)
@@ -124,7 +132,7 @@ export default function StudentDashboardClient({
       void loadTimetable()
       return () => controller.abort()
     }
-  }, [activeTab, studentInfo.id, studentInfo.current_semester, registrationWindow?.academicYear, timetableRefresh])
+  }, [activeTab, studentInfo.id, studentInfo.current_semester, registrationWindow?.academicYear, dataRevision, timetableRefresh])
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -716,7 +724,9 @@ export default function StudentDashboardClient({
               <button
                 type="button"
                 className={styles.timetableRefreshBtn}
-                onClick={() => setTimetableRefresh(value => value + 1)}
+                onClick={() => void refreshDatasets([
+                  `/api/timetable/entries?academicYear=${encodeURIComponent(registrationWindow?.academicYear || '')}&semester=${studentInfo.current_semester || 1}`,
+                ], () => setTimetableRefresh(value => value + 1))}
                 disabled={loadingTimetable}
                 aria-busy={loadingTimetable}
               >

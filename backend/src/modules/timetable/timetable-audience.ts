@@ -12,7 +12,7 @@ export async function loadTimetableAudience(db: SupabaseClient, campusId: string
   // student foreign keys that make PostgREST's relationship choice ambiguous.
   const students = await fetchByIdChunks<{ id: string; department_id: string }>(
     registrations.map(registration => registration.student_id), ids => db.from('students')
-      .select('id,department_id').in('id', ids).order('id'));
+      .select('id,department_id').in('id', ids).order('id'), true);
   const studentDepartments = new Map(students.map(student => [student.id, student.department_id]));
   const courseDepartments = new Map<string, Set<string>>();
   const departmentStudents = new Map<string, Set<string>>();

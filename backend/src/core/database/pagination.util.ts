@@ -9,6 +9,7 @@ export async function fetchAllPaginated<T>(
   fetchPageOrQuery: any,
   pageSize = 1000,
   maxRecords = 100000,
+  knownMaximum?: number,
 ): Promise<T[]> {
   if (!fetchPageOrQuery) return []
 
@@ -24,6 +25,7 @@ export async function fetchAllPaginated<T>(
       }
       const data = res?.data || []
       allResults.push(...data)
+      if ((res.count != null && allResults.length >= res.count) || (knownMaximum != null && allResults.length >= knownMaximum)) break
       if (data.length === 0) {
         break
       }
@@ -53,6 +55,7 @@ export async function fetchAllPaginated<T>(
     }
     const data = res?.data || []
     allResults.push(...data)
+    if ((res.count != null && allResults.length >= res.count) || (knownMaximum != null && allResults.length >= knownMaximum)) break
     if (data.length === 0) {
       break
     }
@@ -63,11 +66,12 @@ export async function fetchAllPaginated<T>(
 }
 
 /** Keep PostgREST URLs bounded when resolving a complete set of UUIDs. */
-export async function fetchByIdChunks<T>(ids: string[], query: (chunk: string[]) => any): Promise<T[]> {
+export async function fetchByIdChunks<T>(ids: string[], query: (chunk: string[]) => any, oneRowPerId = false): Promise<T[]> {
   const unique = [...new Set(ids)]
   const rows: T[] = []
   for (let i = 0; i < unique.length; i += 100) {
-    rows.push(...await fetchAllPaginated<T>(query(unique.slice(i, i + 100))))
+    const chunk = unique.slice(i, i + 100)
+    rows.push(...await fetchAllPaginated<T>(query(chunk), 1000, 100000, oneRowPerId ? chunk.length : undefined))
   }
   return rows
 }

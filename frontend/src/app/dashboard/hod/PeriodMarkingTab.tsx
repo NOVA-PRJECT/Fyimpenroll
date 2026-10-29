@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -75,6 +78,7 @@ function getTodayIST(): string {
 }
 
 export default function PeriodMarkingTab() {
+  const dataRevision = useDataRevision(["attendance","enrollment","timetable","assignments"])
   const [slots, setSlots] = useState<DepartmentSlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
@@ -131,7 +135,7 @@ export default function PeriodMarkingTab() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchSlots()
-  }, [fetchSlots])
+  }, [fetchSlots, dataRevision])
 
   // ── Fetch Roster for Selected Slot (F46) ──
   const fetchRoster = useCallback(async (slotId: string) => {
@@ -160,7 +164,7 @@ export default function PeriodMarkingTab() {
     } else {
       setRosterData(null)
     }
-  }, [selectedSlotId, fetchRoster])
+  }, [selectedSlotId, fetchRoster, dataRevision])
 
   // ── Export Statement ──
   async function handleExportStatement() {
@@ -309,7 +313,15 @@ export default function PeriodMarkingTab() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '14px', fontWeight: 700, color: "var(--portal-brand-text,#002147)", margin: 0 }}>Timetable Lecture Slots</h3>
             <button
-              onClick={fetchSlots}
+              onClick={() => {
+                const params = new URLSearchParams()
+                if (semesterFilter !== 'all') params.set('semester', String(semesterFilter))
+                if (dayFilter !== 'all') params.set('dayOfWeek', String(dayFilter))
+                params.set('date', attendanceDate)
+                void refreshDatasets([`/api/attendance/period/slots?${params}`,
+                  ...(selectedSlotId ? [`/api/attendance/period/roster?slotId=${selectedSlotId}&date=${attendanceDate}`] : []),
+                ], () => Promise.all([fetchSlots(), ...(selectedSlotId ? [fetchRoster(selectedSlotId)] : [])]))
+              }}
               disabled={loadingSlots}
               style={{
                 padding: '4px 8px',

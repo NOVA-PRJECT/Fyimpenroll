@@ -1,4 +1,5 @@
 'use client'
+import { useDataRevision } from '@/core/hooks/useDataRevision';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defaultSessionType, editManualSession, linkedCourseIds, ManualEntry, sessionPeriods } from '@/core/utils/manualTimetable';
@@ -51,10 +52,12 @@ export default function ManualTimetableEditor({ academicYear, semester, onSaved,
   const [acknowledged, setAcknowledged] = useState(false);
   const requestId = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     setBusy(true); setError(null); setReport(null); requestId.current++;
     try {
-      const response = await fetch(`/api/timetable/manual?academicYear=${encodeURIComponent(academicYear)}&semester=${semester}`, { cache: 'no-store' });
+      const response = await fetch(`/api/timetable/manual?academicYear=${encodeURIComponent(academicYear)}&semester=${semester}`, {
+        cache: 'no-store', ...(fresh ? { headers: { 'X-Refresh-Data': '1' } } : {}),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(message(data));
       setState(data); setEntries(data.entries); setMode(data.mode); setReason(data.reason);
@@ -64,30 +67,26 @@ export default function ManualTimetableEditor({ academicYear, semester, onSaved,
     finally { setBusy(false); }
   }, [academicYear, semester]);
 
-  useEffect(() => { void load(); }, [load]);
-
   const dirty = !!state && (JSON.stringify(entries) !== JSON.stringify(state.entries) || mode !== state.mode || reason !== state.reason);
   useEffect(() => { onDirtyChange(dirty || busy); return () => onDirtyChange(false); }, [dirty, busy, onDirtyChange]);
-  useEffect(() => {
+  const dataRevision = useDataRevision(['timetable', 'catalogue', 'people', 'assignments', 'enrollment', 'settings'], dirty || busy);
+  useEffect(() => { void load(); }, [load, dataRevision]);
+  async function validate() {
     if (!state || state.published || busy) return;
     const id = ++requestId.current;
-    const controller = new AbortController();
-    setReport(null); setCanSave(false); setChecking(true); setAcknowledged(false);
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch('/api/timetable/manual/preview', { method: 'POST', signal: controller.signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ academicYear, semester, revision: state.revision, entries, mode, reason }) });
-        const data = await response.json();
-        if (id !== requestId.current) return;
-        if (!response.ok) throw new Error(message(data));
-        setReport(data.report); setCanSave(data.canSave); setError(null);
-      } catch (error) {
-        if (!controller.signal.aborted && id === requestId.current) setError((error as Error).message);
-      } finally { if (id === requestId.current) setChecking(false); }
-    }, 350);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [academicYear, semester, state, entries, mode, reason, busy]);
+    setChecking(true); setError(null);
+    try {
+      const response = await fetch('/api/timetable/manual/preview', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ academicYear, semester, revision: state.revision, entries, mode, reason }) });
+      const data = await response.json();
+      if (id !== requestId.current) return;
+      if (!response.ok) throw new Error(message(data));
+      setReport(data.report); setCanSave(data.canSave);
+    } catch (error) { if (id === requestId.current) setError((error as Error).message); }
+    finally { if (id === requestId.current) setChecking(false); }
+  }
+  useEffect(() => { requestId.current++; setReport(null); setCanSave(true); setChecking(false); setAcknowledged(false); }, [entries, mode, reason]);
 
   function change(next: ManualEntry[]) {
     setUndo(previous => [...previous.slice(-19), entries]); setEntries(next);
@@ -154,7 +153,7 @@ export default function ManualTimetableEditor({ academicYear, semester, onSaved,
       <button type="button" onClick={onClose} disabled={busy || dirty}>Close editor</button></div>
     {error && <div role="alert" className={styles.error}>{error}</div>}
     {feedback && <p role="status" className={styles.success}>{feedback}</p>}
-    <div className={styles.toolbar}><button type="button" onClick={() => void load()} disabled={busy}>Reload saved timetable{dirty ? ' (discard edits)' : ''}</button>
+    <div className={styles.toolbar}><button type="button" onClick={() => void load(true)} disabled={busy}>Reload saved timetable{dirty ? ' (discard edits)' : ''}</button>
       {!state?.published && <button type="button" disabled={readOnly || !undo.length} onClick={() => {
         const previous = undo[undo.length - 1]; setUndo(undo.slice(0, -1)); setEntries(previous); setSelected(null);
       }}>Undo last edit</button>}
@@ -231,6 +230,7 @@ export default function ManualTimetableEditor({ academicYear, semester, onSaved,
       </div>
       {!state.published && <div className={styles.publication}>
         <button type="button" className={styles.primary} disabled={readOnly || checking || !canSave || (!dirty && state.saved)} onClick={() => void save()}>Save manual draft</button>
+        <button type="button" disabled={readOnly || checking} onClick={() => void validate()}>Validate changes</button>
         {mode === 'allow_overrides' && <label><input type="checkbox" checked={acknowledged} disabled={readOnly || dirty || !report}
           onChange={event => setAcknowledged(event.target.checked)} /> I have reviewed and accept the listed rule violations and missing hours for publication.</label>}
         <p>Publishing makes this timetable visible to students and faculty and locks its placements.</p>

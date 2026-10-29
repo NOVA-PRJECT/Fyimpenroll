@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import { GLOBAL_BASKET_CATEGORIES, groupBlueprintCourses } from '@/core/blueprint-options'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
@@ -33,6 +36,7 @@ interface PathwayData {
 
 interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; id: string; course_code: string; title: string; credits: number; category: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
 export default function BlueprintTab({ semester, onSemesterChange: setSemester }: { semester: number; onSemesterChange: (semester: number) => void }) {
+  const dataRevision = useDataRevision(["catalogue"])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -110,6 +114,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
     return JSON.stringify(cleanPws(pathways)) !== JSON.stringify(cleanPws(initialSnapshot.pathways))
   })()
 
+  useDataRevision([], hasChanges)
   function getBasketCourses(slot: SlotData, pathway?: PathwayData) {
     const fixedTargets = new Set((pathway?.slots || [])
       .filter(item => ['FIXED', 'AEC_ELECT', 'CAMPUS_FIXED'].includes(item.rule))
@@ -199,7 +204,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
     const controller = new AbortController()
     loadInitialBlueprint(controller.signal)
     return () => controller.abort()
-  }, [semester])
+  }, [semester, dataRevision])
 
   async function fetchDepartmentsList() {
     try {
@@ -209,7 +214,7 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
         setDepartments(data)
       }
     } catch (err) {
-      console.error('Failed to fetch departments:', err)
+      if (!(err instanceof Error && err.name === 'AbortError')) setError('Unable to load departments. Please retry.')
     }
   }
 
@@ -279,8 +284,9 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
 
       await fetchCourses(sem, signal)
     } catch (err: unknown) {
-      console.error('Failed to fetch blueprint:', err)
-      if (!signal?.aborted) setError((err instanceof Error ? err.message : '') || 'Network error fetching blueprint')
+      if (!signal?.aborted && !(err instanceof Error && err.name === 'AbortError')) {
+        setError((err instanceof Error ? err.message : '') || 'Network error fetching blueprint')
+      }
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
@@ -741,6 +747,9 @@ export default function BlueprintTab({ semester, onSemesterChange: setSemester }
             <option key={s} value={s}>Semester {s}</option>
           ))}
         </select>
+        <SectionRefreshButton className={styles.exportBtn} label="Refresh blueprint"
+          endpoints={[`/api/hod/blueprint?semester=${semester}`, `/api/hod/courses?semester=${semester}&scope=global`, '/api/hod/departments']}
+          onRefresh={() => Promise.all([fetchBlueprint(semester), fetchDepartmentsList()])} disabled={loading || hasChanges} />
       </div>
 
       {loading ? (

@@ -1,5 +1,7 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+
 import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { useEffect, useState } from 'react'
@@ -45,6 +47,7 @@ export interface RegistrationWindow {
 export default function StudentDashboardPage() {
   const entryFetch = useDashboardEntryFetch()
   const router = useRouter()
+  const dataRevision = useDataRevision(["people","catalogue","enrollment","settings","jobs"])
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [hasSubmission, setHasSubmission] = useState(false)
   const [hasRegistration, setHasRegistration] = useState(false)
@@ -59,30 +62,6 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    // 1. Instant hydration from sessionStorage for zero-flash page back/forth transitions
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('fyimp_student_summary')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (parsed?.studentInfo) {
-
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
-            setStudentInfo(parsed.studentInfo)
-            setHasSubmission(parsed.hasSubmission ?? false)
-            setHasRegistration(parsed.hasRegistration ?? false)
-            setAllocationCompleted(parsed.allocationCompleted ?? false)
-            setEnrolledCourses(parsed.enrolledCourses || [])
-            setTotalRegisteredCredits(parsed.totalRegisteredCredits || 0)
-            if (parsed.registrationWindow) setRegistrationWindow(parsed.registrationWindow)
-            setLoading(false)
-          }
-        }
-      } catch {
-        // Ignore session parse error
-      }
-    }
-
     // 2. Background fresh revalidation
     async function loadSummary() {
       try {
@@ -100,12 +79,6 @@ export default function StudentDashboardPage() {
         setTotalRegisteredCredits(data.totalRegisteredCredits || 0)
         setRegistrationWindow(data.registrationWindow || null)
 
-        // Cache for subsequent instant transitions
-        try {
-          sessionStorage.setItem('fyimp_student_summary', JSON.stringify(data))
-        } catch {
-          // Ignore storage quota error
-        }
       } catch (error) {
         if (!controller.signal.aborted) setSummaryError(error instanceof Error ? error.message : 'Your dashboard data couldn’t be loaded. Please try again.')
       } finally {
@@ -114,7 +87,7 @@ export default function StudentDashboardPage() {
     }
     loadSummary()
     return () => controller.abort()
-  }, [router, retry, entryFetch])
+  }, [router, retry, entryFetch, dataRevision])
 
   function retrySummary() {
     setSummaryError('')

@@ -1,3 +1,4 @@
+import { freshRead } from '../../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -33,7 +34,7 @@ export default function CoursesListScreen() {
   });
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
+    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
       <View style={styles.header}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           Semester {activeSemester} Registrations
@@ -46,7 +47,7 @@ export default function CoursesListScreen() {
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load courses.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

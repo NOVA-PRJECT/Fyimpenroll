@@ -1,5 +1,6 @@
 ﻿import { Module } from '@nestjs/common'
 import { join } from 'node:path'
+import { DataCacheModule } from './core/cache/data-cache.module'
 import { ConfigModule } from '@nestjs/config'
 import { DatabaseModule } from './core/database/database.module'
 import { LoggingModule } from './core/logging/logging.module'
@@ -27,6 +28,7 @@ import { HealthController } from './modules/health/health.controller'
       envFilePath: join(__dirname, '..', '.env'),
     }),
     DatabaseModule,
+    DataCacheModule,
     LoggingModule,
     SecurityModule,
     AuthModule,

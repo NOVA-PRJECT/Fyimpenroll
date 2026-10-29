@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import GraduationPanel from './GraduationPanel'
 
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
@@ -33,6 +36,7 @@ export default function DirectorDashboard() {
   useBfcacheGuard()
   const router = useRouter()
 
+  const dataRevision = useDataRevision(["settings","people","jobs"])
   const [activeTab, setActiveTab] = useState<DirectorSection>('registration')
 
   const [directorName, setDirectorName] = useState('')
@@ -83,14 +87,6 @@ export default function DirectorDashboard() {
   // A typed or preset value stays untouched by background settings refreshes.
   const deadlineInput = deadline ?? utcIsoToKolkataInput(windowIsOpen ? currentDeadline : new Date(currentTime))
 
-  function invalidateDirectorCache() {
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.removeItem('fyimp_director_settings_cache')
-      } catch {}
-    }
-  }
-
   const loadSettingsData = useCallback(async (isBackground = false) => {
     try {
       const response = await entryFetch('/api/director/settings')
@@ -101,9 +97,6 @@ export default function DirectorDashboard() {
       setSettingsError('')
       setSettingsReady(true)
 
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(data))
-      }
 
         setDirectorName(data.directorName || '')
       setCampusId(data.campusId || '')
@@ -122,34 +115,7 @@ export default function DirectorDashboard() {
     }
   }, [router, entryFetch])
 
-  useEffect(() => {
-    // Check sessionStorage cache for instant render, but revalidate in background (F59)
-    const cached = typeof window !== 'undefined' ? sessionStorage.getItem('fyimp_director_settings_cache') : null
-    if (cached) {
-      try {
-        const data = JSON.parse(cached)
-
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore browser settings after hydration and revalidate.
-        setDirectorName(data.directorName || '')
-        setCampusId(data.campusId || '')
-        setCampusName(data.campusName || '')
-
-        if (data.settings) {
-          setCurrentDeadline(data.settings.deadline)
-          setLastPromotedAt(data.settings.last_promoted_at ?? null)
-        setTermVersion(data.settings.term_version ?? null)
-        }
-        setLoadingDirector(false)
-      } catch {}
-    }
-
-    loadSettingsData()
-
-    // Refresh settings on tab focus or reconnect (F59)
-    const onFocus = () => { loadSettingsData(true) }
-    window.addEventListener('focus', onFocus)
-    return () => { window.removeEventListener('focus', onFocus) }
-  }, [loadSettingsData])
+  useEffect(() => { void loadSettingsData() }, [loadSettingsData, dataRevision])
 
   // Academic year helper
   function getAcademicYear(): string {
@@ -161,34 +127,11 @@ export default function DirectorDashboard() {
   }
 
 
-  // Poll allocation status while running
   useEffect(() => {
     if (activeTab !== 'allocation') return
-    const year = allocationAcademicYear || getAcademicYear()
-
-    let timer: ReturnType<typeof setTimeout> | null = null
-    async function checkStatus() {
-      try {
-        const res = await fetch(
-          `/api/allocation/status?academicYear=${encodeURIComponent(year)}&semester=${allocationSemester}`,
-        )
-        const data = await res.json()
-        if (res.ok) {
-          setAllocationRun(data.run)
-        }
-      } catch {}
-    }
-
-    checkStatus()
-
-    if (allocationRun?.status === 'running') {
-      timer = setInterval(checkStatus, 2000)
-    }
-
-    return () => {
-      if (timer) clearInterval(timer)
-    }
-  }, [activeTab, allocationSemester, allocationAcademicYear, allocationRun?.status])
+    fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`)
+      .then(async response => { if (response.ok) setAllocationRun((await response.json()).run) }).catch(() => {})
+  }, [activeTab, allocationSemester, allocationAcademicYear, dataRevision])
 
   function handleSetPreset(days: number) {
     setDeadline(utcIsoToKolkataInput(new Date(Date.now() + days * 24 * 60 * 60 * 1000)))
@@ -215,25 +158,15 @@ export default function DirectorDashboard() {
     setShowWindowOpenWarning(false)
     const nowIso = new Date().toISOString()
     try {
-      await entryFetch('/api/director/settings', {
+      const response = await entryFetch('/api/director/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deadline: nowIso }),
       })
+      if (!response.ok) throw new Error('Registration could not be closed. Refresh settings and try again.')
       setCurrentDeadline(nowIso)
       setDeadline(null)
-      // Keep sessionStorage in sync so returning to the tab shows correct status
-      if (typeof window !== 'undefined') {
-        const cached = sessionStorage.getItem('fyimp_director_settings_cache')
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached)
-            parsed.settings = { ...(parsed.settings || {}), deadline: nowIso }
-            sessionStorage.setItem('fyimp_director_settings_cache', JSON.stringify(parsed))
-          } catch {}
-        }
-      }
-    } catch {}
+    } catch (error) { setAllocationError(error instanceof Error ? error.message : 'Could not close registration.'); return }
     await executeRunAllocation()
   }
 
@@ -261,7 +194,7 @@ export default function DirectorDashboard() {
       }
 
       setAllocationSuccess('Course allocation run completed successfully!')
-      setAllocationRun({ status: 'running', triggered_at: new Date().toISOString() })
+      setAllocationRun({ ...data, id: data.run_id, status: 'completed', triggered_at: new Date().toISOString() })
     } catch (err: unknown) {
       setAllocationError((err instanceof Error ? err.message : '') || 'Error triggering allocation')
     } finally {
@@ -310,7 +243,6 @@ export default function DirectorDashboard() {
       setCurrentDeadline(utcIso)
       setDeadline(null)
       setWindowSuccess(data.message || 'Registration window updated successfully.')
-      invalidateDirectorCache()
     } catch (err: unknown) {
       setWindowError((err instanceof Error ? err.message : '') || 'Network error: could not connect to server. Your input has been preserved; please retry.')
     } finally {
@@ -346,7 +278,6 @@ export default function DirectorDashboard() {
       setCurrentDeadline(nowIso)
       setDeadline(null)
       setWindowSuccess('Registration window closed successfully. Timetable generation is now unlocked.')
-      invalidateDirectorCache()
     } catch (err: unknown) {
       setWindowError((err instanceof Error ? err.message : '') || 'Network error: could not close registration window. Please retry.')
     } finally {
@@ -378,7 +309,6 @@ export default function DirectorDashboard() {
       setPromoteSuccess(data.message || 'Students promoted. Academic history preserved.')
       setLastPromotedAt(data.last_promoted_at)
       setTermVersion(data.term_version)
-      invalidateDirectorCache()
     } catch (err: unknown) {
       setPromoteError((err instanceof Error ? err.message : '') || 'Network error during promotion. Please check connection and retry.')
     } finally {
@@ -466,6 +396,8 @@ export default function DirectorDashboard() {
         {activeTab === 'registration' && (
           <div>
             <p className={styles.sectionTitle}>Registration Window Management</p>
+            <SectionRefreshButton className={styles.secondaryBtn} label="Refresh registration settings"
+              endpoints={['/api/director/settings']} onRefresh={() => loadSettingsData(true)} disabled={savingWindow || deadline !== null} />
 
             {windowError && <div className={styles.errorBanner}>{windowError}</div>}
             {windowSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {windowSuccess}</div>}
@@ -822,6 +754,12 @@ export default function DirectorDashboard() {
         {activeTab === 'allocation' && (
           <div>
             <p className={styles.sectionTitle}>Scored Course Allocation System</p>
+            <SectionRefreshButton className={styles.secondaryBtn} label="Refresh allocation status"
+              endpoints={[`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`]}
+              onRefresh={async () => {
+                const res = await fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`)
+                if (res.ok) setAllocationRun((await res.json()).run)
+              }} disabled={triggeringRun} />
 
             {allocationError && <div className={styles.errorBanner}>{allocationError}</div>}
             {allocationSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {allocationSuccess}</div>}

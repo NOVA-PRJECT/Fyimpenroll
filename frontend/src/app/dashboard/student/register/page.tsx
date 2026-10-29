@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import { registrationSlotState } from '@/core/registration-display'
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
@@ -83,6 +86,7 @@ type PageState =
 export default function RegisterPage() {
   useBfcacheGuard()
   const router = useRouter()
+  const dataRevision = useDataRevision(["catalogue","enrollment","settings","jobs"])
   const [pageState, setPageState] = useState<PageState>('loading_blueprint')
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [blueprint, setBlueprint] = useState<BlueprintData | null>(null)
@@ -96,6 +100,7 @@ export default function RegisterPage() {
 
   // Scored model preferences per slot
   const [rankedPreferences, setRankedPreferences] = useState<Record<number, SlotRankedPreferences>>({})
+  const [savedPreferences, setSavedPreferences] = useState('{}')
   const [existingSlots, setExistingSlots] = useState<Record<string, string | null>>({})
   const [allocationMetadata, setAllocationMetadata] = useState<Record<string, { status?: string; allocated_by?: string; reason?: string; allocated_course_id?: string; rank?: number }>>({})
   const [existingSubmission, setExistingSubmission] = useState<Record<string, unknown> | null>(null)
@@ -123,6 +128,7 @@ export default function RegisterPage() {
   const [prerequisiteQuestion, setPrerequisiteQuestion] = useState<{ course: Course; accept: () => void } | null>(null)
   const [prerequisiteReview, setPrerequisiteReview] = useState<{ groups: PrerequisiteReviewGroup<Course>[]; fingerprint: string } | null>(null)
   const submissionPending = useRef(false)
+  useDataRevision([], (!hasSubmitted && JSON.stringify(rankedPreferences) !== savedPreferences) || editingSlot !== null)
 
   function prerequisiteContext(): PrerequisiteContext | undefined {
     const student = studentInfo || blueprint?.student
@@ -243,6 +249,7 @@ export default function RegisterPage() {
           }
         }
         setRankedPreferences(initialPrefs)
+        setSavedPreferences(JSON.stringify(initialPrefs))
       } else {
         const regSlots: Record<number, SlotRankedPreferences> = {}
         for (let i = 1; i <= 8; i++) {
@@ -250,6 +257,7 @@ export default function RegisterPage() {
           regSlots[i] = { rank1: slotCid, rank2: '', rank3: '' }
         }
         setRankedPreferences(regSlots)
+        setSavedPreferences(JSON.stringify(regSlots))
       }
 
       // Re-hydrate extraSlotsCount if slot 7 or 8 existed
@@ -298,7 +306,7 @@ export default function RegisterPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts the registration API read for this mounted view.
     loadInitialBlueprint()
-  }, [])
+  }, [dataRevision])
 
   async function handleUpdateSlot(slotNumber: number, courseId: string) {
     if (courseId !== existingSlots[`slot_${slotNumber}`]
@@ -647,14 +655,6 @@ export default function RegisterPage() {
         return
       }
 
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.removeItem('fyimp_student_summary')
-        } catch {
-          // Ignore storage error
-        }
-      }
-
       setSuccessMsg(data.message || 'Course preferences successfully saved!')
       setPageState('submitted')
       setTimeout(() => {
@@ -787,6 +787,9 @@ export default function RegisterPage() {
       )}
 
       <div className={styles.mainContent}>
+        {pageState !== 'loading_blueprint' && <SectionRefreshButton className={styles.closedBackBtn}
+          label="Refresh registration" endpoints={['/api/registrations/blueprint']} onRefresh={loadBlueprint}
+          disabled={pageState === 'submitting' || (!hasSubmitted && JSON.stringify(rankedPreferences) !== savedPreferences) || editingSlot !== null} />}
 
         {/* Loading Blueprint */}
         {pageState === 'loading_blueprint' && (

@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
@@ -327,6 +330,7 @@ export default function TeacherAssignmentTab({
 }: {
   onDirtyChange?: (isDirty: boolean) => void
 } = {}) {
+  const dataRevision = useDataRevision(["catalogue","people","assignments"])
   const [loading, setLoading] = useState(true)
   const [faculty, setFaculty] = useState<Teacher[]>([])
   const [courses, setCourses] = useState<Course[]>([])
@@ -338,6 +342,7 @@ export default function TeacherAssignmentTab({
 
   // Staged assignments awaiting batch save
   const [stagedAssignments, setStagedAssignments] = useState<Map<string, StagedAssignment>>(new Map())
+  useDataRevision([], stagedAssignments.size > 0)
   const [savingBatch, setSavingBatch] = useState(false)
 
   const isDirty = stagedAssignments.size > 0
@@ -446,7 +451,7 @@ export default function TeacherAssignmentTab({
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchData()
-  }, [fetchData])
+  }, [fetchData, dataRevision])
 
   // Filtered courses
   const filteredCourses = useMemo(() => {
@@ -921,8 +926,8 @@ export default function TeacherAssignmentTab({
           </select>
 
           <button
-            onClick={fetchData}
-            disabled={loading}
+            onClick={() => void refreshDatasets(['/api/assignments/courses'], fetchData)}
+            disabled={loading || isDirty}
             style={{
               padding: '8px 12px',
               borderRadius: '8px',

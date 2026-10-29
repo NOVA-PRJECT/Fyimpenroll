@@ -3,6 +3,7 @@ import { INSTALL_REMINDER_DISMISSED_KEY, INSTALL_REMINDER_LAST_SHOWN_KEY } from 
 
 /** Clear session data while keeping browser preferences and director rules. */
 export function clearSessionStorage() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('fyimp:session-cleared'))
   sessionStorage.clear()
   for (const key of Object.keys(localStorage)) {
     if (!key.startsWith('fyimp:rules:') && key !== THEME_KEY && key !== THEME_POSITION_KEY && key !== INSTALL_REMINDER_DISMISSED_KEY && key !== INSTALL_REMINDER_LAST_SHOWN_KEY) localStorage.removeItem(key)

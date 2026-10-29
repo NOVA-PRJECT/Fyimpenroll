@@ -1,3 +1,4 @@
+import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -101,7 +102,7 @@ export default function StudentCreditsScreen() {
   const progressPct = Math.min(Math.round((totalEarned / targetCredits) * 100), 100);
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
+    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
       {/* 1. Total Credits Summary Card */}
       <Card variant="elevated" style={styles.summaryCard}>
         <Text style={[typography.h3, { color: colors.textPrimary }]}>
@@ -155,7 +156,7 @@ export default function StudentCreditsScreen() {
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load credit ledger.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

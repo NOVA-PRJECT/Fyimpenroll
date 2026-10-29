@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import NetInfo from '@react-native-community/netinfo';
 import { Alert } from 'react-native';
 import { apiClient } from '../api/client';
-import { queryClient } from '../lib/query-client';
 import { secureStorage } from '../lib/secure-store';
 import { OfflineActionQueue, QueuedAction } from '../lib/offline-queue';
 import { useAuth } from './AuthContext';
@@ -49,7 +48,7 @@ export const OfflineQueueProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
     update(owner, rows);
     if (rows[0]?.blockedReason) Alert.alert('Offline action needs review', rows[0].blockedReason + '. Refresh the class before submitting a new attendance revision.');
-    await queryClient.invalidateQueries();
+    // Successful API writes invalidate their own dependencies. Empty queue syncs do no reads.
   }, [owner, update]);
   useEffect(() => NetInfo.addEventListener(state => {
     const online = !!state.isConnected && state.isInternetReachable !== false;

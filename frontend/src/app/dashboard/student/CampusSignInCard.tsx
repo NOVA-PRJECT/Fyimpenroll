@@ -1,5 +1,10 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+import { useCurrentTime } from '@/core/hooks/useCurrentTime'
+import { projectReadData } from '@fyimp/contracts'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -10,7 +15,10 @@ import styles from '@/components/campus-attendance/campus-attendance.module.css'
 interface CampusSignInCardProps { studentId?: string; campusName: string }
 
 export default function CampusSignInCard({ studentId, campusName }: CampusSignInCardProps) {
-  const [status, setStatus] = useState<CampusAttendanceStatus | null>(null)
+  const dataRevision = useDataRevision(["signin","settings"])
+  const [storedStatus, setStatus] = useState<CampusAttendanceStatus | null>(null)
+  const clock = useCurrentTime(60000)
+  const status = projectReadData('/api/attendance/campus/status/me', storedStatus, clock)
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [statusError, setStatusError] = useState('')
@@ -33,7 +41,6 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
       return data as CampusAttendanceStatus
     } catch (err) {
       if (mounted.current && request === requestSequence.current) {
-        setStatus(null)
         setStatusError(err instanceof Error ? err.message : 'Unable to load campus attendance. Please try again.')
       }
       return null
@@ -44,17 +51,8 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
     mounted.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the live attendance view with the API.
     void fetchStatus()
-    const timer = window.setInterval(() => void fetchStatus(), 30000)
-    const refresh = () => void fetchStatus()
-    window.addEventListener('focus', refresh)
-    window.addEventListener('online', refresh)
-    return () => {
-      mounted.current = false
-      window.clearInterval(timer)
-      window.removeEventListener('focus', refresh)
-      window.removeEventListener('online', refresh)
-    }
-  }, [fetchStatus])
+    return () => { mounted.current = false }
+  }, [fetchStatus, dataRevision])
 
   async function handleGpsSignIn() {
     setFeedback(null)
@@ -109,7 +107,7 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
           <p className={styles.description}>{status?.campus.name || campusName} · Record your morning arrival and evening departure.</p>
           <span className={styles.timeBadge}><Clock3 size={13} aria-hidden="true" /> All times shown in IST</span>
         </div>
-        <button type="button" className={styles.secondaryButton} onClick={() => void fetchStatus()} disabled={!studentId || loading || locating}>
+        <button type="button" className={styles.secondaryButton} onClick={() => void refreshDatasets([`/api/attendance/campus/status/${studentId}`], fetchStatus)} disabled={!studentId || loading || locating}>
           {loading ? <LoadingIndicator message="Refreshing…" /> : <><RefreshCw size={15} aria-hidden="true" /> Refresh status</>}
         </button>
       </div>

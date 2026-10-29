@@ -3,13 +3,15 @@
 import { useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import { takeDashboardEntry } from './dashboard-entry'
+import { primeData } from '../data-cache'
 
-/** Consume the login preload once; subsequent refreshes always reach the API. */
+/** Seed shared display data from the login preload; later reads use the shared transport. */
 export function useDashboardEntryFetch() {
   const path = usePathname()
   return useCallback((endpoint: string, init?: RequestInit): Promise<Response> => {
     if (init?.signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'))
     const entry = (!init?.method || init.method === 'GET') ? takeDashboardEntry(path, endpoint) : null
-    return entry ? Promise.resolve(Response.json(entry.data)) : fetch(endpoint, init)
+    if (entry) { primeData(endpoint, entry.data); return Promise.resolve(Response.json(entry.data)) }
+    return fetch(endpoint, init)
   }, [path])
 }

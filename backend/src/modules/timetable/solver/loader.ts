@@ -239,7 +239,7 @@ export async function loadGenerationInput(
 
   if (allStudentIds.length > 0) {
     const studentDepts = await fetchByIdChunks<any>(allStudentIds, ids => supabase.from('students')
-      .select('id, department_id').in('id', ids).order('id'));
+      .select('id, department_id').in('id', ids).order('id'), true);
     for (const row of studentDepts) if (row.department_id) studentDeptMap.set(row.id, row.department_id);
     if (allStudentIds.some(id => !studentDeptMap.has(id))) {
       throw new Error('Some enrolled students have no current department mapping; repair the cohort before generation.');
@@ -268,7 +268,7 @@ export async function loadGenerationInput(
   // Query 3: Fetch courses metadata
   const rawCourses = await fetchByIdChunks<any>([...allCourseIds], ids => supabase.from('courses')
     .select('id, title, course_code, department_id, theory_hours_per_week, practical_hours_per_week, category')
-    .in('id', ids).order('id'));
+    .in('id', ids).order('id'), true);
   if (rawCourses.length !== allCourseIds.size) throw new Error('Some registered courses are missing from the catalogue');
 
   // Query 3b: Load teacher assignments for current cohort (F37)

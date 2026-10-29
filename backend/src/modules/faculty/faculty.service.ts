@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
+import { enrollmentCounts } from '../../core/database/enrollment-counts'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util'
 import { AuthUser } from '../../core/auth/types'
@@ -54,7 +55,7 @@ export class FacultyService {
     }
 
     const depts = await fetchByIdChunks<any>(deptIds, ids => this.supabase.admin
-      .from('departments').select('id, name, code').in('id', ids).order('id'))
+      .from('departments').select('id, name, code').in('id', ids).order('id'), true)
 
     const { data: campusSettings } = await this.supabase.admin
       .from('campus_settings')
@@ -63,19 +64,10 @@ export class FacultyService {
       .single()
 
     const academicYear = campusSettings?.academic_year ?? ''
-    const enrolledCounts: Record<string, number> = {}
-
-    for (const course of courseList) {
-      const host = course.campus_id || user.campus_id
-      const year = course.academic_year || academicYear
-      if (!host || !year) continue
-      const slots = Array.from({ length: 8 }, (_, i) => `slot_${i + 1}_course_id.eq.${course.id}`).join(',')
-      const { count, error } = await this.supabase.admin.from('current_student_registrations')
-        .select('id', { count: 'exact', head: true }).eq('campus_id', host)
-        .eq('academic_year', year).eq('semester', course.semester).or(slots)
-      if (error) throw new InternalServerErrorException('Failed to count course enrollment')
-      enrolledCounts[course.delivery_id || course.id] = count || 0
-    }
+    const enrolledCounts = await enrollmentCounts(this.supabase.admin, courseList.filter(course => (course.campus_id || user.campus_id) && (course.academic_year || academicYear)).map(course => ({
+      key: course.delivery_id || course.id, course_id: course.id, campus_id: course.campus_id || user.campus_id,
+      academic_year: course.academic_year || academicYear, semester: course.semester,
+    })))
 
     const coursesWithCounts = (courseList ?? []).map((course) => ({
       ...course,
@@ -185,7 +177,7 @@ export class FacultyService {
 
     const students = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('students')
       .select('id, full_name, campus_id, departments (name, code)').in('id', ids)
-      .eq('campus_id', deliveryCampusId).order('id'));
+      .eq('campus_id', deliveryCampusId).order('id'), true);
 
     const departmentBreakdown: Record<string, number> = {}
     students.forEach((student: any) => {

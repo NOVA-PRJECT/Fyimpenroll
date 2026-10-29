@@ -8,6 +8,9 @@
  * - Distinguishes transient provider/backend outages (503/network) from genuine session revocation (401/400)
  */
 
+let dataTransport: ((input: RequestInfo | URL, init: RequestInit | undefined, network: typeof apiFetch) => Promise<Response>) | undefined
+export function registerDataTransport(transport: typeof dataTransport) { dataTransport = transport }
+
 interface RefreshResult {
   success: boolean
   outage?: boolean
@@ -22,6 +25,7 @@ let sessionEnding = false
 let refreshController: AbortController | null = null
 
 export function beginSessionLogout(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('fyimp:session-cleared'))
   sessionEnding = true
   try { document.cookie = 'session_ended=1; Path=/; SameSite=Lax' } catch { /* Provider cookie cleanup still runs. */ }
   refreshController?.abort()
@@ -180,7 +184,9 @@ export async function apiFetch(
 export function installGlobalFetchInterceptor(): void {
   if (typeof window === 'undefined' || isInterceptionInstalled) return
 
-  const nativeFetch = window.fetch
+  // Fast Refresh can recreate this module while the prior wrapper is still installed.
+  // Keep the original browser transport rather than wrapping that wrapper recursively.
+  const nativeFetch = window.__originalFetch || window.fetch
   ;window.__originalFetch = nativeFetch
 
   window.fetch = async function interceptedFetch(
@@ -195,7 +201,7 @@ export function installGlobalFetchInterceptor(): void {
       return nativeFetch.apply(window, [input, init])
     }
 
-    return apiFetch(input, init)
+    return dataTransport ? dataTransport(input, init, apiFetch) : apiFetch(input, init)
   }
 
   isInterceptionInstalled = true

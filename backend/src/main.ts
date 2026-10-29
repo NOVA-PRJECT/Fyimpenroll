@@ -70,8 +70,8 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Content-Disposition', 'X-Request-ID', 'Server-Timing'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Refresh-Data'],
+    exposedHeaders: ['Content-Disposition', 'X-Request-ID', 'Server-Timing', 'X-Data-Scope', 'X-Data-Updated-At'],
   })
 
   const port = process.env.PORT || 4000

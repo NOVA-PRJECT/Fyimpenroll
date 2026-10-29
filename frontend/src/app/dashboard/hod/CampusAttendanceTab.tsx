@@ -1,8 +1,13 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+import { useCurrentTime } from '@/core/hooks/useCurrentTime'
+import { projectReadData } from '@fyimp/contracts'
+
 import LoadingState from '@/components/LoadingState'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   MapPin,
   Calendar,
@@ -56,20 +61,26 @@ interface CampusRosterResponse {
 }
 
 export default function CampusAttendanceTab() {
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const todayStr = useMemo(() => new Date(Date.now() + 330 * 60000).toISOString().split('T')[0], [])
+  const dataRevision = useDataRevision(["people","settings","signin"])
   const [selectedDate, setSelectedDate] = useState(todayStr)
-  const [data, setData] = useState<CampusRosterResponse | null>(null)
+  const [storedData, setData] = useState<CampusRosterResponse | null>(null)
+  const rosterRequest = useRef(0)
+  const clock = useCurrentTime(60000)
+  const data = projectReadData('/api/attendance/campus/roster', storedData, clock)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [semesterFilter, setSemesterFilter] = useState<number | 'all'>('all')
   const [error, setError] = useState('')
 
   const fetchRoster = useCallback(async (date: string) => {
+    const request = ++rosterRequest.current
     setLoading(true)
     setError('')
     try {
       const res = await fetch(`/api/attendance/campus/roster?date=${date}`)
       const json = await res.json()
+      if (request !== rosterRequest.current) return
       if (!res.ok) {
         setError(json.message || 'Failed to fetch campus attendance roster.')
         setLoading(false)
@@ -77,9 +88,9 @@ export default function CampusAttendanceTab() {
       }
       setData(json)
     } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : '') || 'Network error fetching campus attendance.')
+      if (request === rosterRequest.current) setError((err instanceof Error ? err.message : '') || 'Network error fetching campus attendance.')
     } finally {
-      setLoading(false)
+      if (request === rosterRequest.current) setLoading(false)
     }
   }, [])
 
@@ -87,7 +98,7 @@ export default function CampusAttendanceTab() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchRoster(selectedDate)
-  }, [selectedDate, fetchRoster])
+  }, [selectedDate, fetchRoster, dataRevision])
 
   // Filtered Students
   const filteredStudents = useMemo(() => {
@@ -268,7 +279,7 @@ export default function CampusAttendanceTab() {
           </div>
 
           <button
-            onClick={() => fetchRoster(selectedDate)}
+            onClick={() => void refreshDatasets([`/api/attendance/campus/roster?date=${selectedDate}`], () => fetchRoster(selectedDate))}
             disabled={loading}
             style={{
               padding: '7px 12px',

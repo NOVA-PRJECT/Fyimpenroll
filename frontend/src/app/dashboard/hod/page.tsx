@@ -1,5 +1,9 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import { bulkUploadResult, type BulkUploadResult } from '@/core/bulk-upload-result'
 import { apiErrorMessage } from '@/core/api-error'
 import BulkUploadResults from './BulkUploadResults'
@@ -84,10 +88,14 @@ export default function HodDashboard() {
   useBfcacheGuard()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const studentsRequest = useRef(0)
+  const defaultersRequest = useRef(0)
 
   const [blueprintSemester, setBlueprintSemester] = useState(1)
   const [coursesSemester, setCoursesSemester] = useState(1)
   const [activeTab, setActiveTab] = useState<Tab>('defaulters')
+  const [tabRestored, setTabRestored] = useState(false)
+  const profileRevision = useDataRevision(['people'])
   const [hodInfo, setHodInfo] = useState<HodInfo | null>(null)
   const [loadingHod, setLoadingHod] = useState(true)
   const [profileError, setProfileError] = useState('')
@@ -131,6 +139,7 @@ export default function HodDashboard() {
   // Delete confirmation
   const [deleteStudent, setDeleteStudent] = useState<Student | null>(null)
   const [deleting, setDeleting] = useState(false)
+  useDataRevision([], showAddModal || !!editStudent || !!deleteStudent)
 
   // ── Defaulters Tab State ──
   const [defaulterSemester, setDefaulterSemester] = useState<number | 'all'>('all')
@@ -185,7 +194,7 @@ export default function HodDashboard() {
     }
     loadHodInfo()
     return () => controller.abort()
-  }, [router, profileRetry, entryFetch])
+  }, [router, profileRetry, entryFetch, profileRevision])
 
   // Load active tab from sessionStorage on mount (hydration-safe)
   useEffect(() => {
@@ -196,6 +205,7 @@ export default function HodDashboard() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
       setActiveTab(storedTab)
     }
+    setTabRestored(true)
   }, [])
 
   // Mobile / Lower-Screen Hamburger More Menu State
@@ -258,6 +268,7 @@ export default function HodDashboard() {
   }
 
   // Use the latest filters without a changing function identity.
+  const dataRevision = useDataRevision(activeTab === 'defaulters' ? ['people', 'enrollment', 'settings'] : activeTab === 'students' ? ['people'] : [], isAssignmentTabDirty)
   const loadTab = useEffectEvent(() => {
     if (activeTab === 'defaulters') {
       handleFetch(defaulterSemester)
@@ -265,7 +276,7 @@ export default function HodDashboard() {
       fetchStudents(studentSemester)
     }
   })
-  useEffect(() => { loadTab() }, [activeTab, defaulterSemester, studentSemester])
+  useEffect(() => { if (tabRestored) loadTab() }, [activeTab, defaulterSemester, studentSemester, tabRestored, dataRevision])
 
   // ── Upload Tab Functions ──
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -368,17 +379,21 @@ export default function HodDashboard() {
 
   // ── Students Tab Functions ──
   async function fetchStudents(sem: number = studentSemester) {
+    const request = ++studentsRequest.current
     setLoadingStudents(true)
     setStudentError('')
     setStudentSuccess('')
-    const response = await fetch(`/api/hod/students?semester=${sem}`)
-    const result = await response.json()
-    if (!response.ok) {
-      setStudentError(result.error ?? 'Failed to fetch students')
-    } else {
-      setStudents(result)
+    try {
+      const response = await fetch(`/api/hod/students?semester=${sem}`)
+      const result = await response.json()
+      if (request !== studentsRequest.current) return
+      if (!response.ok) setStudentError(result.error ?? 'Failed to fetch students')
+      else setStudents(result)
+    } catch {
+      if (request === studentsRequest.current) setStudentError('Unable to load students. Retry the refresh.')
+    } finally {
+      if (request === studentsRequest.current) setLoadingStudents(false)
     }
-    setLoadingStudents(false)
   }
 
   async function handleAddStudent() {
@@ -482,6 +497,7 @@ export default function HodDashboard() {
 
   // ── Defaulters Tab Functions ──
   async function handleFetch(sem: number | 'all' = defaulterSemester) {
+    const request = ++defaultersRequest.current
     setLoadingDefaulters(true)
     setDefaulterError('')
     setCopied(false)
@@ -495,15 +511,16 @@ export default function HodDashboard() {
         },
       })
       const result = await response.json()
+      if (request !== defaultersRequest.current) return
       if (!response.ok) {
         setDefaulterError(result.error ?? 'Failed to fetch data.')
       } else {
         setDeptData(result)
       }
     } catch {
-      setDefaulterError('Failed to fetch data. Please try again.')
+      if (request === defaultersRequest.current) setDefaulterError('Failed to fetch data. Please try again.')
     } finally {
-      setLoadingDefaulters(false)
+      if (request === defaultersRequest.current) setLoadingDefaulters(false)
     }
   }
 
@@ -793,13 +810,15 @@ export default function HodDashboard() {
               <select className={styles.semesterSelect} value={studentSemester} onChange={e => {
                 const nextSem = Number(e.target.value)
                 setStudentSemester(nextSem)
-                fetchStudents(nextSem)
               }}>
                 {[1,2,3,4,5,6,7,8,9,10].map(s => <option key={s} value={s}>Semester {s}</option>)}
               </select>
               <button className={styles.addBtn} onClick={() => { setShowAddModal(true); setStudentError(''); setStudentSuccess('') }}>
                 + Add Student
               </button>
+              <SectionRefreshButton className={styles.exportBtn} label="Refresh students"
+                endpoints={[`/api/hod/students?semester=${studentSemester}`]} onRefresh={() => fetchStudents(studentSemester)}
+                disabled={loadingStudents || showAddModal || !!editStudent || !!deleteStudent} />
               <button
                 className={styles.exportBtn}
                 onClick={() => handleExportExcel(studentSemester)}
@@ -980,7 +999,6 @@ export default function HodDashboard() {
                 onChange={e => {
                   const nextVal = e.target.value === 'all' ? 'all' : Number(e.target.value)
                   setDefaulterSemester(nextVal)
-                  handleFetch(nextVal)
                 }}
               >
                 <option value="all">All Semesters</option>
@@ -996,7 +1014,7 @@ export default function HodDashboard() {
               </button>
               <button
                 className={styles.exportBtn}
-                onClick={() => handleFetch(defaulterSemester)}
+                onClick={() => void refreshDatasets([`/api/faculty/defaulters${defaulterSemester === 'all' ? '' : `?semester=${defaulterSemester}`}`], () => handleFetch(defaulterSemester))}
                 disabled={loadingDefaulters}
                 style={{ background: "var(--portal-info-bg,#f8fafc)", color: "var(--portal-info-text,#334155)", border: "1px solid var(--portal-strong-border,#cbd5e1)" }}
                 title="Refresh live student registration status from server"

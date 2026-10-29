@@ -7,6 +7,9 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import * as crypto from 'node:crypto';
+import { Optional } from '@nestjs/common';
+import { DataCacheService } from '../../core/cache/data-cache.service';
+import { readContext } from '../../core/cache/read-context';
 import { SupabaseService } from '../../core/database/supabase.service';
 import { AuditLoggerService } from '../../core/logging/audit-logger.service';
 import { AuthUser } from '../../core/auth/types';
@@ -20,6 +23,7 @@ export class PeriodAttendanceService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditLogger: AuditLoggerService,
+    @Optional() private readonly cache?: DataCacheService,
   ) {}
 
   /**
@@ -409,6 +413,7 @@ export class PeriodAttendanceService {
    * along with attendance marking status and valid adjacent practical pairs (R03).
    */
   async getTeacherSchedule(user: AuthUser, queryDate?: string) {
+    const loadWeekly = async () => {
     const { data: faculty } = await this.supabase.admin
       .from('faculty')
       .select('id, full_name, department_id, campus_id, departments!faculty_department_id_fkey(name), campuses(name)')
@@ -426,15 +431,6 @@ export class PeriodAttendanceService {
 
     const assignedCourses = (assignments || []).map((a: any) => a.courses).filter(Boolean);
     const assignedCourseIds = assignedCourses.map((c: any) => c.id);
-
-    const ist = getISTDateTime();
-    let dateStr = ist.dateString;
-    let dayOfWeek = ist.dayOfWeek;
-
-    if (queryDate && this.isValidCalendarDate(queryDate)) {
-      dateStr = queryDate;
-      dayOfWeek = this.getCalendarDayOfWeek(queryDate);
-    }
 
     let scheduleQuery = this.supabase.admin
       .from('current_timetable_entries')
@@ -457,6 +453,22 @@ export class PeriodAttendanceService {
       ? scheduleQuery.or(`teacher_id.eq.${user.userId},course_id.in.(${[...new Set(assignedCourseIds)].join(',')})`)
       : scheduleQuery.eq('teacher_id', user.userId);
     const rawEntries = await fetchAllPaginated<any>(scheduleQuery.order('id'));
+
+      return { faculty, assignments, rawEntries };
+    };
+    const { faculty, assignments, rawEntries } = await (this.cache
+      ? this.cache.get('weekly:' + user.userId + ':' + user.campus_id + ':' + user.term_version,
+        ['catalogue', 'people', 'assignments', 'timetable', 'settings'], loadWeekly, readContext.getStore()?.force)
+      : loadWeekly());
+    const assignedCourses = (assignments || []).map((a: any) => a.courses).filter(Boolean);
+    const ist = getISTDateTime();
+    let dateStr = ist.dateString;
+    let dayOfWeek = ist.dayOfWeek;
+
+    if (queryDate && this.isValidCalendarDate(queryDate)) {
+      dateStr = queryDate;
+      dayOfWeek = this.getCalendarDayOfWeek(queryDate);
+    }
 
     const entries = (rawEntries || []).filter((e: any) => {
       if (e.teacher_id === user.userId) return true;
@@ -492,30 +504,24 @@ export class PeriodAttendanceService {
       (e: any) => e.time_slots?.day_of_week === dayOfWeek
     );
 
+    const statuses: Record<string, any> = {};
+    for (let offset = 0; offset < dayEntries.length; offset += 200) {
+      const { data, error } = await this.supabase.admin.rpc('display_period_status', {
+        p_slots: dayEntries.slice(offset, offset + 200).map((entry: any) => ({ id: entry.id, course_id: entry.course_id,
+          campus_id: entry.campus_id || entry.departments?.campus_id, academic_year: entry.academic_year, semester: entry.semester })),
+        p_date: dateStr,
+      });
+      if (error || !data) throw new InternalServerErrorException('Period totals unavailable. Verify that the data-read optimization SQL has been applied.');
+      Object.assign(statuses, data);
+    }
     const periodsWithStatus = await Promise.all(
       dayEntries.map(async (entry: any) => {
         const slot = entry.time_slots;
         const campusId = (entry as any).campus_id || (entry as any).departments?.campus_id;
 
-        const [roster, { data: marks }, { data: session }] = await Promise.all([
-          this.getEnrolledRoster(entry.course_id, entry.academic_year, campusId, entry.semester),
-          this.supabase.admin
-            .from('period_attendance')
-            .select('student_id, status, marked_at')
-            .eq('timetable_slot_id', entry.id)
-            .eq('attendance_date', dateStr),
-          (() => {
-            const sq = this.supabase.admin.from('period_attendance_sessions');
-            return typeof (sq as any)?.select === 'function'
-              ? sq.select('revision, revision_token').eq('timetable_slot_id', entry.id).eq('attendance_date', dateStr).maybeSingle()
-              : Promise.resolve({ data: null });
-          })(),
-        ]);
-
-        const isMarked = (marks || []).length > 0;
-        const presentCount = (marks || []).filter((m: any) => m.status === 'present').length;
-        const absentCount = (marks || []).filter((m: any) => m.status === 'absent').length;
-
+        const state = statuses[entry.id] || { total_enrolled: 0, present: 0, absent: 0, is_marked: false, revision: 0, revision_token: '0' };
+        const isMarked = state.is_marked;
+        const presentCount = Number(state.present), absentCount = Number(state.absent);
         // R03: Validate that adjacent practical slot forms an approved consecutive pair
         const isPractical = entry.is_lab_block || entry.session_type === 'practical';
         let adjacentPracticalSlotId: string | null = null;
@@ -549,10 +555,10 @@ export class PeriodAttendanceService {
           start_time: slot?.start_time || '',
           end_time: slot?.end_time || '',
           is_marked: isMarked,
-          revision: session?.revision ?? (isMarked ? 1 : 0),
-          revision_token: session?.revision_token ?? (isMarked ? '1' : '0'),
-          total_enrolled: roster.length,
-          present_count: isMarked ? presentCount : roster.length,
+          revision: state.revision,
+          revision_token: state.revision_token,
+          total_enrolled: Number(state.total_enrolled),
+          present_count: isMarked ? presentCount : Number(state.total_enrolled),
           absent_count: isMarked ? absentCount : 0,
           adjacent_practical_slot_id: adjacentPracticalSlotId,
         };

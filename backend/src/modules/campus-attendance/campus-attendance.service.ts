@@ -341,6 +341,7 @@ export class CampusAttendanceService {
       current_time_ist: ist.timeString,
       active_session: activeSession,
       can_sign_in: student.current_semester !== 11 && !setupError && activeSession !== 'closed' && !completed,
+      static_unavailable_reason: student.current_semester === 11 ? 'Programme completed; campus sign-ins are closed.' : setupError || null,
       unavailable_reason: student.current_semester === 11 ? 'Programme completed; campus sign-ins are closed.' : setupError || (activeSession === 'closed' ? `Campus checkpoints closed at ${formatCampusTime(settings.day_end_time)} IST.` : completed ? 'This session is already recorded.' : null),
       campus: {
         id: campus?.id ?? null,
@@ -501,6 +502,8 @@ export class CampusAttendanceService {
         full_name: student.full_name,
         cap_application_number: student.cap_application_number,
         current_semester: student.current_semester,
+        midday_split: settings.midday_split_time,
+        day_end: settings.day_end_time,
         morning: {
           status: morningDerivedStatus,
           signed_in_at: morningRecord?.signed_in_at || null,

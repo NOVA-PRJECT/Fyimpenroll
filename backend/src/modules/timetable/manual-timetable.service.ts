@@ -58,7 +58,7 @@ export class ManualTimetableService {
     if (error) this.databaseError(error);
     const teachers = await fetchByIdChunks<{ id: string; full_name: string }>(
       [...new Set(input.courses.map(course => course.teacherId).filter((id): id is string => !!id))],
-      ids => this.supabase.admin.from('faculty').select('id,full_name').in('id', ids).order('id'));
+      ids => this.supabase.admin.from('faculty').select('id,full_name').in('id', ids).order('id'), true);
     return { revision: context.revision, entries, rules, published: context.published,
       saved: !!manual, mode: manual?.mode ?? 'follow_rules', reason: manual?.reason ?? '',
       courses: input.courses.map(({ studentIds: _students, conflictSummary: _conflicts, ...course }) => ({ ...course,
@@ -103,9 +103,12 @@ export class ManualTimetableService {
 
   async publish(request: z.infer<typeof ManualPublishSchema>, user: AuthUser) {
     const loaded = await this.load(request.academicYear, request.semester, user);
+    if (loaded.context.published) throw new ConflictException('Published timetables cannot be edited.');
+    if (request.revision !== loaded.context.revision) throw new ConflictException('The timetable or its inputs changed. Reload the manual editor before saving.');
     if (!loaded.manual) throw new BadRequestException('Save the manual timetable before publication.');
     const candidate = { ...request, entries: loaded.entries, mode: loaded.manual.mode, reason: loaded.manual.reason };
-    const { report } = await this.candidate(candidate, user);
+    const report = validateManualEntries(candidate.entries, loaded.input.courses, loaded.input.slotMap,
+      loaded.input.parallelGroups, loaded.input.teacherReservations, request.semester, loaded.rules);
     if (!loaded.entries.length) throw new BadRequestException('An empty timetable cannot be published.');
     if (candidate.mode === 'follow_rules' && report.violations.length) {
       throw new UnprocessableEntityException({ message: 'Complete the timetable and resolve all rule violations before publishing.', violations: report.violations });

@@ -15,7 +15,8 @@ export class StudentService {
   ) {}
 
   async getDashboardSummary(user: AuthUser) {
-    const loadSettings = (campusId: string) => this.supabase.admin.from('campus_settings')
+    const loadSettings = (campusId: string) => user.verifiedCampusSettings && campusId === user.campus_id
+      ? Promise.resolve({ data: user.verifiedCampusSettings, error: null }) : this.supabase.admin.from('campus_settings')
       .select('deadline, min_credits, max_credits, academic_year').eq('campus_id', campusId).maybeSingle()
     const [studentResult, verifiedSettings] = await Promise.all([
       this.supabase.admin
@@ -239,7 +240,7 @@ export class StudentService {
           const c = courseDetailsMap.get(slotInfo.courseId)
           if (c) {
             const cr = Number(c.credits) || 0
-            totalRegisteredCredits += cr
+            if (slotInfo.isConfirmed) totalRegisteredCredits += cr
             enrolledCourses.push({
               slotNumber: slotNum,
               id: c.id,
@@ -265,7 +266,7 @@ export class StudentService {
       allocationCompleted,
       must_change_password: student.must_change_password,
       enrolledCourses,
-      totalRegisteredCredits: totalRegisteredCredits || (reg ? Number(reg.total_credits) || 0 : 0),
+      totalRegisteredCredits,
       registrationWindow,
     }
   }

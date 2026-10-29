@@ -3,14 +3,14 @@ const assert = require('node:assert/strict')
 require('reflect-metadata')
 const { AllocationService } = require('../backend/dist/modules/allocation/allocation.service')
 
-async function allocate(students, preferences, courses, existing = []) {
+async function allocate(students, preferences, courses, existing = [], pathwaySlots = [{ rule: 'GLOBAL_BASKET', target: 'SEC', name: 'Elective' }]) {
   let committed
   const rows = {
     campus_settings: [{ campus_id: 'campus', deadline: '2020-01-01' }], timetable_entries: [],
     courses: courses.map(course => ({ semester: 3, department_id: 'dept', category: 'SEC', seat_limit: 1, title: course.id, course_code: course.id, prerequisites: ['Know C.'], ...course })),
     students: students.map(student => ({ department_id: 'dept', current_semester: 3, departments: { code: 'CS' }, ...student })),
     registration_preferences: preferences.map((preference, i) => ({ id: `pref-${i}`, campus_id: 'campus', semester: 3, academic_year: '2026-27', pathway_id: 'path', ...preference })),
-    semester_blueprints: [{ id: 'blueprint', department_id: 'dept', semester: 3, pathways: [{ id: 'path', name: 'Path', slots: [{ rule: 'GLOBAL_BASKET', target: 'SEC', name: 'Elective' }] }] }],
+    semester_blueprints: [{ id: 'blueprint', department_id: 'dept', semester: 3, pathways: [{ id: 'path', name: 'Path', slots: pathwaySlots }] }],
     departments: [{ id: 'dept', code: 'CS' }], student_registrations: existing,
   }
   const queried = []
@@ -66,6 +66,14 @@ test('student ID breaks exact ties and globally filled seats are not allocated a
   ], [{ id: 'FULL' }, { id: 'A' }], [{ student_id: 'other-campus', semester: 3, academic_year: '2026-27', slot_1_course_id: 'FULL' }])
   assert.deepEqual(result.p_allocations.map(row => [row.student_id, row.course_id]), [['a', 'A']])
   assert.equal(result.p_unallocated[0].student_id, 'b')
+})
+
+test('fixed papers and elective winners are sent in the same atomic allocation commit', async () => {
+  const result = await allocate([{id:'student'}], [{student_id:'student',submitted_at:'2026-10-01',preferences:[
+    {slot:1,is_fixed:true,choices:[{course_id:'FIX',rank:1}]},{slot:2,is_fixed:false,choices:[{course_id:'SEC',rank:1}]},
+  ]}], [{id:'FIX',course_code:'FIX101',category:'DSC'},{id:'SEC'}], [],
+  [{rule:'FIXED',target:'FIX101',name:'Fixed'},{rule:'GLOBAL_BASKET',target:'SEC',name:'Elective'}])
+  assert.deepEqual(result.p_allocations.map(row=>[row.slot_key,row.course_id,row.allocated_by]),[['slot_1','FIX','fixed'],['slot_2','SEC','rank_1']])
 })
 
 

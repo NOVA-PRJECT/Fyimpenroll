@@ -1,5 +1,6 @@
 import './globals.css'
 import './theme.css'
+import DataProvider from '@/components/DataProvider'
 import { ApiRefreshInit } from '../components/ApiRefreshInit'
 import ThemeToggle from '@/components/ThemeToggle'
 import ThemeBootstrap from '@/components/ThemeBootstrap'
@@ -37,13 +38,13 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <PwaProvider>
+        <PwaProvider><DataProvider>
         <ThemeBootstrap />
         <ApiRefreshInit />
         {children}
         <LogoutDialog />
         <ThemeToggle />
-        </PwaProvider>
+        </DataProvider></PwaProvider>
       </body>
     </html>
   );

@@ -1,3 +1,4 @@
+import { enrollmentCounts } from '../../core/database/enrollment-counts'
 import { termOperation } from '../../core/database/term-operation'
 import { fetchAllPaginated } from '../../core/database/pagination.util'
 import {
@@ -36,6 +37,7 @@ export class RegistrationsService {
     user: AuthUser,
     deptMap: Map<string, string>,
     deptIdToName: Map<string, string>,
+    requestedSlot?: number,
   ) {
     const slotsInfo = pathway.slots
       .map((s: PathwaySlot, i: number) => ({
@@ -85,125 +87,21 @@ export class RegistrationsService {
       }
     }
 
-    const resolvedSlots = await Promise.all(
-      slotsInfo.map(async ({ slot, rule, target, name }) => {
-        if (
-          rule === SLOT_RULES.FIXED ||
-          rule === SLOT_RULES.AEC_ELECT ||
-          rule === SLOT_RULES.CAMPUS_FIXED
-        ) {
-          const normTarget = normalizeCourseCode(target)
-          const c = fixedCoursesMap[normTarget] || fixedCoursesMap[target?.trim()]
-          return {
-            slot,
-            rule,
-            name,
-            course: c
-              ? {
-                  ...c,
-                  department_name: deptIdToName.get(c.department_id) || 'Unknown',
-                }
-              : undefined,
-          }
-        }
-
-        let query = this.supabase.admin
-          .from('courses')
-          .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisites')
-
-        if (fixedCourseIds.length > 0) {
-          query = query.not('id', 'in', `(${fixedCourseIds.join(',')})`)
-        }
-
-        if (rule === SLOT_RULES.DEPT_RESTRICTED) {
-          const deptCodes = ((target as string) ?? '').split(',').map((code: string) => code.trim().toUpperCase())
-          const deptIds = deptCodes
-            .map((code: string) => deptMap.get(code) || (Array.from(deptMap.values()).includes(code) ? code : undefined))
-            .filter((id): id is string => id !== undefined)
-          if (deptIds.length === 0) return { slot, rule, name, options: [] }
-          const { data: options } = await query
-            .in('department_id', deptIds)
-            .eq('semester', user.current_semester)
-            .in('category', ['DSC', 'DSE', 'DSS'])
-
-          const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
-          )
-          const mapped = filtered.map((c) => ({
-            ...c,
-            department_name: deptIdToName.get(c.department_id) || 'Unknown',
-          }))
-          return { slot, rule, name, options: mapped }
-        }
-
-        if (rule === SLOT_RULES.EXCLUDE_DEPT) {
-          const deptCodes = ((target as string) ?? '').split(',').map((code: string) => code.trim().toUpperCase())
-          const deptIds = deptCodes
-            .map((code: string) => deptMap.get(code) || (Array.from(deptMap.values()).includes(code) ? code : undefined))
-            .filter((id): id is string => id !== undefined)
-          if (deptIds.length === 0) return { slot, rule, name, options: [] }
-
-          const isMdc = (name && name.toUpperCase().includes('MDC')) || ((target as string) ?? '').toUpperCase().includes('MDC')
-
-          let queryEx = query
-            .not('department_id', 'in', `(${deptIds.join(',')})`)
-            .eq('semester', user.current_semester)
-
-          if (isMdc) {
-            queryEx = queryEx.eq('category', 'MDC')
-          } else {
-            queryEx = queryEx.in('category', ['DSC', 'DSE', 'DSS'])
-          }
-
-          const { data: options } = await queryEx
-
-          const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
-          )
-          const mapped = filtered.map((c) => ({
-            ...c,
-            department_name: deptIdToName.get(c.department_id) || 'Unknown',
-          }))
-          return { slot, rule, name, options: mapped }
-        }
-
-        // POOL_RESTRICTED — own department DSE courses
-        if (rule === SLOT_RULES.POOL_RESTRICTED) {
-          const options = await fetchAllPaginated<any>(query
-            .eq('department_id', user.department_id)
-            .eq('category', 'DSE')
-            .eq('semester', user.current_semester).order('id'))
-
-          const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
-          )
-          const mapped = filtered.map((c) => ({
-            ...c,
-            department_name: deptIdToName.get(c.department_id) || 'Unknown',
-          }))
-          return { slot, rule, name, options: mapped }
-        }
-
-        // GLOBAL_BASKET — category across all campuses, in the student's semester
-        if (rule === SLOT_RULES.GLOBAL_BASKET) {
-          const category = (target || '').trim().toUpperCase()
-          let q = query.eq('semester', user.current_semester).eq('category', category)
-          if (category === 'MDC') q = q.neq('department_id', user.department_id)
-          const options = await fetchAllPaginated<any>(q.order('id'))
-
-          const filtered = (options ?? []).filter((c) =>
-            isCourseEligibleForSlot(c, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name),
-          )
-          const mapped = filtered.map((c) => ({
-            ...c,
-            department_name: deptIdToName.get(c.department_id) || 'Unknown',
-          }))
-          return { slot, rule, name, options: mapped }
-        }
-
-        return { slot, rule, name, options: [] }
-      }),
-    )
+    const candidates = await fetchAllPaginated<any>(this.supabase.admin.from('courses')
+      .select('id, course_code, title, department_id, semester, credits, category, seat_limit, prerequisites')
+      .eq('semester', user.current_semester).order('id'))
+    const resolvedSlots = slotsInfo.filter(info => requestedSlot === undefined || info.slot === requestedSlot).map(({ slot, rule, target, name }) => {
+      if ([SLOT_RULES.FIXED, SLOT_RULES.AEC_ELECT, SLOT_RULES.CAMPUS_FIXED].includes(rule as any)) {
+        const course = fixedCoursesMap[normalizeCourseCode(target)] || fixedCoursesMap[target?.trim()]
+        return { slot, rule, name, course: course ? { ...course, department_name: deptIdToName.get(course.department_id) || 'Unknown' } : undefined }
+      }
+      if (rule === SLOT_RULES.EXCLUDE_DEPT && !String(target || '').split(',').some(code =>
+        deptMap.has(code.trim().toUpperCase()) || Array.from(deptMap.values()).includes(code.trim()))) return { slot, rule, name, options: [] }
+      const options = candidates.filter(course => !fixedCourseIds.includes(course.id) &&
+        isCourseEligibleForSlot(course, rule, target, user.department_id ?? '', deptMap, user.current_semester!, name))
+        .map(course => ({ ...course, department_name: deptIdToName.get(course.department_id) || 'Unknown' }))
+      return { slot, rule, name, options }
+    })
 
     return resolvedSlots
   }
@@ -443,25 +341,6 @@ export class RegistrationsService {
     // Calculate real-time available seats for candidate courses post-allocation
     const availableSeats: Record<string, number> = {}
     if (allocationCompleted) {
-      const { data: allRegs } = await this.supabase.admin
-        .from('current_student_registrations')
-        .select('slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-        .eq('campus_id', campusId)
-        .eq('academic_year', settings.academic_year)
-        .eq('semester', semester)
-
-      const seatCounts: Record<string, number> = {}
-      if (allRegs) {
-        for (const reg of allRegs) {
-          for (let s = 1; s <= 8; s++) {
-            const cid = (reg as any)[`slot_${s}_course_id`]
-            if (cid) {
-              seatCounts[cid] = (seatCounts[cid] || 0) + 1
-            }
-          }
-        }
-      }
-
       const allReferencedCourses: any[] = []
       for (const slot of slots) {
         if (slot.options) allReferencedCourses.push(...slot.options)
@@ -469,6 +348,9 @@ export class RegistrationsService {
       }
       allReferencedCourses.push(...minorCourses)
 
+      const seatCounts = await enrollmentCounts(this.supabase.admin, [...new Map(allReferencedCourses.filter(c => c?.id).map(c => [c.id, c])).values()].map(c => ({
+        key: c.id, course_id: c.id, campus_id: campusId, academic_year: settings.academic_year, semester,
+      })))
       for (const c of allReferencedCourses) {
         if (c && c.id) {
           const limit = c.seat_limit ? Number(c.seat_limit) : 60
@@ -725,7 +607,7 @@ export class RegistrationsService {
         .maybeSingle(),
       this.supabase.admin
         .from('current_student_registrations')
-        .select('id, submitted_at, allocation_metadata')
+        .select('id, submitted_at')
         .eq('student_id', user.userId)
         .eq('semester', semester)
         .eq('academic_year', settings.academic_year)
@@ -737,9 +619,6 @@ export class RegistrationsService {
 
     // Step 3 tiebreaker rule: frozen on first submission. Re-ranking preferences never resets this timestamp (F17)
     const submittedAt = existingPref?.submitted_at ?? existingReg?.submitted_at ?? new Date().toISOString()
-    const allocationMetadata: Record<string, any> = {
-      ...(typeof existingReg?.allocation_metadata === 'object' && existingReg?.allocation_metadata ? existingReg.allocation_metadata : {}),
-    }
 
     // Resolve fixed targets globally by unique course code (F14)
     const fixedTargets: string[] = []
@@ -782,7 +661,6 @@ export class RegistrationsService {
     }[] = []
 
     const evaluatedCourses: any[] = []
-    const fixedCourseAssignments: Record<string, string> = {}
 
     // F13: Process configured pathway slots (supporting variable component sizes for research/projects)
     pathway.slots.forEach((s, i) => {
@@ -804,8 +682,6 @@ export class RegistrationsService {
           is_fixed: true,
           choices: [{ course_id: fc.id, rank: 1 }],
         })
-        allocationMetadata[slotKey] = { allocated_by: 'fixed' }
-        fixedCourseAssignments[slotKey] = fc.id
         evaluatedCourses.push(fc)
       } else {
         // Elective slot: student submits up to 3 preferences
@@ -855,14 +731,6 @@ export class RegistrationsService {
         })
       }
     })
-
-    // R14: If a slot was previously marked as fixed but is not fixed in the newly submitted pathway, clear its fixed metadata
-    for (let s = 1; s <= 8; s++) {
-      const k = `slot_${s}`
-      if (!fixedCourseAssignments[k] && allocationMetadata[k]?.allocated_by === 'fixed') {
-        delete allocationMetadata[k]
-      }
-    }
 
     // Optional Slot 7 (Paper 7 - Additional Minor Elective)
     if (!pathway.slots[6]?.rule && preferences && preferences['slot_7'] && preferences['slot_7'].length > 0) {
@@ -1004,11 +872,12 @@ export class RegistrationsService {
       p_pathway_id: pathway_id,
       p_preferences: unifiedPreferences,
       p_allocation_metadata: {
-        ...allocationMetadata,
-        credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
+        registration_state: 'pending_allocation',
+        preference_credit_breakdown: { core_credits: coreCredits, additional_credits: additionalCredits, total_credits: totalCredits },
       },
-      p_fixed_assignments: fixedCourseAssignments,
-      p_total_credits: totalCredits,
+      // Fixed choices are saved in preferences, and become enrollments only in the allocation transaction.
+      p_fixed_assignments: {},
+      p_total_credits: 0,
       p_submitted_at: submittedAt,
     })
 
@@ -1132,7 +1001,7 @@ export class RegistrationsService {
         current_semester: sem,
       }
 
-      const slots = await this.resolvePathwaySlots(chosenPathway, effectiveUser, deptMap, deptIdToName)
+      const slots = await this.resolvePathwaySlots(chosenPathway, effectiveUser, deptMap, deptIdToName, slotNumber)
       const targetSlot = slots.find((s) => s.slot === slotNumber)
 
       if (!targetSlot) {

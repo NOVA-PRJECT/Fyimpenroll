@@ -9,8 +9,8 @@ export interface CatalogueSnapshot<T> {
 export function createSemesterCatalogue<T extends { semester: number; course_code: string; id: string }>(
   load: (semester: number, signal: AbortSignal) => Promise<T[]>,
   publish: (snapshot: CatalogueSnapshot<T>) => void,
+  cached: (semester: number) => T[] | undefined = () => undefined,
 ) {
-  const cache = new Map<number, T[]>()
   let generation = 0, selected = 1, disposed = false
   let controller: AbortController | undefined
   async function select(semester: number) {
@@ -20,7 +20,7 @@ export function createSemesterCatalogue<T extends { semester: number; course_cod
     controller?.abort()
     const active = new AbortController()
     controller = active
-    const rows = cache.get(semester)
+    const rows = cached(semester)
     publish({ semester, rows, loading: true, error: '' })
     const current = () => request === generation && selected === semester && !active.signal.aborted
     try {
@@ -28,7 +28,6 @@ export function createSemesterCatalogue<T extends { semester: number; course_cod
       if (!current()) return
       if (!Array.isArray(result) || result.some(row => row.semester !== semester)) throw new Error('The server returned courses for a different semester. Retry loading courses.')
       const sorted = [...result].sort((a, b) => a.course_code < b.course_code ? -1 : a.course_code > b.course_code ? 1 : a.id.localeCompare(b.id))
-      cache.set(semester, sorted)
       publish({ semester, rows: sorted, loading: false, error: '' })
     } catch (error) {
       if (current()) publish({ semester, rows, loading: false, error: error instanceof Error ? error.message : 'Unable to load courses. Retry.' })
@@ -38,11 +37,11 @@ export function createSemesterCatalogue<T extends { semester: number; course_cod
     select,
     start(semester: number) {
       disposed = false
-      if (selected !== semester || !controller || controller.signal.aborted) return select(semester)
+      return select(semester)
     },
     refresh() { return select(selected) },
-    invalidate() { cache.clear(); return select(selected) },
+    invalidate() { return select(selected) },
     cancel() { generation++; controller?.abort() },
-    dispose() { disposed = true; generation++; controller?.abort(); cache.clear() },
+    dispose() { disposed = true; generation++; controller?.abort() },
   }
 }

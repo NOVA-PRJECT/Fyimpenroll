@@ -27,7 +27,7 @@ export class ExportService {
   }
   private async names(ids: string[]) {
     const unique = [...new Set(ids.filter(Boolean))]
-    const rows = await fetchByIdChunks<any>(unique, ids => this.supabase.admin.from('faculty').select('id,full_name').in('id',ids).order('id'))
+    const rows = await fetchByIdChunks<any>(unique, ids => this.supabase.admin.from('faculty').select('id,full_name').in('id',ids).order('id'), true)
     return new Map(rows.map(r => [r.id,r.full_name]))
   }
   private async deliveries(user: AuthUser, courseId?: string) {
@@ -99,7 +99,7 @@ export class ExportService {
     const regs = await this.registrations(query,user)
     const blueprints = await this.completionData()
     const ids = [...new Set(regs.flatMap(r=>registrationSlots(r).map(s=>s.courseId)))]
-    const courses = await fetchByIdChunks<any>(ids, chunk => this.supabase.admin.from('courses').select('id,title,course_code,credits').in('id',chunk).order('id'))
+    const courses = await fetchByIdChunks<any>(ids, chunk => this.supabase.admin.from('courses').select('id,title,course_code,credits').in('id',chunk).order('id'), true)
     const map = new Map(courses.map(c=>[c.id,c]))
     const rows = regs.map(r=>{
       const row: Record<string,any> = {'Academic Year':r.academic_year,'Semester':r.semester,'Campus':r.students?.campuses?.name,

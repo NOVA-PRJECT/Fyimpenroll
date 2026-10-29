@@ -1,5 +1,8 @@
 ﻿import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Optional } from '@nestjs/common'
+import { DataCacheService } from '../cache/data-cache.service'
+import { databaseFetch } from '../cache/database-fetch'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const boundedFetch: typeof fetch = (input, init) => fetch(input, {
@@ -17,7 +20,7 @@ export class SupabaseService {
   private readonly supabaseAnonKey: string
   private adminClientInstance: SupabaseClient
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private readonly configService: ConfigService, @Optional() cache?: DataCacheService) {
     this.supabaseUrl = this.configService.get<string>('SUPABASE_URL') || process.env.SUPABASE_URL || ''
     this.supabaseServiceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY') || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     this.supabaseAnonKey = this.configService.get<string>('SUPABASE_ANON_KEY') || process.env.SUPABASE_ANON_KEY || ''
@@ -28,7 +31,7 @@ export class SupabaseService {
 
     this.adminClientInstance = createClient(this.supabaseUrl, this.supabaseServiceRoleKey, {
       global: {
-        fetch: boundedFetch,
+        fetch: databaseFetch(boundedFetch, cache),
         headers: {
           Authorization: `Bearer ${this.supabaseServiceRoleKey}`,
         },

@@ -3,12 +3,20 @@ export const ROLES: Readonly<{ SUPER_ADMIN: 'superadmin'; CAMPUS_DIRECTOR: 'camp
 export const ROLE_VALUES: readonly ['superadmin', 'campus_director', 'hod', 'teaching_staff', 'teacher', 'student']
 export type Role = typeof ROLE_VALUES[number]
 export const ENROLLMENT_SLOT_COUNT: 8
+export type DataDomain = 'catalogue' | 'people' | 'settings' | 'enrollment' | 'assignments' | 'timetable' | 'attendance' | 'signin' | 'jobs' | 'logs'
+export const DATA_DOMAINS: readonly DataDomain[]
+export function dataReadDomains(path: string): DataDomain[]
+export function dataChangeDomains(path: string): DataDomain[]
+export function databaseChangeDomains(name: string): DataDomain[]
+export function canonicalDataUrl(path: string): string
+export function projectReadData<T>(path: string, value: T, now?: number): T
 export interface TeachingDelivery { delivery_id: string; id: string; campus_id: string; academic_year: string; semester: number }
 export interface CampusAttendanceStatus {
   date: string
   current_time_ist: string
   active_session: 'morning' | 'evening' | 'closed'
   can_sign_in: boolean
+  static_unavailable_reason?: string | null
   unavailable_reason: string | null
   campus: {
     id: string | null; name: string | null; radius_meters: number

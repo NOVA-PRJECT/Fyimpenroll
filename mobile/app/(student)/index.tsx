@@ -1,3 +1,4 @@
+import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -35,13 +36,13 @@ export default function StudentHomeScreen() {
     enabled: !!userId,
   });
 
-  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
+  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
     <ScreenContainer
       scrollable
       refreshing={isRefetching}
-      onRefresh={refetch}
+      onRefresh={() => freshRead(() => refetch())}
     >
       {/* Welcome Banner */}
       <View style={styles.welcomeSection}>
@@ -73,7 +74,7 @@ export default function StudentHomeScreen() {
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Could not load dashboard data.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

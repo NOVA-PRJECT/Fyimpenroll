@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { useState, useEffect } from 'react'
@@ -45,9 +48,11 @@ interface PlacementCourse extends RemainingCourse {
 }
 
 export default function ManualAllocationTab() {
+  const dataRevision = useDataRevision(["enrollment","jobs"])
   const [selectedSemester, setSelectedSemester] = useState<number>(1)
   const [unresolvedStudents, setUnresolvedStudents] = useState<UnresolvedStudent[]>([])
   const [remainingCourses, setRemainingCourses] = useState<RemainingCourse[]>([])
+  const [allocationCompleted, setAllocationCompleted] = useState(true)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
@@ -104,7 +109,7 @@ export default function ManualAllocationTab() {
 
   useEffect(() => {
     fetchData(selectedSemester)
-  }, [selectedSemester])
+  }, [selectedSemester, dataRevision])
 
   const canConfirmAllocation = !submitting && !placementLoading && !placementError
     && placementCourses.some(course => course.id === selectedCourseId && course.can_allocate)
@@ -129,6 +134,7 @@ export default function ManualAllocationTab() {
       }
 
       setUnresolvedStudents(unresolvedData.unresolvedStudents || [])
+      setAllocationCompleted(unresolvedData.allocationCompleted !== false)
       setRemainingCourses(remainingData.courses || [])
     } catch (err: unknown) {
       setError((err instanceof Error ? err.message : '') || 'Error loading manual allocation data')
@@ -219,8 +225,10 @@ export default function ManualAllocationTab() {
           </select>
 
           <button
-            onClick={() => fetchData(selectedSemester)}
-            disabled={loading}
+            onClick={() => void refreshDatasets([
+              `/api/allocation/unresolved?semesterId=${selectedSemester}`, `/api/allocation/remaining-seats?semesterId=${selectedSemester}`,
+            ], () => fetchData(selectedSemester))}
+            disabled={loading || !!allocatingTarget}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -306,6 +314,11 @@ export default function ManualAllocationTab() {
 
           {loading ? (
             <LoadingState layout="table" message="Loading unresolved students…" />
+          ) : !allocationCompleted ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <h3>Awaiting course allocation</h3>
+              <p>All submitted papers, including fixed papers, stay pending until the Campus Director completes allocation. Manual resolution becomes available afterward.</p>
+            </div>
           ) : unresolvedStudents.length === 0 ? (
             <div
               style={{

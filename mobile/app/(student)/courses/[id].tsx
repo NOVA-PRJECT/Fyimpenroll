@@ -1,3 +1,4 @@
+import { freshRead } from '../../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -30,11 +31,11 @@ export default function CourseDetailScreen() {
   });
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
+    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load course details.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

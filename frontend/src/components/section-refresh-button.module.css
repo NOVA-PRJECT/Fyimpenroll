@@ -1,0 +1,16 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border: 1px solid var(--portal-strong-border, #cbd5e1);
+  border-radius: 8px;
+  background: var(--portal-surface, #fff);
+  color: var(--portal-brand-text, #002147);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.button:disabled { opacity: .55; cursor: default; }

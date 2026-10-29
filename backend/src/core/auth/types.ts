@@ -10,6 +10,8 @@ export interface AuthUser {
   must_change_password?: boolean
   current_semester?: number
   term_version?: number
+  /** Verified by the guard for this request only; never accepted from browser claims. */
+  verifiedCampusSettings?: Record<string, any>
   full_name?: string
   token?: string
   consent?: { accepted: boolean; currentVersion: string }

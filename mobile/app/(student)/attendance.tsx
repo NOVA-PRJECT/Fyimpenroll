@@ -1,3 +1,6 @@
+import { freshRead } from '../../src/lib/data-refresh';
+import { useLocalClock } from '../../src/hooks/useLocalClock';
+import { projectReadData } from '@fyimp/contracts';
 import React, { useState } from 'react';
 import { campusSessionLabel, formatCampusTime, type CampusAttendanceStatus } from '@fyimp/contracts';
 import { View, Text, StyleSheet, Alert } from 'react-native';
@@ -10,7 +13,7 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { useOfflineQueue } from '../../src/hooks/useOfflineQueue';
 import { apiClient } from '../../src/api/client';
 import { API_ENDPOINTS } from '../../src/api/endpoints';
-import { queryClient, queryKeys } from '../../src/lib/query-client';
+import { queryKeys } from '../../src/lib/query-client';
 import { CampusSignInStatusSchema, StudentAttendanceListSchema } from '../../src/api/schemas/attendance.schema';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
@@ -32,7 +35,7 @@ export default function StudentAttendanceScreen() {
 
   // 1. Fetch campus verification status for today
   const {
-    data: campusStatus,
+    data: storedCampusStatus,
     isLoading: loadingStatus,
     error: statusError,
     refetch: refetchStatus,
@@ -41,10 +44,11 @@ export default function StudentAttendanceScreen() {
     queryKey: queryKeys.student.campusStatus(userId, todayStr),
     queryFn: () =>
       apiClient.get<CampusAttendanceStatus>(`${API_ENDPOINTS.CAMPUS_STATUS}/${userId}`, { schema: CampusSignInStatusSchema }),
-    refetchInterval: 30000,
     enabled: !!userId,
   });
 
+  const clock = useLocalClock();
+  const campusStatus = projectReadData('/api/attendance/campus/status/me', storedCampusStatus, clock);
   // 2. Fetch student's course-level attendance list
   const {
     data: courseAttendanceData,
@@ -62,10 +66,7 @@ export default function StudentAttendanceScreen() {
     enabled: !!userId,
   });
 
-  const refetchAll = () => {
-    refetchStatus();
-    refetchCourses();
-  };
+  const refetchAll = async () => { await Promise.all([refetchStatus(), refetchCourses()]); };
 
   // 3. Campus Sign-in Mutation
   const signInMutation = useMutation({
@@ -117,12 +118,6 @@ export default function StudentAttendanceScreen() {
     },
     onSuccess: (res: any) => {
       Alert.alert('Campus Sign-In Recorded', res?.message || 'Your campus sign-in was recorded.');
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.student.campusStatus(userId, todayStr),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.student.dashboard(userId),
-      });
     },
     onError: (err: any) => {
       setLocating(false);
@@ -141,7 +136,7 @@ export default function StudentAttendanceScreen() {
     <ScreenContainer
       scrollable
       refreshing={refetchingStatus || refetchingCourses}
-      onRefresh={refetchAll}
+      onRefresh={() => freshRead(() => refetchAll())}
     >
       {/* Campus Sign-In Action Card */}
       <Card variant="elevated" style={styles.actionCard}>
@@ -167,7 +162,7 @@ export default function StudentAttendanceScreen() {
           <Text style={{ fontWeight: '700', color: colors.textPrimary }}>not saved</Text>. The time, result, location accuracy and audit details are retained. Sign-in requires an internet connection.
         </Text>
 
-        {statusError && <ErrorView message={statusError instanceof Error ? statusError.message : 'Unable to load campus status.'} onRetry={refetchStatus} />}
+        {statusError && <ErrorView message={statusError instanceof Error ? statusError.message : 'Unable to load campus status.'} onRetry={() => freshRead(() => refetchStatus())} />}
         {/* Action Button */}
         <Button
           title={locating ? 'Acquiring GPS Signal...' : buttonTitle}
@@ -257,7 +252,7 @@ export default function StudentAttendanceScreen() {
       {courseError ? (
         <ErrorView
           message={courseError instanceof Error ? courseError.message : 'Failed to load course attendance.'}
-          onRetry={refetchCourses}
+          onRetry={() => freshRead(() => refetchCourses())}
         />
       ) : null}
 

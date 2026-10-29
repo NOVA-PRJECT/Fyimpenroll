@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { ENV } from '../config/env';
+import { dataChangeDomains } from '@fyimp/contracts';
+import { queryClient } from '../lib/query-client';
+import { isFreshMobileRead, mobileQueryDomains } from '../lib/data-refresh';
 import { supabase } from '../lib/supabase';
 
 export class ApiError extends Error {
@@ -55,6 +58,7 @@ export async function apiFetch<T = any>(
     'Content-Type': 'application/json',
     ...(headers as Record<string, string>),
   };
+  if (isFreshMobileRead()) requestHeaders['X-Refresh-Data'] = '1';
 
   let requestOwner: string | undefined;
   if (!skipAuth) {
@@ -124,6 +128,11 @@ export async function apiFetch<T = any>(
       response.status,
       responseBody
     );
+  }
+
+  if (fetchOptions.method && !['GET', 'HEAD', 'OPTIONS'].includes(fetchOptions.method.toUpperCase())) {
+    const changed = dataChangeDomains(endpoint);
+    if (changed.length) await queryClient.invalidateQueries({ predicate: query => mobileQueryDomains(query.queryKey).some(domain => changed.includes(domain)) });
   }
 
   // Validate with Zod schema if provided

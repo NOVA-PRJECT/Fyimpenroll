@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
 import { Inbox as UiInbox, Search as UiSearch, Users as UiUsers } from 'lucide-react'
@@ -8,7 +11,7 @@ import { useDashboardEntryFetch } from '@/core/security/useDashboardEntryFetch'
 
 import { logoutPortal } from '@/core/security/logout'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
@@ -153,6 +156,7 @@ export default function TeachingStaffDashboard() {
   const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
+  const dataRevision = useDataRevision(["people","catalogue","enrollment","assignments"])
   const [facultyName, setFacultyName] = useState('')
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [departments, setDepartments] = useState<Department[]>([])
@@ -165,6 +169,7 @@ export default function TeachingStaffDashboard() {
 
   const [loading, setLoading] = useState(false)
   const [rosterData, setRosterData] = useState<RosterData | null>(null)
+  const rosterRequest = useRef(0)
   const [error, setError] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -191,7 +196,7 @@ export default function TeachingStaffDashboard() {
       }
     }
     loadData()
-  }, [router, entryFetch])
+  }, [router, entryFetch, dataRevision])
 
   // Derive unique semesters present in fetched courses
   const availableSemesters = useMemo(() => {
@@ -256,6 +261,7 @@ export default function TeachingStaffDashboard() {
   }, [rosterData, tableDeptFilter])
 
   async function handleFetchCourse(targetCourseId?: string) {
+    const request = ++rosterRequest.current
     const courseIdToFetch = targetCourseId ?? selectedCourseId
     if (!courseIdToFetch) {
       setError('Please select a paper first')
@@ -264,12 +270,12 @@ export default function TeachingStaffDashboard() {
 
     setLoading(true)
     setError('')
-    setRosterData(null)
     setTableDeptFilter('all')
 
     try {
       const response = await fetch(`/api/faculty/attendance?course_id=${courseIdToFetch}`)
       const result = await response.json()
+      if (request !== rosterRequest.current) return
 
       if (!response.ok) {
         setError(result.error ?? 'Failed to fetch roster. Please try again.')
@@ -279,11 +285,13 @@ export default function TeachingStaffDashboard() {
 
       setRosterData(result)
     } catch {
-      setError('Network error while fetching roster.')
+      if (request === rosterRequest.current) setError('Network error while fetching roster.')
     } finally {
-      setLoading(false)
+      if (request === rosterRequest.current) setLoading(false)
     }
   }
+  const reloadVisibleRoster = useEffectEvent(() => { if (selectedCourseId) void handleFetchCourse(selectedCourseId) })
+  useEffect(() => { if (dataRevision) reloadVisibleRoster() }, [dataRevision])
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -352,6 +360,12 @@ export default function TeachingStaffDashboard() {
         {loadingProfile ? <LoadingState layout="form" rows={3} message="Loading courses and filters…" /> : <div className={styles.filterCard}>
           <div className={styles.filterCardHeader}>
             <p className={styles.filterCardTitle}>Department Course Catalog & Student Inspection</p>
+            <SectionRefreshButton className={styles.exportBtn} label="Refresh courses"
+              endpoints={['/api/faculty/courses']} disabled={loadingProfile} onRefresh={async () => {
+                const res = await fetch('/api/faculty/courses'); const data = await res.json()
+                if (!res.ok) throw new Error('Unable to refresh courses.')
+                setFacultyName(data.teacherName); setCourses(data.courses ?? []); setDepartments(data.departments ?? [])
+              }} />
           </div>
 
           <div className={styles.filterControlsGrid}>
@@ -415,6 +429,9 @@ export default function TeachingStaffDashboard() {
               }}
               disabled={loading}
             />
+            <SectionRefreshButton label="Refresh roster" className={styles.exportBtn}
+              endpoints={[`/api/faculty/attendance?course_id=${selectedCourseId}`]}
+              onRefresh={() => handleFetchCourse(selectedCourseId)} disabled={!selectedCourseId || loading} />
           </div>
         </div>
 

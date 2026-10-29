@@ -38,7 +38,9 @@ export class DirectorService {
   }
 
   async getSettings(user: AuthUser) {
-    const { data: faculty, error: facultyError } = await this.supabase.admin
+    const { data: faculty, error: facultyError } = user.full_name && user.campus_id
+      ? { data: { full_name: user.full_name, campus_id: user.campus_id }, error: null }
+      : await this.supabase.admin
       .from('faculty')
       .select('full_name, campus_id')
       .eq('id', user.userId)
@@ -54,7 +56,8 @@ export class DirectorService {
       .eq('id', faculty.campus_id)
       .single()
 
-    const { data: settings } = await this.supabase.admin
+    const { data: settings } = user.verifiedCampusSettings
+      ? { data: user.verifiedCampusSettings } : await this.supabase.admin
       .from('campus_settings')
       .select('deadline, min_credits, max_credits, academic_year, last_promoted_at, term_version, term_started_at')
       .eq('campus_id', faculty.campus_id)

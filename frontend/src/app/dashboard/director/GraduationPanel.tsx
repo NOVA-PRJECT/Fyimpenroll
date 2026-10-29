@@ -1,11 +1,15 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+
 import { useCallback, useEffect, useState } from 'react'
 import styles from './director-dashboard.module.css'
 
 type Candidate = { id: string; full_name: string; cap_application_number: string; departments?: { name: string } | null }
 
 export default function GraduationPanel() {
+  const dataRevision = useDataRevision(["people","enrollment"])
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -13,10 +17,10 @@ export default function GraduationPanel() {
   const [review, setReview] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     setLoading(true)
     try {
-      const response = await fetch('/api/admin/campus/graduation-candidates', { cache: 'no-store' })
+      const response = await fetch('/api/admin/campus/graduation-candidates', { cache: 'no-store', headers: force ? { 'X-Refresh-Data': '1' } : {} })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Unable to load graduating students.')
       setCandidates(data.candidates)
@@ -24,9 +28,10 @@ export default function GraduationPanel() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load graduating students.') }
     finally { setLoading(false) }
   }, [])
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { void refresh() }, [refresh, dataRevision])
 
   async function deleteSelected() {
+    let committed = false
     setDeleting(true); setError(''); setSuccess('')
     try {
       const response = await fetch('/api/admin/campus/graduate-students', {
@@ -34,12 +39,14 @@ export default function GraduationPanel() {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Deletion was not completed.')
+      committed = true
       setSuccess(`${data.deleted_count} graduating student account(s) deleted.`)
       setSelected([])
     } catch (err) {
       setError(`${err instanceof Error ? err.message : 'Connection lost.'} The list has been refreshed; verify the remaining accounts before retrying.`)
     } finally {
-      await refresh(); setReview(false); setDeleting(false)
+      if (!committed) await refresh(true)
+      setReview(false); setDeleting(false)
     }
   }
 
@@ -48,7 +55,7 @@ export default function GraduationPanel() {
     <p>Students in semester 11 have completed their programme. Review and delete their accounts separately from semester promotion.</p>
     {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
     {success && <div role="status" className={styles.successBanner}>{success}</div>}
-    <button className={styles.secondaryBtn} disabled={loading || deleting} onClick={() => { setError(''); void refresh() }}>Refresh list</button>
+    <button className={styles.secondaryBtn} disabled={loading || deleting} onClick={() => { setError(''); void refreshDatasets(['/api/admin/campus/graduation-candidates'], () => refresh()) }}>Refresh list</button>
     {loading ? <p role="status">Loading graduating students…</p> : candidates.length === 0 ? <p>No semester-11 students are awaiting deletion.</p> : <>
       <p>{candidates.length} eligible student(s). Select up to 500 accounts.</p>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', textAlign: 'left', borderSpacing: '0 12px' }}>

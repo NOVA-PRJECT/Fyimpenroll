@@ -1,5 +1,9 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import LoadingState from '@/components/LoadingState'
 
 import { Info as UiInfo } from 'lucide-react'
@@ -86,9 +90,11 @@ interface CreditLedgerViewProps {
 export default function CreditLedgerView({
   studentId,
 }: CreditLedgerViewProps) {
+  const dataRevision = useDataRevision(["people","catalogue","enrollment","assignments"])
   const [data, setData] = useState<CreditLedgerData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const ledgerEndpoint = studentId && studentId !== 'me' ? `/api/credit-ledger/${studentId}` : '/api/credit-ledger/me'
 
   const fetchLedger = useCallback(async () => {
     setLoading(true)
@@ -126,7 +132,7 @@ export default function CreditLedgerView({
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Starts synchronization with the remote API for this mounted view.
     fetchLedger()
-  }, [fetchLedger])
+  }, [fetchLedger, dataRevision])
 
   if (loading) {
     return (
@@ -136,12 +142,12 @@ export default function CreditLedgerView({
     )
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <div className={styles.container}>
         <div className={styles.errorContainer}>
           <p style={{ color: "var(--portal-danger-text,#be123c)", fontWeight: 600 }}>{error || 'Unable to load credit ledger.'}</p>
-          <button onClick={fetchLedger} className={styles.backBtn}>
+          <button onClick={() => void refreshDatasets([ledgerEndpoint], fetchLedger)} className={styles.backBtn}>
             Try Again
           </button>
         </div>
@@ -168,6 +174,10 @@ export default function CreditLedgerView({
   return (
     <div className={styles.container}>
       <main className={styles.contentWrapper}>
+        {error && <div role="alert" className={styles.errorContainer}>
+          <p>{error} Showing the last successful result.</p>
+          <button className={styles.backBtn} onClick={() => void refreshDatasets([ledgerEndpoint], fetchLedger)}>Retry</button>
+        </div>}
         {/* Top Header Card (F50 Advisory Labeling) */}
         <section className={styles.ledgerHeaderCard}>
           <div className={styles.ledgerHeaderLeft}>
@@ -181,6 +191,7 @@ export default function CreditLedgerView({
               Registered coursework; degree compliance is not assessed
             </p>
             <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+              <SectionRefreshButton endpoints={[ledgerEndpoint]} onRefresh={fetchLedger} disabled={loading} className={styles.backBtn} label="Refresh ledger" />
               <a
                 href={exportUrl('csv')}
                 download

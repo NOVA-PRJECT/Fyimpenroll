@@ -1,5 +1,9 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { refreshDatasets } from '@/core/data-cache'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import { adminRequest, apiErrorMessage } from '@/core/api-error'
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
 
@@ -60,7 +64,9 @@ export default function SuperAdminDashboard() {
   const entryFetch = useDashboardEntryFetch()
   useBfcacheGuard()
   const router = useRouter()
+  const dataRevision = useDataRevision(["catalogue","people","settings","logs"])
   const [activeTab, setActiveTab] = useState<Tab>('campuses')
+  const [tabRestored, setTabRestored] = useState(false)
   const [adminName, setAdminName] = useState('')
   const [loadingAdmin, setLoadingAdmin] = useState(true)
   const [error, setError] = useState('')
@@ -132,6 +138,7 @@ export default function SuperAdminDashboard() {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores browser view state after hydration or resets a changed cohort.
         setActiveTab(tabParam as Tab)
       }
+      setTabRestored(true)
     }
   }, [])
 
@@ -149,7 +156,7 @@ export default function SuperAdminDashboard() {
     } finally { setLoadingAdmin(false) }
   }
   const loadProfile = useEffectEvent(() => { void loadAdminProfile() })
-  useEffect(() => { loadProfile() }, [router, entryFetch])
+  useEffect(() => { loadProfile() }, [router, entryFetch, dataRevision])
 
   const loadActiveTab = useEffectEvent(() => {
     if (activeTab === 'campuses') fetchCampuses()
@@ -157,7 +164,7 @@ export default function SuperAdminDashboard() {
     else if (activeTab === 'faculty') { fetchFaculty(); fetchCampuses(); fetchDepartments() }
     else if (activeTab === 'logs') { fetchLogs() }
   })
-  useEffect(() => { loadActiveTab() }, [activeTab, logTypeFilter, logStatusFilter])
+  useEffect(() => { if (tabRestored) loadActiveTab() }, [activeTab, logTypeFilter, logStatusFilter, tabRestored, dataRevision])
 
   function clearMessages() { setError(''); setSuccess('') }
 
@@ -356,6 +363,7 @@ export default function SuperAdminDashboard() {
           <>
             <div className={styles.sectionHeader}>
               <p className={styles.sectionTitle}>Campuses</p>
+              <SectionRefreshButton className={styles.exportBtn} label="Refresh campuses" endpoints={['/api/admin/campuses']} onRefresh={fetchCampuses} disabled={loadingCampuses} />
               <button className={styles.addBtn} onClick={() => { setShowAddCampus(true); clearMessages() }}>
                 + Add Campus
               </button>
@@ -408,6 +416,7 @@ export default function SuperAdminDashboard() {
           <>
             <div className={styles.sectionHeader}>
               <p className={styles.sectionTitle}>Departments</p>
+              <SectionRefreshButton className={styles.exportBtn} label="Refresh departments" endpoints={['/api/admin/departments']} onRefresh={fetchDepartments} disabled={loadingDepts} />
               <button className={styles.addBtn} onClick={() => { setShowAddDept(true); clearMessages() }}>
                 + Add Department
               </button>
@@ -489,6 +498,7 @@ export default function SuperAdminDashboard() {
           <>
             <div className={styles.sectionHeader}>
               <p className={styles.sectionTitle}>Faculty Management</p>
+              <SectionRefreshButton className={styles.exportBtn} label="Refresh faculty" endpoints={['/api/admin/faculty-list']} onRefresh={fetchFaculty} disabled={loadingFaculty} />
               <button className={styles.addBtn} onClick={() => { setShowAddFaculty(true); clearMessages() }}>
                 + Add Faculty
               </button>
@@ -738,7 +748,13 @@ export default function SuperAdminDashboard() {
               </div>
               <button
                 className={styles.addBtn}
-                onClick={fetchLogs}
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (logTypeFilter !== 'all') params.set('log_type', logTypeFilter)
+                  if (logStatusFilter !== 'all') params.set('status', logStatusFilter)
+                  if (logSearch.trim()) params.set('search', logSearch.trim())
+                  void refreshDatasets([`/api/admin/logs?${params}`], fetchLogs)
+                }}
                 disabled={loadingLogs}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >

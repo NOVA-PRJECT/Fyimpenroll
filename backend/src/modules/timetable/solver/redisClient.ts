@@ -17,7 +17,7 @@ export function getRedisClient(): Redis {
         },
       } as unknown as Redis;
     }
-    redisInstance = new Redis({ url, token });
+    redisInstance = new Redis({ url, token, retry: false, signal: () => AbortSignal.timeout(2000) });
   }
   return redisInstance;
 }

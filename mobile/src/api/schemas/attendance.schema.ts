@@ -9,6 +9,7 @@ export const CampusSignInStatusSchema = z.object({
   date: z.string(), current_time_ist: z.string(),
   active_session: z.enum(['morning', 'evening', 'closed']),
   can_sign_in: z.boolean(), unavailable_reason: z.string().nullable(),
+  static_unavailable_reason: z.string().nullable().optional(),
   campus: z.object({
     id: z.string().nullable(), name: z.string().nullable(), radius_meters: z.number(),
     morning_cutoff: z.string(), midday_split: z.string(), evening_cutoff: z.string(), day_end: z.string(),

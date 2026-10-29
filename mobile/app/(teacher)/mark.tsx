@@ -1,6 +1,7 @@
+import { freshRead } from '../../src/lib/data-refresh';
 import React, { useState } from 'react';
 import { Text, TextInput, View, Switch, Alert, Button } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../src/context/AuthContext';
 import { useOfflineQueue } from '../../src/context/OfflineQueueContext';
 import { apiClient } from '../../src/api/client';
@@ -15,7 +16,6 @@ function DatedRoster({ data }: { data: Marks }) {
   const [absent, setAbsent] = useState(() => new Set(data.students.filter(s => s.status === 'absent').map(s => s.id)));
   const [busy, setBusy] = useState(false);
   const { isOnline, enqueueAction } = useOfflineQueue();
-  const queries = useQueryClient();
   const submit = async () => {
     setBusy(true);
     const payload = { timetable_slot_id: data.slot.id, attendance_date: data.attendance_date, expected_revision: data.revision, absent_student_ids: [...absent] };
@@ -25,7 +25,6 @@ function DatedRoster({ data }: { data: Marks }) {
         Alert.alert('Saved offline', 'This dated revision will sync for this account. Conflicting edits require review.');
       } else {
         await apiClient.post('/api/attendance/period/submit', payload);
-        await queries.invalidateQueries({ queryKey: ['dated-marks'] });
         Alert.alert('Attendance saved');
       }
     } catch (error) { Alert.alert('Submission needs review', error instanceof Error ? error.message : 'Refresh the roster before retrying'); }
@@ -61,7 +60,7 @@ export default function PeriodMarkingScreen() {
     {schedule.data?.periods.map(slot => <Button key={slot.timetable_slot_id} title={`${slot.course_code} · Period ${slot.period_number}`} onPress={() => setSlotId(slot.timetable_slot_id)} />)}
     {marks.error && <Text>{marks.error.message}</Text>}
     {marks.data && <DatedRoster key={`${slotId}:${date}:${marks.data.revision}`} data={marks.data} />}
-    {pendingActions.PERIOD_MARKING?.blockedReason && <View><Text>{pendingActions.PERIOD_MARKING.blockedReason}</Text><Button title="Discard queued marks and reload" onPress={() => Alert.alert('Discard queued attendance?', 'All pending attendance actions for this account will be removed. Reload each class to review current marks.', [{ text: 'Cancel' }, { text: 'Discard', style: 'destructive', onPress: () => { void clearAction('PERIOD_MARKING').then(() => marks.refetch()); } }])} /></View>}
-    <Button title="Reload current marks" onPress={() => Alert.alert('Reload marks?', 'Unsaved selections will be discarded.', [{ text: 'Cancel' }, { text: 'Reload', onPress: () => { setSlotId(''); void schedule.refetch(); } }])} />
+    {pendingActions.PERIOD_MARKING?.blockedReason && <View><Text>{pendingActions.PERIOD_MARKING.blockedReason}</Text><Button title="Discard queued marks and reload" onPress={() => Alert.alert('Discard queued attendance?', 'All pending attendance actions for this account will be removed. Reload each class to review current marks.', [{ text: 'Cancel' }, { text: 'Discard', style: 'destructive', onPress: () => { void clearAction('PERIOD_MARKING').then(() => freshRead(() => marks.refetch())); } }])} /></View>}
+    <Button title="Reload current marks" onPress={() => Alert.alert('Reload marks?', 'Unsaved selections will be discarded.', [{ text: 'Cancel' }, { text: 'Reload', onPress: () => { setSlotId(''); void freshRead(() => schedule.refetch()); } }])} />
   </ScreenContainer>;
 }

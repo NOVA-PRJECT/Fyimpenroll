@@ -1,5 +1,8 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { useEffect, useState } from 'react'
@@ -17,7 +20,10 @@ const fields = [
 type Field = typeof fields[number][0]
 
 export default function CampusAttendanceSettings() {
+  const dataRevision = useDataRevision(["settings"])
   const [values, setValues] = useState<Partial<Record<Field, string>>>({})
+  const [savedValues, setSavedValues] = useState('{}')
+  useDataRevision([], JSON.stringify(values) !== savedValues)
   const [ready, setReady] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -32,7 +38,9 @@ export default function CampusAttendanceSettings() {
         const res = await fetch('/api/director/attendance-settings', { cache: 'no-store', signal: controller.signal })
         const data = await res.json()
         if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load campus attendance settings.')
-        setValues(Object.fromEntries(fields.map(([key]) => [key, data.settings[key] == null ? '' : String(data.settings[key])])))
+        const loaded = Object.fromEntries(fields.map(([key]) => [key, data.settings[key] == null ? '' : String(data.settings[key])]))
+        setValues(loaded)
+        setSavedValues(JSON.stringify(loaded))
         setReady(true)
         setError(data.setup_error || '')
       } catch (err) {
@@ -41,7 +49,7 @@ export default function CampusAttendanceSettings() {
     }
     void load()
     return () => controller.abort()
-  }, [retry])
+  }, [retry, dataRevision])
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -54,6 +62,7 @@ export default function CampusAttendanceSettings() {
       const data = await res.json()
       if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to save settings.')
       setSuccess('Campus location and attendance timings saved.')
+      setSavedValues(JSON.stringify(values))
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to save settings.') }
     finally { setSaving(false) }
   }
@@ -72,6 +81,9 @@ export default function CampusAttendanceSettings() {
   return <section className={styles.card} aria-labelledby="campus-settings-title">
     <span className={styles.eyebrow}>Attendance configuration</span>
     <h2 id="campus-settings-title" className={styles.title}>Campus sign-in settings</h2>
+    <SectionRefreshButton className={styles.secondaryButton} label="Refresh attendance settings"
+      endpoints={['/api/director/attendance-settings']} onRefresh={() => setRetry(value => value + 1)}
+      disabled={saving || JSON.stringify(values) !== savedValues} />
     <p className={styles.description}>Manage the campus location and daily sign-in checkpoints. These settings are separate from course registration.</p>
     {error && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{error} {!ready && <button type="button" className={styles.secondaryButton} onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
     {!ready && !error && <LoadingState layout="form" rows={7} compact message="Loading attendance settings…" />}

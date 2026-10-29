@@ -1,5 +1,9 @@
 'use client'
 
+import { useDataRevision } from '@/core/hooks/useDataRevision'
+import { cachedData, refreshDatasets } from '@/core/data-cache'
+import SectionRefreshButton from '@/components/SectionRefreshButton'
+
 import { apiErrorMessage } from '@/core/api-error'
 import { createSemesterCatalogue, type CatalogueSnapshot } from '@/core/semester-catalogue'
 import AccessibleModal from '@/components/AccessibleModal'
@@ -14,6 +18,7 @@ import styles from './hod-dashboard.module.css'
 
 interface CatalogueCourse { is_own_campus?: boolean; is_own_dept?: boolean; department_name?: string; theory_hours_per_week: number; practical_hours_per_week: number; id: string; course_code: string; title: string; credits: number; category: string; semester: number; seat_limit: number; theory_hours: number; practical_hours: number; department_id: string; prerequisites?: string[]; departments?: { name: string; code: string } }
 export default function CoursesTab({ semester, onSemesterChange: setSemester }: { semester: number; onSemesterChange: (semester: number) => void }) {
+  const dataRevision = useDataRevision(["catalogue"])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [courseSemester, setCourseSemester] = useState(semester)
@@ -26,7 +31,7 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
     const data = await res.json().catch(() => null)
     if (!res.ok || !Array.isArray(data)) throw new Error(apiErrorMessage(data, 'Unable to load courses. Please retry.', res.status))
     return data
-  }, setCatalogue))
+  }, setCatalogue, sem => cachedData<CatalogueCourse[]>(`/api/hod/courses?semester=${sem}&own=true`)))
   const currentCatalogue = catalogue.semester === semester ? catalogue : { semester, rows: undefined, loading: true, error: '' }
   const courses = currentCatalogue.rows ?? []
   const loadingCourses = currentCatalogue.loading && !currentCatalogue.rows
@@ -44,7 +49,8 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
 
   const [savingCourse, setSavingCourse] = useState(false)
   const [deletingCourse, setDeletingCourse] = useState(false)
-  useEffect(() => { void catalogueLoader.start(semester) }, [semester, catalogueLoader])
+  useDataRevision([], showAddCourse || !!editCourse || !!deleteCourse)
+  useEffect(() => { void catalogueLoader.start(semester) }, [semester, catalogueLoader, dataRevision])
   useEffect(() => () => catalogueLoader.dispose(), [catalogueLoader])
 
   async function handleSaveCourse() {
@@ -133,7 +139,7 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
       {error && !showAddCourse && !editCourse && !deleteCourse && <div role="alert" className={styles.errorBanner}>{error}</div>}
       {currentCatalogue.error && <div role="alert" className={styles.errorBanner}>
         {currentCatalogue.rows ? 'Showing saved courses. ' : ''}{currentCatalogue.error}{' '}
-        <button type="button" onClick={() => void catalogueLoader.refresh()}>Retry</button>
+        <button type="button" onClick={() => void refreshDatasets([`/api/hod/courses?semester=${semester}&own=true`], () => catalogueLoader.select(semester))}>Retry</button>
       </div>}
       {currentCatalogue.loading && currentCatalogue.rows && <div role="status"><LoadingIndicator message="Updating courses…" /></div>}
       {/* Semester Selector */}
@@ -142,13 +148,15 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
         <select className={styles.semesterSelect} value={semester}
           onChange={e => {
             const nextSem = Number(e.target.value)
-            void catalogueLoader.select(nextSem)
             setSemester(nextSem)
           }}>
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
             <option key={s} value={s}>Semester {s}</option>
           ))}
         </select>
+        <SectionRefreshButton className={styles.exportBtn} label="Refresh courses"
+          endpoints={[`/api/hod/courses?semester=${semester}&own=true`]} onRefresh={() => catalogueLoader.select(semester)}
+          disabled={currentCatalogue.loading || showAddCourse || !!editCourse || !!deleteCourse} />
       </div>
 
           {/* ── COURSES ── */}

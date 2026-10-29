@@ -1,3 +1,4 @@
+import { enrollmentCounts } from '../../core/database/enrollment-counts'
 import { termOperation } from '../../core/database/term-operation'
 import {
   BadRequestException,
@@ -199,7 +200,7 @@ export class AllocationService {
       const studentMap = new Map<string, any>()
       if (studentIds.length > 0) {
         const studentsData = await fetchByIdChunks<any>(studentIds, ids => this.supabase.admin.from('students')
-          .select('id, department_id, current_semester').in('id', ids).order('id'))
+          .select('id, department_id, current_semester').in('id', ids).order('id'), true)
         if (studentsData) {
           for (const s of studentsData) {
             studentMap.set(s.id, s)
@@ -333,7 +334,20 @@ export class AllocationService {
         slot_key: string
         course_id: string
         metadata: any
+        allocated_by?: string
       }[] = []
+
+      // Fixed papers remain preferences until this same atomic commit as electives.
+      for (const pref of studentPrefList) {
+        for (const slot of extractSlots(pref.preferences)) {
+          const resolved = studentSlotState.get(pref.student_id)?.get(`slot_${slot.slot}`)
+          if (!slot.is_fixed || !resolved?.course_id) continue
+          finalAllocations.push({ student_id: pref.student_id, preference_id: pref.id,
+            slot_key: `slot_${slot.slot}`, course_id: resolved.course_id, allocated_by: 'fixed',
+            metadata: { allocated_by: 'fixed', run_id: runId },
+          })
+        }
+      }
 
       // F18: Pure rank-first rounds (direct confirmation pre-round shortcut removed)
 
@@ -438,6 +452,7 @@ export class AllocationService {
                 score: winner.score,
                 allocated_at: new Date().toISOString(),
               },
+              allocated_by: `rank_${roundNumber}`,
             })
           }
         }
@@ -747,6 +762,11 @@ export class AllocationService {
 
     // Find students in HOD's department
     if (!campusId || !academicYear) throw new BadRequestException('Active campus and academic year are required')
+    const { data: completedRun, error: completedRunError } = await this.supabase.admin.from('current_system_logs')
+      .select('id').eq('log_type', 'allocation_run').eq('campus_id', campusId)
+      .eq('academic_year', academicYear).eq('semester', sem).eq('status', 'completed').limit(1).maybeSingle()
+    if (completedRunError) throw new InternalServerErrorException('Unable to verify allocation completion')
+    if (!completedRun) return { success: true, allocationCompleted: false, unresolvedStudents: [] }
     const students = await fetchAllPaginated<any>(this.supabase.admin.from('students')
       .select('id, full_name, cap_application_number, current_semester')
       .eq('department_id', departmentId).eq('campus_id',campusId).eq('current_semester',sem).order('id'))
@@ -869,6 +889,7 @@ export class AllocationService {
 
     return {
       success: true,
+      allocationCompleted: true,
       unresolvedStudents: unresolvedList,
     }
   }
@@ -961,23 +982,11 @@ export class AllocationService {
     }
     const results: any[] = []
 
-    // Fetch registrations across all campuses for this academic_year and semester (F21 global capacity across 8 slots)
-    const registrations = await fetchAllPaginated<any>(this.supabase.admin
-      .from('current_student_registrations')
-      .select('id, slot_1_course_id, slot_2_course_id, slot_3_course_id, slot_4_course_id, slot_5_course_id, slot_6_course_id, slot_7_course_id, slot_8_course_id')
-      .eq('academic_year', academicYear).eq('semester', sem).order('id'))
-
-    const allocationCounts = new Map<string, number>()
-    if (registrations) {
-      for (const reg of registrations) {
-        for (let i = 1; i <= 8; i++) {
-          const cId = (reg as any)[`slot_${i}_course_id`]
-          if (cId) {
-            allocationCounts.set(cId, (allocationCounts.get(cId) || 0) + 1)
-          }
-        }
-      }
-    }
+    // Shared catalogue capacity remains global across campuses.
+    const totals = await enrollmentCounts(this.supabase.admin, courseList.map(course => ({
+      key: course.id, course_id: course.id, academic_year: academicYear, semester: sem,
+    })))
+    const allocationCounts = new Map(Object.entries(totals))
 
     for (const course of courseList) {
       const seatLimit = course.seat_limit == null ? 60 : Number(course.seat_limit)
@@ -1109,6 +1118,13 @@ export class AllocationService {
       )
     }
     const activeSemester = student.current_semester
+
+    const { data: completedAllocation, error: allocationError } = await this.supabase.admin
+      .from('current_system_logs').select('id').eq('log_type', 'allocation_run')
+      .eq('campus_id', student.campus_id).eq('academic_year', academicYear)
+      .eq('semester', activeSemester).eq('status', 'completed').limit(1).maybeSingle()
+    if (allocationError) throw new InternalServerErrorException('Unable to verify allocation completion')
+    if (!completedAllocation) throw new ForbiddenException('Complete the cohort course allocation before assigning any paper manually.')
 
     // Fetch existing registration record if any
     const { data: reg } = await this.supabase.admin

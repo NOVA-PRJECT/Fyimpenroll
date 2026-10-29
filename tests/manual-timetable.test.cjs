@@ -25,7 +25,7 @@ before(async () => {
   for (const file of fs.readdirSync(path.join(__dirname, '../supabase/migrations')).sort().filter(file => file > '20261020135038\uffff')) {
     await db.exec(fs.readFileSync(path.join(__dirname, '../supabase/migrations', file), 'utf8'))
   }
-  for (const file of ['semester_lifecycle.sql', 'manual_timetable.sql']) await db.exec(fs.readFileSync(path.join(__dirname, '../supabase/changes', file), 'utf8'))
+  for (const file of ['semester_lifecycle.sql', 'manual_timetable.sql', 'data_read_optimization.sql']) await db.exec(fs.readFileSync(path.join(__dirname, '../supabase/changes', file), 'utf8'))
 })
 after(async () => { await db?.close() })
 

@@ -1,3 +1,6 @@
+import { freshRead } from '../../src/lib/data-refresh';
+import { useLocalClock } from '../../src/hooks/useLocalClock';
+import { projectReadData } from '@fyimp/contracts';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -16,20 +19,22 @@ import { ErrorView } from '../../src/components/common/ErrorView';
 export default function HodHomeScreen() {
   const { profile } = useAuth();
   const { colors, typography } = useTheme();
+  const clock = useLocalClock();
 
   const deptId = profile?.department_id || '';
   const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.hod.absenceSummary(deptId, todayStr),
-    queryFn: async () => summarizeCampusRoster(await apiClient.get(`${API_ENDPOINTS.HOD_ABSENCE_SUMMARY}?date=${todayStr}`)),
+    queryFn: () => apiClient.get(`${API_ENDPOINTS.HOD_ABSENCE_SUMMARY}?date=${todayStr}`),
+    select: response => summarizeCampusRoster(projectReadData('/api/attendance/campus/roster', response, clock)),
     enabled: !!deptId,
   });
 
-  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
+  if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
+    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
       <View style={styles.header}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           {profile?.department_name || 'Department'} Dashboard
@@ -42,7 +47,7 @@ export default function HodHomeScreen() {
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load department metrics.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

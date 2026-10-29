@@ -1,3 +1,4 @@
+import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -31,10 +32,10 @@ export default function TeacherHomeScreen() {
     enabled: !!teacherId,
   });
 
-  if (error && !periods) return <ScreenContainer><ErrorView message={error.message} onRetry={refetch} /></ScreenContainer>;
+  if (error && !periods) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={refetch}>
+    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
       <View style={styles.welcomeSection}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           Welcome, Prof. {profile?.full_name || 'Faculty Member'}
@@ -70,7 +71,7 @@ export default function TeacherHomeScreen() {
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load scheduled periods.'}
-          onRetry={refetch}
+          onRetry={() => freshRead(() => refetch())}
         />
       ) : null}
 

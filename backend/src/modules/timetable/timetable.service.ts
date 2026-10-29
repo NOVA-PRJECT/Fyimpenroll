@@ -1,4 +1,6 @@
 import { termOperation } from '../../core/database/term-operation'
+import type { Request, Response } from 'express'
+import { timetableProgressKey } from './solver/progress-key'
 import {
   BadRequestException,
   ConflictException,
@@ -135,7 +137,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       if (manual && !publication?.published) {
         const courseIds = [...new Set<string>(manual.entries.map((entry: any) => entry.courseId))]
         const catalogue = await fetchByIdChunks<any>(courseIds, ids => this.supabase.admin.from('courses')
-          .select('id,title,course_code,category,department_id').in('id', ids).order('id'))
+          .select('id,title,course_code,category,department_id').in('id', ids).order('id'), true)
         const assignments = await fetchAllPaginated<any>(this.supabase.admin.from('current_teacher_course_assignments').select('course_id,teacher_id')
           .eq('campus_id', scope.campusId).eq('academic_year', academicYear).eq('semester', semester).order('id'))
         const teachers = new Map(assignments.map((assignment: any) => [assignment.course_id, assignment.teacher_id]))
@@ -441,6 +443,7 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       dynamicConstraints || [],
       effectiveRules ? { rules: effectiveRules } : undefined,
       fencingToken,
+      user.term_version,
     ).catch(async (err: any) => {
       this.serverLogger.error(
         `Background generation job error for job ${newJobId}`,
@@ -519,6 +522,45 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       jobId: job.id,
       errorMessage: job.error_message,
     }
+  }
+
+  async progress(academicYear: string, semester: number, jobId: string, user: AuthUser, req: Request, res: Response) {
+    if (user.role !== 'campus_director' || !user.campus_id || !Number.isInteger(user.term_version)) throw new ForbiddenException('A campus director is required')
+    const current = await this.getJobStatus(academicYear, semester, user)
+    if (current.jobId !== jobId) throw new ForbiddenException('This job is outside the current campus term')
+    const redis = getRedisClient()
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'private, no-store')
+    res.setHeader('X-Accel-Buffering', 'no')
+    res.flushHeaders()
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      res.end(`data: ${JSON.stringify({ status: 'unavailable', message: 'Live progress is unavailable. Use Refresh to check the job.' })}\n\n`)
+      return
+    }
+    let closed = false, pending = false, previous = ''
+    const send = (value: unknown) => { if (!closed) res.write(`data: ${JSON.stringify(value)}\n\n`) }
+    const stop = () => { if (closed) return; closed = true; clearInterval(timer); clearTimeout(timeout); res.end() }
+    const tick = async () => {
+      if (closed || pending) return
+      pending = true
+      try {
+        const raw = await redis.get(timetableProgressKey(user.campus_id!, user.term_version!, jobId))
+        const value = typeof raw === 'string' ? JSON.parse(raw) : raw
+        if (value && typeof value === 'object' && (value as any).jobId === jobId) {
+          const serialized = JSON.stringify(value)
+          if (serialized !== previous) { previous = serialized; send(value) }
+          if (['completed', 'failed'].includes((value as any).status)) stop()
+        } else if (['completed', 'failed'].includes(current.status)) { send(current); stop() }
+        else res.write(': waiting\n\n')
+      } catch { send({ status: 'unavailable', message: 'Progress disconnected. Use Refresh to check the job.' }); stop() }
+      finally { pending = false }
+    }
+    const timer = setInterval(() => void tick(), 1000)
+    let expires = Date.now() + 10 * 60 * 1000
+    try { expires = Math.min(expires, JSON.parse(Buffer.from(user.token!.split('.')[1], 'base64url').toString()).exp * 1000) } catch {}
+    const timeout = setTimeout(stop, Math.max(1, expires - Date.now()))
+    res.on('close', stop)
+    void tick()
   }
 
   // ──────────────── Publish ────────────────
