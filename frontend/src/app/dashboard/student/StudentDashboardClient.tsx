@@ -3,7 +3,7 @@
 import { useDataRevision } from '@/core/hooks/useDataRevision'
 import { refreshDatasets } from '@/core/data-cache'
 
-import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
+import LoadingState from '@/components/LoadingState'
 
 import { CalendarDays as UiCalendarDays, Check as UiCheck, Clock as UiClock, FileText as UiFileText, Info as UiInfo, TriangleAlert as UiTriangleAlert } from 'lucide-react'
 
@@ -267,7 +267,7 @@ export default function StudentDashboardClient({
             title="Log out of portal"
           >
             <LogOut size={16} />
-            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -730,7 +730,7 @@ export default function StudentDashboardClient({
                 disabled={loadingTimetable}
                 aria-busy={loadingTimetable}
               >
-                {loadingTimetable ? <LoadingIndicator message="Refreshing…" /> : <><RefreshCw size={16} aria-hidden="true" /> Refresh timetable</>}
+                <RefreshCw size={16} aria-hidden="true" /> {loadingTimetable ? 'Refreshing…' : 'Refresh timetable'}
               </button>
             </div>
 

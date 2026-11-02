@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
@@ -13,7 +14,7 @@ import { queryKeys } from '../../src/lib/query-client';
 import { StudentDashboardSchema, type StudentDashboard } from '../../src/api/schemas/student.schema';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
-import { Skeleton } from '../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 import { Badge } from '../../src/components/common/Badge';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
@@ -35,14 +36,15 @@ export default function StudentHomeScreen() {
       ),
     enabled: !!userId,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
     <ScreenContainer
       scrollable
-      refreshing={isRefetching}
-      onRefresh={() => freshRead(() => refetch())}
+      refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled}
+      onRefresh={pullRefresh.onRefresh}
     >
       {/* Welcome Banner */}
       <View style={styles.welcomeSection}>
@@ -84,10 +86,10 @@ export default function StudentHomeScreen() {
           Attendance Overview
         </Text>
         {isLoading ? (
-          <View>
+          <SkeletonGroup>
             <Skeleton height={24} width="50%" />
             <Skeleton height={16} width="80%" style={{ marginTop: 8 }} />
-          </View>
+          </SkeletonGroup>
         ) : (
           <View>
             <View style={styles.attendanceRow}>
@@ -163,11 +165,11 @@ export default function StudentHomeScreen() {
       </View>
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={64} style={{ marginVertical: 6 }} />
           <Skeleton height={64} style={{ marginVertical: 6 }} />
           <Skeleton height={64} style={{ marginVertical: 6 }} />
-        </View>
+        </SkeletonGroup>
       ) : data?.todaySlots && data.todaySlots.length > 0 ? (
         data.todaySlots.map((slot) => (
           <Card key={slot.id} variant="outlined" style={styles.slotCard}>

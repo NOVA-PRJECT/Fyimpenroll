@@ -5,7 +5,7 @@ import SectionRefreshButton from '@/components/SectionRefreshButton'
 
 import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import styles from '@/components/campus-attendance/campus-attendance.module.css'
 
 const fields = [
@@ -25,31 +25,34 @@ export default function CampusAttendanceSettings() {
   const [savedValues, setSavedValues] = useState('{}')
   useDataRevision([], JSON.stringify(values) !== savedValues)
   const [ready, setReady] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [retry, setRetry] = useState(0)
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/director/attendance-settings', { cache: 'no-store', signal })
+      const data = await res.json()
+      if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load campus attendance settings.')
+      if (signal?.aborted) return
+      const loaded = Object.fromEntries(fields.map(([key]) => [key, data.settings[key] == null ? '' : String(data.settings[key])]))
+      setValues(loaded)
+      setSavedValues(JSON.stringify(loaded))
+      setReady(true)
+      setError(data.setup_error || '')
+    } catch (err) {
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : 'Unable to load settings.')
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [])
   useEffect(() => {
     const controller = new AbortController()
-    async function load() {
-      setReady(false)
-      setError('')
-      try {
-        const res = await fetch('/api/director/attendance-settings', { cache: 'no-store', signal: controller.signal })
-        const data = await res.json()
-        if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load campus attendance settings.')
-        const loaded = Object.fromEntries(fields.map(([key]) => [key, data.settings[key] == null ? '' : String(data.settings[key])]))
-        setValues(loaded)
-        setSavedValues(JSON.stringify(loaded))
-        setReady(true)
-        setError(data.setup_error || '')
-      } catch (err) {
-        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Unable to load settings.')
-      }
-    }
-    void load()
+    void load(controller.signal)
     return () => controller.abort()
-  }, [retry, dataRevision])
+  }, [load, dataRevision])
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -82,14 +85,14 @@ export default function CampusAttendanceSettings() {
     <span className={styles.eyebrow}>Attendance configuration</span>
     <h2 id="campus-settings-title" className={styles.title}>Campus sign-in settings</h2>
     <SectionRefreshButton className={styles.secondaryButton} label="Refresh attendance settings"
-      endpoints={['/api/director/attendance-settings']} onRefresh={() => setRetry(value => value + 1)}
-      disabled={saving || JSON.stringify(values) !== savedValues} />
+      endpoints={['/api/director/attendance-settings']} onRefresh={() => load()}
+      disabled={loading || saving || JSON.stringify(values) !== savedValues} />
     <p className={styles.description}>Manage the campus location and daily sign-in checkpoints. These settings are separate from course registration.</p>
-    {error && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{error} {!ready && <button type="button" className={styles.secondaryButton} onClick={() => setRetry(value => value + 1)}>Retry</button>}</p>}
-    {!ready && !error && <LoadingState layout="form" rows={7} compact message="Loading attendance settings…" />}
+    {error && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{error} {!ready && <button type="button" className={styles.secondaryButton} disabled={loading} onClick={() => void load()}>Retry</button>}</p>}
+    {loading && !saving && <LoadingState layout="form" rows={7} compact message="Loading attendance settings…" />}
     {success && <p role="status" className={`${styles.notice} ${styles.successNotice}`}>{success}</p>}
-    <form hidden={!ready} onSubmit={save}>
-      <fieldset disabled={!ready || saving} className={styles.fieldset}>
+    <form hidden={!ready || (loading && !saving)} onSubmit={save}>
+      <fieldset disabled={!ready || loading || saving} className={styles.fieldset}>
         <div className={styles.formSection}>
           <h3 className={styles.sectionTitle}>Campus location</h3>
           <p className={styles.sectionDescription}>Use a verified centre point and a radius that covers the campus.</p>

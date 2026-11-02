@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
@@ -13,7 +14,7 @@ import { queryKeys } from '../../../src/lib/query-client';
 import { ScreenContainer } from '../../../src/components/layout/ScreenContainer';
 import { Card } from '../../../src/components/common/Card';
 import { Badge } from '../../../src/components/common/Badge';
-import { Skeleton } from '../../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../../src/components/common/Skeleton';
 import { ErrorView } from '../../../src/components/common/ErrorView';
 
 export default function CoursesListScreen() {
@@ -32,9 +33,10 @@ export default function CoursesListScreen() {
       ),
     enabled: !!userId,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
+    <ScreenContainer scrollable refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled} onRefresh={pullRefresh.onRefresh}>
       <View style={styles.header}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           Semester {activeSemester} Registrations
@@ -52,11 +54,11 @@ export default function CoursesListScreen() {
       ) : null}
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={80} style={{ marginVertical: 6 }} />
           <Skeleton height={80} style={{ marginVertical: 6 }} />
           <Skeleton height={80} style={{ marginVertical: 6 }} />
-        </View>
+        </SkeletonGroup>
       ) : courses && courses.length > 0 ? (
         courses.map((course: any) => (
           <TouchableOpacity

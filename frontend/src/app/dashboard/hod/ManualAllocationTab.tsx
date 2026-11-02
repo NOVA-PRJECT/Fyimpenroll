@@ -242,8 +242,8 @@ export default function ManualAllocationTab() {
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} className={loading ? 'spin' : ''} />
-            Refresh
+            <RefreshCw size={14} aria-hidden="true" />
+            {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </div>

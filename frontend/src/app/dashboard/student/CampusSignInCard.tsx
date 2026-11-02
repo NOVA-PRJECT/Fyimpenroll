@@ -25,6 +25,7 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const requestSequence = useRef(0)
   const mounted = useRef(false)
+  const operation = useRef<'refresh' | 'signin' | null>(null)
 
   const fetchStatus = useCallback(async () => {
     if (!studentId || !mounted.current) return null
@@ -50,11 +51,12 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
   useEffect(() => {
     mounted.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the live attendance view with the API.
-    void fetchStatus()
+    if (operation.current !== 'signin') void fetchStatus()
     return () => { mounted.current = false }
   }, [fetchStatus, dataRevision])
 
   async function handleGpsSignIn() {
+    if (operation.current || loading || !status?.can_sign_in) return
     setFeedback(null)
     if (!window.isSecureContext || !navigator.geolocation) {
       setFeedback({ type: 'error', message: 'Location access requires HTTPS and a browser that supports geolocation.' })
@@ -64,6 +66,7 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
       setFeedback({ type: 'error', message: 'Connect to the internet before signing in. Campus sign-in cannot be saved offline.' })
       return
     }
+    operation.current = 'signin'
     setLocating(true)
     try {
       const latest = await fetchStatus()
@@ -95,8 +98,18 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
         await fetchStatus()
         setLocating(false)
       }
+      operation.current = null
     }
   }
+
+  async function refreshStatus() {
+    if (operation.current || loading) return
+    operation.current = 'refresh'
+    try { await refreshDatasets([`/api/attendance/campus/status/${studentId}`], fetchStatus) }
+    finally { operation.current = null }
+  }
+
+  const showSkeleton = !!studentId && !locating && (loading || (!status && !statusError))
 
   return (
     <section aria-labelledby="campus-signin-title" className={styles.card} aria-busy={loading || locating}>
@@ -107,13 +120,13 @@ export default function CampusSignInCard({ studentId, campusName }: CampusSignIn
           <p className={styles.description}>{status?.campus.name || campusName} · Record your morning arrival and evening departure.</p>
           <span className={styles.timeBadge}><Clock3 size={13} aria-hidden="true" /> All times shown in IST</span>
         </div>
-        <button type="button" className={styles.secondaryButton} onClick={() => void refreshDatasets([`/api/attendance/campus/status/${studentId}`], fetchStatus)} disabled={!studentId || loading || locating}>
-          {loading ? <LoadingIndicator message="Refreshing…" /> : <><RefreshCw size={15} aria-hidden="true" /> Refresh status</>}
+        <button type="button" className={styles.secondaryButton} onClick={() => void refreshStatus()} disabled={!studentId || showSkeleton || loading || locating} aria-busy={showSkeleton}>
+          <RefreshCw size={15} aria-hidden="true" /> {showSkeleton ? 'Refreshing…' : 'Refresh status'}
         </button>
       </div>
       {statusError && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>{statusError}</p>}
       {!studentId && <p role="alert" className={`${styles.notice} ${styles.errorNotice}`}>Your student profile is unavailable. Reload the page or contact your administrator.</p>}
-      {studentId && !status && !statusError ? <LoadingState layout="cards" rows={2} compact message="Loading campus sign-in status…" /> : <div className={styles.sessionGrid}>
+      {showSkeleton ? <LoadingState layout="cards" rows={2} compact message="Loading campus sign-in status…" /> : <div className={styles.sessionGrid}>
         {(['morning', 'evening'] as const).map(session => {
           const record = status?.[session]
           const completed = record?.state === 'completed'

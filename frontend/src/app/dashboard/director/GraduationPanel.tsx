@@ -2,6 +2,7 @@
 
 import { useDataRevision } from '@/core/hooks/useDataRevision'
 import { refreshDatasets } from '@/core/data-cache'
+import LoadingState, { LoadingIndicator } from '@/components/LoadingState'
 
 import { useCallback, useEffect, useState } from 'react'
 import styles from './director-dashboard.module.css'
@@ -56,7 +57,7 @@ export default function GraduationPanel() {
     {error && <div role="alert" className={styles.errorBanner}>{error}</div>}
     {success && <div role="status" className={styles.successBanner}>{success}</div>}
     <button className={styles.secondaryBtn} disabled={loading || deleting} onClick={() => { setError(''); void refreshDatasets(['/api/admin/campus/graduation-candidates'], () => refresh()) }}>Refresh list</button>
-    {loading ? <p role="status">Loading graduating students…</p> : candidates.length === 0 ? <p>No semester-11 students are awaiting deletion.</p> : <>
+    {loading && !deleting ? <LoadingState layout="table" message="Loading graduating students…" /> : candidates.length === 0 ? <p>No semester-11 students are awaiting deletion.</p> : <>
       <p>{candidates.length} eligible student(s). Select up to 500 accounts.</p>
       <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', textAlign: 'left', borderSpacing: '0 12px' }}>
         <thead><tr><th>Select</th><th>Admission number</th><th>Student</th><th>Department</th></tr></thead>
@@ -68,7 +69,7 @@ export default function GraduationPanel() {
       {review ? <div className={styles.windowCard}>
         <p><strong>Permanently delete {selected.length} selected account(s)?</strong></p>
         <p>This removes their login accounts, profiles and registration/credit-ledger records. Institutional timetable and teacher-assignment history is preserved. This action cannot be undone.</p>
-        <button className={styles.primaryBtn} disabled={deleting} onClick={deleteSelected}>{deleting ? 'Deleting…' : `Delete ${selected.length} account(s)`}</button>{' '}
+        <button className={styles.primaryBtn} disabled={deleting} onClick={deleteSelected}>{deleting ? <LoadingIndicator message="Deleting…" /> : `Delete ${selected.length} account(s)`}</button>{' '}
         <button className={styles.secondaryBtn} disabled={deleting} onClick={() => setReview(false)}>Cancel</button>
       </div> : <button className={styles.primaryBtn} disabled={!selected.length || deleting} onClick={() => { setReview(true); setError(''); setSuccess('') }}>Review selected accounts</button>}
     </>}

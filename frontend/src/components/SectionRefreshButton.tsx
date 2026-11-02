@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { canonicalDataUrl } from '@fyimp/contracts'
 import { dataClient, refreshDatasets } from '@/core/data-cache'
@@ -15,6 +15,7 @@ export default function SectionRefreshButton({ endpoints, onRefresh, disabled = 
   label?: string
 }) {
   const [busy, setBusy] = useState(false)
+  const refreshing = useRef(false)
   const [error, setError] = useState('')
   const [, update] = useState(0)
   useEffect(() => dataClient.getQueryCache().subscribe(() => update(value => value + 1)), [])
@@ -24,12 +25,15 @@ export default function SectionRefreshButton({ endpoints, onRefresh, disabled = 
   const failed = queries.some(query => query.state.status === 'error')
   return <>
     <button type="button" className={[styles.button, className].filter(Boolean).join(' ')} disabled={disabled || busy}
+      aria-busy={busy || undefined}
       title={last ? `Last updated ${new Date(last).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` : undefined}
       onClick={async () => {
+        if (disabled || refreshing.current) return
+        refreshing.current = true
         setBusy(true); setError('')
         try { await refreshDatasets(endpoints, onRefresh) }
         catch (reason) { if (!(reason instanceof Error && reason.name === 'AbortError')) setError('Refresh failed. Please retry.') }
-        finally { setBusy(false) }
+        finally { refreshing.current = false; setBusy(false) }
       }}>
       <RefreshCw size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />
       {busy ? 'Refreshing…' : failed ? 'Retry' : label}

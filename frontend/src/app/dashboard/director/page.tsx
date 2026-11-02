@@ -18,7 +18,7 @@ import { sessionRedirect } from '@/core/security/session-response'
 
 import { logoutPortal } from '@/core/security/logout'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import UniversityLogo from '@/components/UniversityLogo'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
@@ -80,6 +80,8 @@ export default function DirectorDashboard() {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [allocationError, setAllocationError] = useState('')
   const [allocationSuccess, setAllocationSuccess] = useState('')
+  const [loadingAllocation, setLoadingAllocation] = useState(true)
+  const allocationRequest = useRef(0)
 
   // Derived window status
   const windowIsOpen = currentDeadline !== null && currentTime < Date.parse(currentDeadline)
@@ -88,6 +90,8 @@ export default function DirectorDashboard() {
   const deadlineInput = deadline ?? utcIsoToKolkataInput(windowIsOpen ? currentDeadline : new Date(currentTime))
 
   const loadSettingsData = useCallback(async (isBackground = false) => {
+    if (!isBackground) setLoadingDirector(true)
+    setSettingsError('')
     try {
       const response = await entryFetch('/api/director/settings')
       const data = await response.json().catch(() => ({}))
@@ -127,11 +131,28 @@ export default function DirectorDashboard() {
   }
 
 
+  const loadAllocationStatus = useCallback(async (signal?: AbortSignal) => {
+    const request = ++allocationRequest.current
+    setLoadingAllocation(true)
+    setAllocationError('')
+    try {
+      const response = await fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`, { signal })
+      if (!response.ok) throw new Error('Unable to load allocation status. Please refresh to retry.')
+      const data = await response.json()
+      if (!signal?.aborted && request === allocationRequest.current) setAllocationRun(data.run)
+    } catch (error) {
+      if (!signal?.aborted && request === allocationRequest.current) setAllocationError(error instanceof Error ? error.message : 'Unable to load allocation status.')
+    } finally {
+      if (!signal?.aborted && request === allocationRequest.current) setLoadingAllocation(false)
+    }
+  }, [allocationAcademicYear, allocationSemester])
+
   useEffect(() => {
     if (activeTab !== 'allocation') return
-    fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`)
-      .then(async response => { if (response.ok) setAllocationRun((await response.json()).run) }).catch(() => {})
-  }, [activeTab, allocationSemester, allocationAcademicYear, dataRevision])
+    const controller = new AbortController()
+    void loadAllocationStatus(controller.signal)
+    return () => controller.abort()
+  }, [activeTab, loadAllocationStatus, dataRevision])
 
   function handleSetPreset(days: number) {
     setDeadline(utcIsoToKolkataInput(new Date(Date.now() + days * 24 * 60 * 60 * 1000)))
@@ -378,7 +399,7 @@ export default function DirectorDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -388,6 +409,8 @@ export default function DirectorDashboard() {
       {/* Main Content */}
       <div className={styles.mainContent}>
         {activeTab === 'campus-signin' && <CampusAttendanceSettings />}
+        {activeTab === 'registration' && <SectionRefreshButton className={styles.secondaryBtn} label="Refresh registration settings"
+          endpoints={['/api/director/settings']} onRefresh={() => loadSettingsData()} disabled={loadingDirector || savingWindow || deadline !== null} />}
         {settingsError && <div role="alert" className={styles.errorBanner}>{settingsError} <button onClick={() => loadSettingsData()}>Try again</button></div>}
         {loadingDirector && activeTab !== 'campus-signin' && <LoadingState layout="form" message="Loading campus settings…" />}
         <fieldset hidden={loadingDirector} disabled={!settingsReady} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -396,8 +419,6 @@ export default function DirectorDashboard() {
         {activeTab === 'registration' && (
           <div>
             <p className={styles.sectionTitle}>Registration Window Management</p>
-            <SectionRefreshButton className={styles.secondaryBtn} label="Refresh registration settings"
-              endpoints={['/api/director/settings']} onRefresh={() => loadSettingsData(true)} disabled={savingWindow || deadline !== null} />
 
             {windowError && <div className={styles.errorBanner}>{windowError}</div>}
             {windowSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {windowSuccess}</div>}
@@ -493,7 +514,7 @@ export default function DirectorDashboard() {
                   }}
                 >
                   {savingWindow
-                    ? <><span className={styles.spinner} /> Saving...</>
+                    ? <LoadingIndicator message="Saving…" />
                     : windowIsOpen
                     ? 'Update Registration Deadline →'
                     : 'Open Registration Window →'
@@ -730,7 +751,7 @@ export default function DirectorDashboard() {
                         }}
                       >
                         {promoting
-                          ? <><span className={styles.spinner} /> Promoting...</>
+                          ? <LoadingIndicator message="Promoting…" />
                           : 'Yes, Start New Semester →'
                         }
                       </button>
@@ -756,10 +777,7 @@ export default function DirectorDashboard() {
             <p className={styles.sectionTitle}>Scored Course Allocation System</p>
             <SectionRefreshButton className={styles.secondaryBtn} label="Refresh allocation status"
               endpoints={[`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`]}
-              onRefresh={async () => {
-                const res = await fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`)
-                if (res.ok) setAllocationRun((await res.json()).run)
-              }} disabled={triggeringRun} />
+              onRefresh={() => loadAllocationStatus()} disabled={loadingAllocation || triggeringRun} />
 
             {allocationError && <div className={styles.errorBanner}>{allocationError}</div>}
             {allocationSuccess && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {allocationSuccess}</div>}
@@ -814,7 +832,7 @@ export default function DirectorDashboard() {
               </div>
 
               {/* Status Display Card */}
-              <div
+              {loadingAllocation && !triggeringRun ? <LoadingState layout="cards" rows={1} message="Loading allocation status…" /> : <div
                 style={{
                   marginTop: '1.5rem',
                   padding: '1.25rem',
@@ -859,7 +877,6 @@ export default function DirectorDashboard() {
                         gap: '0.4rem',
                       }}
                     >
-                      <span className={styles.spinner} style={{ width: 12, height: 12 }} />
                       Algorithm Running (Rounds 1–3)...
                     </span>
                   ) : allocationRun.status === 'completed' ? (
@@ -973,7 +990,7 @@ export default function DirectorDashboard() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Registration Window Protocol Status Banner */}
               {windowIsOpen ? (
@@ -1030,7 +1047,7 @@ export default function DirectorDashboard() {
                   <button
                     className={styles.primaryBtn}
                     onClick={() => handleRunAllocation()}
-                    disabled={triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'completed'}
+                    disabled={loadingAllocation || triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'completed'}
                     style={{
                       background: allocationRun?.status === 'completed'
                         ? '#334155'
@@ -1045,10 +1062,7 @@ export default function DirectorDashboard() {
                     }}
                   >
                     {triggeringRun || allocationRun?.status === 'running' ? (
-                      <>
-                        <span className={styles.spinner} />
-                        Allocating Courses...
-                      </>
+                      <LoadingIndicator message="Allocating courses…" />
                     ) : allocationRun?.status === 'completed' ? (
                       'Allocation Completed (Locked for this semester)'
                     ) : allocationRun?.status === 'failed' ? (

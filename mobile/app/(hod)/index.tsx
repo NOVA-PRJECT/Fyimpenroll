@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../src/lib/data-refresh';
 import { useLocalClock } from '../../src/hooks/useLocalClock';
 import { projectReadData } from '@fyimp/contracts';
@@ -13,7 +14,7 @@ import { queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
 import { Badge } from '../../src/components/common/Badge';
-import { Skeleton } from '../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
 export default function HodHomeScreen() {
@@ -30,11 +31,12 @@ export default function HodHomeScreen() {
     select: response => summarizeCampusRoster(projectReadData('/api/attendance/campus/roster', response, clock)),
     enabled: !!deptId,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   if (error && !data) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
+    <ScreenContainer scrollable refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled} onRefresh={pullRefresh.onRefresh}>
       <View style={styles.header}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           {profile?.department_name || 'Department'} Dashboard
@@ -58,7 +60,7 @@ export default function HodHomeScreen() {
             TOTAL ENROLLED
           </Text>
           {isLoading ? (
-            <Skeleton height={28} width="60%" style={{ marginTop: 6 }} />
+            <SkeletonGroup><Skeleton height={28} width="60%" style={{ marginTop: 6 }} /></SkeletonGroup>
           ) : (
             <Text style={[typography.h1, { color: colors.primary, marginTop: 4 }]}>
               {data?.totalStudents ?? 0}
@@ -71,7 +73,7 @@ export default function HodHomeScreen() {
             ABSENT TODAY
           </Text>
           {isLoading ? (
-            <Skeleton height={28} width="60%" style={{ marginTop: 6 }} />
+            <SkeletonGroup><Skeleton height={28} width="60%" style={{ marginTop: 6 }} /></SkeletonGroup>
           ) : (
             <Text style={[typography.h1, { color: colors.danger, marginTop: 4 }]}>
               {data?.absentCount ?? 0}
@@ -91,7 +93,7 @@ export default function HodHomeScreen() {
             </Text>
           </View>
           {isLoading ? (
-            <Skeleton height={32} width={50} />
+            <SkeletonGroup><Skeleton height={32} width={50} /></SkeletonGroup>
           ) : (
             <Text
               style={[
@@ -119,10 +121,10 @@ export default function HodHomeScreen() {
       </View>
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={60} style={{ marginVertical: 4 }} />
           <Skeleton height={60} style={{ marginVertical: 4 }} />
-        </View>
+        </SkeletonGroup>
       ) : data?.flaggedStudents && data.flaggedStudents.length > 0 ? (
         data.flaggedStudents.map((student: any) => (
           <Card key={student.id} variant="outlined" style={styles.flagCard}>

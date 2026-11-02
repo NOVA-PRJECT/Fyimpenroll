@@ -178,6 +178,7 @@ export default function TeachingStaffDashboard() {
 
   useEffect(() => {
     async function loadData() {
+      setLoadingProfile(true)
       try {
         const response = await entryFetch('/api/faculty/courses')
         const data = await response.json()
@@ -347,7 +348,7 @@ export default function TeachingStaffDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -357,17 +358,21 @@ export default function TeachingStaffDashboard() {
         {error && <div className={styles.errorBanner}>{error}</div>}
 
         {/* Paper Filter & Custom Select Card */}
-        {loadingProfile ? <LoadingState layout="form" rows={3} message="Loading courses and filters…" /> : <div className={styles.filterCard}>
+        <div className={styles.filterCard}>
           <div className={styles.filterCardHeader}>
             <p className={styles.filterCardTitle}>Department Course Catalog & Student Inspection</p>
             <SectionRefreshButton className={styles.exportBtn} label="Refresh courses"
               endpoints={['/api/faculty/courses']} disabled={loadingProfile} onRefresh={async () => {
-                const res = await fetch('/api/faculty/courses'); const data = await res.json()
-                if (!res.ok) throw new Error('Unable to refresh courses.')
-                setFacultyName(data.teacherName); setCourses(data.courses ?? []); setDepartments(data.departments ?? [])
+                setLoadingProfile(true)
+                try {
+                  const res = await fetch('/api/faculty/courses'); const data = await res.json()
+                  if (!res.ok) throw new Error('Unable to refresh courses.')
+                  setFacultyName(data.teacherName); setCourses(data.courses ?? []); setDepartments(data.departments ?? [])
+                } finally { setLoadingProfile(false) }
               }} />
           </div>
 
+          {loadingProfile ? <LoadingState layout="form" rows={3} message="Loading courses and filters…" /> : <>
           <div className={styles.filterControlsGrid}>
             {/* 1. Semester Filter */}
             <div className={styles.filterGroup}>
@@ -433,9 +438,9 @@ export default function TeachingStaffDashboard() {
               endpoints={[`/api/faculty/attendance?course_id=${selectedCourseId}`]}
               onRefresh={() => handleFetchCourse(selectedCourseId)} disabled={!selectedCourseId || loading} />
           </div>
+          </>}
         </div>
 
-        }
         {/* Loading */}
         {loading && (
           <LoadingState layout="table" message="Fetching enrolled students…" />

@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useTransition, type ComponentProps } from 'react'
-import { Loader2 } from 'lucide-react'
 
 type Props = Omit<ComponentProps<typeof Link>, 'href' | 'onNavigate'> & {
   href: string
@@ -30,7 +29,7 @@ export default function NavigationLink({ href, children, pendingLabel = 'Opening
         })
       }}>
       {pending ? <span role="status" className="inline-flex items-center gap-2">
-        <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />{pendingLabel}
+        {pendingLabel}
       </span> : children}
     </Link>
   )

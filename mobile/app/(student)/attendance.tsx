@@ -1,7 +1,8 @@
 import { freshRead } from '../../src/lib/data-refresh';
+import { usePullToRefresh } from '../../src/hooks/usePullToRefresh';
 import { useLocalClock } from '../../src/hooks/useLocalClock';
 import { projectReadData } from '@fyimp/contracts';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { campusSessionLabel, formatCampusTime, type CampusAttendanceStatus } from '@fyimp/contracts';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -19,7 +20,7 @@ import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
 import { Button } from '../../src/components/common/Button';
 import { Badge } from '../../src/components/common/Badge';
-import { Skeleton } from '../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
 export default function StudentAttendanceScreen() {
@@ -32,6 +33,7 @@ export default function StudentAttendanceScreen() {
   const todayStr = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
   const [locating, setLocating] = useState(false);
+  const signingIn = useRef(false);
 
   // 1. Fetch campus verification status for today
   const {
@@ -124,19 +126,26 @@ export default function StudentAttendanceScreen() {
       Alert.alert('Sign-In Check Failed', err?.message || 'Unable to record campus attendance.');
       void refetchStatus();
     },
+    onSettled: () => { signingIn.current = false; },
   });
+
+  const pullRefresh = usePullToRefresh(async () => {
+    if (signingIn.current) return;
+    await freshRead(() => refetchAll());
+  }, loadingStatus || loadingCourses || refetchingStatus || refetchingCourses || signInMutation.isPending || locating);
 
   const buttonTitle = !isOnline ? 'Connect to the internet to sign in'
     : loadingStatus ? 'Loading campus status…'
     : campusStatus?.can_sign_in ? campusStatus.active_session === 'morning' ? 'Sign In (Morning Arrival)' : 'Sign In (Evening Departure)'
     : campusStatus?.unavailable_reason || 'Campus sign-in unavailable';
-  const buttonDisabled = !isOnline || !!statusError || !campusStatus?.can_sign_in;
+  const buttonDisabled = !isOnline || !!statusError || !campusStatus?.can_sign_in || loadingStatus || refetchingStatus || pullRefresh.refreshing;
 
   return (
     <ScreenContainer
       scrollable
-      refreshing={refetchingStatus || refetchingCourses}
-      onRefresh={() => freshRead(() => refetchAll())}
+      refreshing={pullRefresh.refreshing}
+      refreshDisabled={pullRefresh.refreshDisabled}
+      onRefresh={pullRefresh.onRefresh}
     >
       {/* Campus Sign-In Action Card */}
       <Card variant="elevated" style={styles.actionCard}>
@@ -166,7 +175,11 @@ export default function StudentAttendanceScreen() {
         {/* Action Button */}
         <Button
           title={locating ? 'Acquiring GPS Signal...' : buttonTitle}
-          onPress={() => signInMutation.mutate()}
+          onPress={() => {
+            if (buttonDisabled || signingIn.current || pullRefresh.isRefreshing()) return;
+            signingIn.current = true;
+            signInMutation.mutate();
+          }}
           loading={signInMutation.isPending || locating}
           disabled={buttonDisabled || signInMutation.isPending || locating}
           variant="primary"
@@ -174,7 +187,7 @@ export default function StudentAttendanceScreen() {
         />
 
         {/* Checkpoint Status Readout Grid */}
-        <View style={styles.statusReadoutGrid}>
+        {loadingStatus ? <SkeletonGroup label="Loading campus checkpoint status"><Skeleton height={100} /></SkeletonGroup> : <View style={styles.statusReadoutGrid}>
           {/* Morning Checkpoint */}
           <View style={[styles.statusBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
             <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700' }]}>
@@ -236,7 +249,7 @@ export default function StudentAttendanceScreen() {
               </Text>
             )}
           </View>
-        </View>
+        </View>}
       </Card>
 
       {/* Course Attendance Header */}
@@ -257,11 +270,11 @@ export default function StudentAttendanceScreen() {
       ) : null}
 
       {courseAttendanceData?.cleared ? <Text style={[typography.body, { color: colors.textSecondary }]}>{courseAttendanceData.message}</Text> : loadingCourses ? (
-        <View style={{ gap: 8 }}>
+        <SkeletonGroup style={{ gap: 8 }}>
           <Skeleton height={75} />
           <Skeleton height={75} />
           <Skeleton height={75} />
-        </View>
+        </SkeletonGroup>
       ) : courseAttendanceData?.courses && courseAttendanceData.courses.length > 0 ? (
         courseAttendanceData.courses.map((course: any) => {
           const isAdequate = course.percentage == null || course.percentage >= 75;

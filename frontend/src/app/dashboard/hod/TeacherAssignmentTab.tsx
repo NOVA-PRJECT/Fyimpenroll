@@ -941,8 +941,8 @@ export default function TeacherAssignmentTab({
               color: "var(--portal-info-text,#475569)",
             }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
+            <RefreshCw size={14} aria-hidden="true" />
+            {loading ? 'Refreshing…' : 'Refresh'}
           </button>
 
           <button

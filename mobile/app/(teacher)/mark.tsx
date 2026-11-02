@@ -1,11 +1,13 @@
 import { freshRead } from '../../src/lib/data-refresh';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, TextInput, View, Switch, Alert, Button } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../src/context/AuthContext';
 import { useOfflineQueue } from '../../src/context/OfflineQueueContext';
 import { apiClient } from '../../src/api/client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
+import { Button as ActionButton } from '../../src/components/common/Button';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 
 interface Marks {
   attendance_date: string; revision: number;
@@ -15,8 +17,11 @@ interface Marks {
 function DatedRoster({ data }: { data: Marks }) {
   const [absent, setAbsent] = useState(() => new Set(data.students.filter(s => s.status === 'absent').map(s => s.id)));
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const { isOnline, enqueueAction } = useOfflineQueue();
   const submit = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     const payload = { timetable_slot_id: data.slot.id, attendance_date: data.attendance_date, expected_revision: data.revision, absent_student_ids: [...absent] };
     try {
@@ -28,7 +33,7 @@ function DatedRoster({ data }: { data: Marks }) {
         Alert.alert('Attendance saved');
       }
     } catch (error) { Alert.alert('Submission needs review', error instanceof Error ? error.message : 'Refresh the roster before retrying'); }
-    finally { setBusy(false); }
+    finally { submitting.current = false; setBusy(false); }
   };
   return <View style={{ gap: 12 }}>
     <Text>{data.slot.course_code} — {data.attendance_date} — Period {data.slot.period_number}</Text>
@@ -36,7 +41,7 @@ function DatedRoster({ data }: { data: Marks }) {
     {data.students.map(student => <View key={student.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
       <Text>{student.full_name}</Text><Switch accessibilityLabel={`${student.full_name} absent`} value={absent.has(student.id)} onValueChange={value => setAbsent(old => { const next = new Set(old); if (value) next.add(student.id); else next.delete(student.id); return next; })} />
     </View>)}
-    <Button title={busy ? 'Saving…' : 'Save attendance'} disabled={busy} onPress={() => void submit()} />
+    <ActionButton title={busy ? 'Saving…' : 'Save attendance'} loading={busy} onPress={() => void submit()} />
   </View>;
 }
 export default function PeriodMarkingScreen() {
@@ -55,11 +60,11 @@ export default function PeriodMarkingScreen() {
     <Text style={{ fontSize: 24 }}>Period attendance</Text>
     <Text>Select a past or current scheduled date in the active semester.</Text>
     <TextInput accessibilityLabel="Attendance date" value={date} placeholder="YYYY-MM-DD" onChangeText={value => { setDate(value); setSlotId(''); }} />
-    {schedule.isPending && <Text>Loading schedule…</Text>}
+    {schedule.isLoading && <SkeletonGroup label="Loading schedule"><Skeleton height={60} /><Skeleton height={60} /></SkeletonGroup>}
     {schedule.error && <Text>{schedule.error.message}</Text>}
     {schedule.data?.periods.map(slot => <Button key={slot.timetable_slot_id} title={`${slot.course_code} · Period ${slot.period_number}`} onPress={() => setSlotId(slot.timetable_slot_id)} />)}
     {marks.error && <Text>{marks.error.message}</Text>}
-    {marks.data && <DatedRoster key={`${slotId}:${date}:${marks.data.revision}`} data={marks.data} />}
+    {marks.isLoading ? <SkeletonGroup label="Loading student roster"><Skeleton height={60} /><Skeleton height={60} /><Skeleton height={60} /></SkeletonGroup> : marks.data && <DatedRoster key={`${slotId}:${date}:${marks.data.revision}`} data={marks.data} />}
     {pendingActions.PERIOD_MARKING?.blockedReason && <View><Text>{pendingActions.PERIOD_MARKING.blockedReason}</Text><Button title="Discard queued marks and reload" onPress={() => Alert.alert('Discard queued attendance?', 'All pending attendance actions for this account will be removed. Reload each class to review current marks.', [{ text: 'Cancel' }, { text: 'Discard', style: 'destructive', onPress: () => { void clearAction('PERIOD_MARKING').then(() => freshRead(() => marks.refetch())); } }])} /></View>}
     <Button title="Reload current marks" onPress={() => Alert.alert('Reload marks?', 'Unsaved selections will be discarded.', [{ text: 'Cancel' }, { text: 'Reload', onPress: () => { setSlotId(''); void freshRead(() => schedule.refetch()); } }])} />
   </ScreenContainer>;

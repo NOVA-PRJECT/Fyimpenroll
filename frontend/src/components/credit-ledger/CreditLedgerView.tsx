@@ -134,9 +134,12 @@ export default function CreditLedgerView({
     fetchLedger()
   }, [fetchLedger, dataRevision])
 
+  const refreshControl = <SectionRefreshButton endpoints={[ledgerEndpoint]} onRefresh={fetchLedger} disabled={loading} className={styles.backBtn} label="Refresh ledger" />
+
   if (loading) {
     return (
       <div className={styles.container}>
+        {refreshControl}
         <LoadingState layout="dashboard" message="Loading registered coursework…" />
       </div>
     )
@@ -145,6 +148,7 @@ export default function CreditLedgerView({
   if (!data) {
     return (
       <div className={styles.container}>
+        {refreshControl}
         <div className={styles.errorContainer}>
           <p style={{ color: "var(--portal-danger-text,#be123c)", fontWeight: 600 }}>{error || 'Unable to load credit ledger.'}</p>
           <button onClick={() => void refreshDatasets([ledgerEndpoint], fetchLedger)} className={styles.backBtn}>
@@ -173,6 +177,7 @@ export default function CreditLedgerView({
 
   return (
     <div className={styles.container}>
+      {refreshControl}
       <main className={styles.contentWrapper}>
         {error && <div role="alert" className={styles.errorContainer}>
           <p>{error} Showing the last successful result.</p>
@@ -191,7 +196,6 @@ export default function CreditLedgerView({
               Registered coursework; degree compliance is not assessed
             </p>
             <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-              <SectionRefreshButton endpoints={[ledgerEndpoint]} onRefresh={fetchLedger} disabled={loading} className={styles.backBtn} label="Refresh ledger" />
               <a
                 href={exportUrl('csv')}
                 download

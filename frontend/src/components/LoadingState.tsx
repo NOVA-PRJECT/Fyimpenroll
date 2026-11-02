@@ -57,7 +57,7 @@ export default function LoadingState({ message = 'Loading content…', layout = 
   compact?: boolean
 }) {
   return <div className={`${styles.root} ${compact ? styles.compact : ''}`} aria-busy="true">
-    <LoadingIndicator message={message} />
+    <span role="status" className={styles.srOnly}>{message}</span>
     <div aria-hidden="true" className={styles.preview}>
       {layout === 'dashboard' && <>
         <div className={styles.heading}><Skeleton width="45%" height="1.35rem" /><Skeleton width="65%" /></div>

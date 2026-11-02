@@ -608,7 +608,7 @@ export default function HodDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -790,7 +790,7 @@ export default function HodDashboard() {
 
               {uploadError && <div className={styles.errorBanner} style={{ marginBottom: '1rem' }}>{uploadError}</div>}
               <button className={styles.uploadBtn} onClick={handleUpload} disabled={uploading || !selectedFile || !batchPassword}>
-                {uploading ? <><span className={styles.spinner} /> Uploading...</> : 'Upload Students →'}
+                {uploading ? <LoadingIndicator message="Uploading…" /> : 'Upload Students →'}
               </button>
             </div>
 
@@ -1019,7 +1019,7 @@ export default function HodDashboard() {
                 style={{ background: "var(--portal-info-bg,#f8fafc)", color: "var(--portal-info-text,#334155)", border: "1px solid var(--portal-strong-border,#cbd5e1)" }}
                 title="Refresh live student registration status from server"
               >
-                {loadingDefaulters ? <LoadingIndicator message="Refreshing…" /> : 'Refresh Status'}
+                {loadingDefaulters ? 'Refreshing…' : 'Refresh Status'}
               </button>
             </div>
 

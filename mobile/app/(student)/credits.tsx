@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -10,7 +11,7 @@ import { queryKeys } from '../../src/lib/query-client';
 import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
 import { Badge } from '../../src/components/common/Badge';
-import { Skeleton } from '../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
 interface CategoryItem {
@@ -95,6 +96,7 @@ export default function StudentCreditsScreen() {
     queryFn: () => apiClient.get(API_ENDPOINTS.CREDIT_LEDGER_ME),
     enabled: !!userId,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   const totalEarned = data?.totalCredits ?? 0;
   // Progress against 4-year Honours standard (177 credits)
@@ -102,7 +104,7 @@ export default function StudentCreditsScreen() {
   const progressPct = Math.min(Math.round((totalEarned / targetCredits) * 100), 100);
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
+    <ScreenContainer scrollable refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled} onRefresh={pullRefresh.onRefresh}>
       {/* 1. Total Credits Summary Card */}
       <Card variant="elevated" style={styles.summaryCard}>
         <Text style={[typography.h3, { color: colors.textPrimary }]}>
@@ -113,10 +115,10 @@ export default function StudentCreditsScreen() {
         </Text>
 
         {isLoading ? (
-          <View style={{ marginTop: 16 }}>
+          <SkeletonGroup style={{ marginTop: 16 }}>
             <Skeleton height={32} width="40%" />
             <Skeleton height={14} width="70%" style={{ marginTop: 8 }} />
-          </View>
+          </SkeletonGroup>
         ) : (
           <View style={styles.progressContainer}>
             <View style={styles.creditsRow}>
@@ -169,8 +171,10 @@ export default function StudentCreditsScreen() {
 
       {isLoading ? (
         <Card variant="outlined">
-          <Skeleton height={60} style={{ marginVertical: 6 }} />
-          <Skeleton height={60} style={{ marginVertical: 6 }} />
+          <SkeletonGroup>
+            <Skeleton height={60} style={{ marginVertical: 6 }} />
+            <Skeleton height={60} style={{ marginVertical: 6 }} />
+          </SkeletonGroup>
         </Card>
       ) : data?.exitEligibility ? (
         <Card variant="outlined" style={{ padding: 12 }}>
@@ -242,11 +246,11 @@ export default function StudentCreditsScreen() {
       </View>
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={50} style={{ marginVertical: 4 }} />
           <Skeleton height={50} style={{ marginVertical: 4 }} />
           <Skeleton height={50} style={{ marginVertical: 4 }} />
-        </View>
+        </SkeletonGroup>
       ) : data?.categories && data.categories.length > 0 ? (
         data.categories.map((cat) => (
           <Card key={cat.category} variant="outlined" style={styles.categoryCard}>
@@ -282,10 +286,10 @@ export default function StudentCreditsScreen() {
       </View>
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={50} style={{ marginVertical: 4 }} />
           <Skeleton height={50} style={{ marginVertical: 4 }} />
-        </View>
+        </SkeletonGroup>
       ) : data?.levelBands && data.levelBands.length > 0 ? (
         <Card variant="outlined" style={{ padding: 12 }}>
           {data.levelBands.map((band, idx) => (

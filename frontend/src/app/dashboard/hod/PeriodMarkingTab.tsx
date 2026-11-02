@@ -336,7 +336,7 @@ export default function PeriodMarkingTab() {
                 color: "var(--portal-info-text,#475569)",
               }}
             >
-              <RefreshCw size={12} className={loadingSlots ? 'animate-spin' : ''} /> Refresh
+              <RefreshCw size={12} aria-hidden="true" /> {loadingSlots ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
 

@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -13,7 +14,7 @@ import { ScreenContainer } from '../../src/components/layout/ScreenContainer';
 import { Card } from '../../src/components/common/Card';
 import { Badge } from '../../src/components/common/Badge';
 import { Button } from '../../src/components/common/Button';
-import { Skeleton } from '../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../src/components/common/Skeleton';
 import { ErrorView } from '../../src/components/common/ErrorView';
 
 export default function TeacherHomeScreen() {
@@ -31,11 +32,12 @@ export default function TeacherHomeScreen() {
     )).periods,
     enabled: !!teacherId,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   if (error && !periods) return <ScreenContainer><ErrorView message={error.message} onRetry={() => freshRead(() => refetch())} /></ScreenContainer>;
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
+    <ScreenContainer scrollable refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled} onRefresh={pullRefresh.onRefresh}>
       <View style={styles.welcomeSection}>
         <Text style={[typography.h2, { color: colors.textPrimary }]}>
           Welcome, Prof. {profile?.full_name || 'Faculty Member'}
@@ -76,11 +78,11 @@ export default function TeacherHomeScreen() {
       ) : null}
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={75} style={{ marginVertical: 6 }} />
           <Skeleton height={75} style={{ marginVertical: 6 }} />
           <Skeleton height={75} style={{ marginVertical: 6 }} />
-        </View>
+        </SkeletonGroup>
       ) : periods && periods.length > 0 ? (
         periods.map((period: any) => (
           <Card key={period.timetable_slot_id} variant="outlined" style={styles.periodCard}>

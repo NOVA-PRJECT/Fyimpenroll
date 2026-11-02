@@ -34,7 +34,7 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
   }, setCatalogue, sem => cachedData<CatalogueCourse[]>(`/api/hod/courses?semester=${sem}&own=true`)))
   const currentCatalogue = catalogue.semester === semester ? catalogue : { semester, rows: undefined, loading: true, error: '' }
   const courses = currentCatalogue.rows ?? []
-  const loadingCourses = currentCatalogue.loading && !currentCatalogue.rows
+  const loadingCourses = currentCatalogue.loading
   const [showAddCourse, setShowAddCourse] = useState(false)
   const [editCourse, setEditCourse] = useState<CatalogueCourse | null>(null)
   const [deleteCourse, setDeleteCourse] = useState<CatalogueCourse | null>(null)
@@ -141,7 +141,6 @@ export default function CoursesTab({ semester, onSemesterChange: setSemester }: 
         {currentCatalogue.rows ? 'Showing saved courses. ' : ''}{currentCatalogue.error}{' '}
         <button type="button" onClick={() => void refreshDatasets([`/api/hod/courses?semester=${semester}&own=true`], () => catalogueLoader.select(semester))}>Retry</button>
       </div>}
-      {currentCatalogue.loading && currentCatalogue.rows && <div role="status"><LoadingIndicator message="Updating courses…" /></div>}
       {/* Semester Selector */}
       <div className={styles.semesterRow}>
         <span className={styles.semesterLabel}><b>Courses for semester:</b></span>

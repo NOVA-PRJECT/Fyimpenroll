@@ -17,7 +17,8 @@ interface ScreenContainerProps {
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
   refreshing?: boolean;
-  onRefresh?: () => void;
+  refreshDisabled?: boolean;
+  onRefresh?: () => void | Promise<unknown>;
   edges?: ('top' | 'right' | 'bottom' | 'left')[];
 }
 
@@ -27,6 +28,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   style,
   contentContainerStyle,
   refreshing = false,
+  refreshDisabled = false,
   onRefresh,
   edges = ['left', 'right'],
 }) => {
@@ -76,10 +78,10 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
             contentContainerStyle,
           ]}
           refreshControl={
-            onRefresh ? (
+            onRefresh && (!refreshDisabled || refreshing) ? (
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={onRefresh}
+                onRefresh={() => { if (!refreshDisabled) void onRefresh(); }}
                 tintColor={colors.primary}
                 colors={[colors.primary]}
               />

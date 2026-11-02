@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, ViewStyle, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, View, ViewStyle, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
 interface SkeletonProps {
@@ -7,6 +7,17 @@ interface SkeletonProps {
   height?: number;
   borderRadius?: number;
   style?: ViewStyle;
+}
+
+/** Announce a loading region once, keeping its decorative shapes out of the accessibility tree. */
+export function SkeletonGroup({ children, label = 'Loading content', style }: {
+  children: React.ReactNode;
+  label?: string;
+  style?: ViewStyle;
+}) {
+  return <View accessible accessibilityRole="progressbar" accessibilityLabel={label} accessibilityState={{ busy: true }} style={style}>
+    {children}
+  </View>;
 }
 
 export const Skeleton: React.FC<SkeletonProps> = ({

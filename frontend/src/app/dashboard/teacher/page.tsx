@@ -299,6 +299,7 @@ export default function TeacherDashboard() {
 
   // 1. Fetch Teacher Assigned Papers
   const fetchTeacherCourses = useCallback(async () => {
+    setLoadingProfile(true)
     try {
       const res = await entryFetch('/api/faculty/courses')
       const data = await res.json()
@@ -698,7 +699,7 @@ export default function TeacherDashboard() {
             title="Log out of portal"
           >
             <LogOut size={14} />
-            <span className={styles.logoutText}>{loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}</span>
+            <span className={styles.logoutText}>{loggingOut ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </header>
@@ -1111,7 +1112,6 @@ export default function TeacherDashboard() {
         {/* TAB 3: MY ASSIGNED PAPERS & CLASS ROSTERS */}
         {activeTab === 'rosters' && (
           <div>
-            {loadingProfile && <LoadingState layout="cards" message="Loading assigned courses…" />}
             {assignedCourses.length === 0 && !loadingProfile && (
               <div
                 style={{
@@ -1142,7 +1142,7 @@ export default function TeacherDashboard() {
                   endpoints={['/api/faculty/courses']} onRefresh={fetchTeacherCourses} disabled={loadingProfile} />
               </div>
 
-              <div className={styles.filterControlsGrid}>
+              {loadingProfile ? <LoadingState layout="form" rows={2} message="Loading assigned courses…" /> : <div className={styles.filterControlsGrid}>
                 <div className={styles.filterGroup}>
                   <label className={styles.filterLabel}>Filter By Semester</label>
                   <select
@@ -1176,7 +1176,7 @@ export default function TeacherDashboard() {
                     disabled={loadingRoster}
                   />
                 </div>
-              </div>
+              </div>}
             </div>
 
             {loadingRoster && (

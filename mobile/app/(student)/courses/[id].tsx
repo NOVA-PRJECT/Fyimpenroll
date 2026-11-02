@@ -1,3 +1,4 @@
+import { usePullToRefresh } from '../../../src/hooks/usePullToRefresh';
 import { freshRead } from '../../../src/lib/data-refresh';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -13,7 +14,7 @@ import { queryKeys } from '../../../src/lib/query-client';
 import { ScreenContainer } from '../../../src/components/layout/ScreenContainer';
 import { Card } from '../../../src/components/common/Card';
 import { Badge } from '../../../src/components/common/Badge';
-import { Skeleton } from '../../../src/components/common/Skeleton';
+import { Skeleton, SkeletonGroup } from '../../../src/components/common/Skeleton';
 import { ErrorView } from '../../../src/components/common/ErrorView';
 
 export default function CourseDetailScreen() {
@@ -29,9 +30,10 @@ export default function CourseDetailScreen() {
     queryFn: () => apiClient.get(`${API_ENDPOINTS.STUDENT_COURSES}/${id}?semester=${activeSemester}`, { schema: CourseSchema }),
     enabled: !!userId && !!id,
   });
+  const pullRefresh = usePullToRefresh(() => freshRead(() => refetch()), isLoading || isRefetching);
 
   return (
-    <ScreenContainer scrollable refreshing={isRefetching} onRefresh={() => freshRead(() => refetch())}>
+    <ScreenContainer scrollable refreshing={pullRefresh.refreshing} refreshDisabled={pullRefresh.refreshDisabled} onRefresh={pullRefresh.onRefresh}>
       {error ? (
         <ErrorView
           message={error instanceof Error ? error.message : 'Failed to load course details.'}
@@ -40,10 +42,10 @@ export default function CourseDetailScreen() {
       ) : null}
 
       {isLoading ? (
-        <View>
+        <SkeletonGroup>
           <Skeleton height={120} />
           <Skeleton height={200} style={{ marginTop: 16 }} />
-        </View>
+        </SkeletonGroup>
       ) : course ? (
         <>
           <Card variant="elevated" style={styles.summaryCard}>

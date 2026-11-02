@@ -314,7 +314,7 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
         <button className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
-          {loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}
+          {loggingOut ? 'Logging out…' : 'Logout'}
         </button>
       </div>
 

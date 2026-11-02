@@ -734,7 +734,7 @@ export default function RegisterPage() {
             ← Back to Dashboard
           </NavigationLink>
           <button className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
-            {loggingOut ? <LoadingIndicator message="Logging out…" /> : 'Logout'}
+            {loggingOut ? 'Logging out…' : 'Logout'}
           </button>
         </div>
       </header>
@@ -787,9 +787,9 @@ export default function RegisterPage() {
       )}
 
       <div className={styles.mainContent}>
-        {pageState !== 'loading_blueprint' && <SectionRefreshButton className={styles.closedBackBtn}
+        <SectionRefreshButton className={styles.closedBackBtn}
           label="Refresh registration" endpoints={['/api/registrations/blueprint']} onRefresh={loadBlueprint}
-          disabled={pageState === 'submitting' || (!hasSubmitted && JSON.stringify(rankedPreferences) !== savedPreferences) || editingSlot !== null} />}
+          disabled={pageState === 'loading_blueprint' || pageState === 'submitting' || (!hasSubmitted && JSON.stringify(rankedPreferences) !== savedPreferences) || editingSlot !== null} />
 
         {/* Loading Blueprint */}
         {pageState === 'loading_blueprint' && (
