@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -28,6 +29,13 @@ import type { Request, Response } from 'express'
 @UseGuards(AuthGuard, RolesGuard)
 export class TimetableController {
   constructor(private readonly timetableService: TimetableService, private readonly manualTimetable: ManualTimetableService) {}
+
+  @Delete('jobs/:id')
+  @Roles('campus_director')
+  cancelJob(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    if (!z.string().uuid().safeParse(id).success) throw new BadRequestException('Invalid job ID')
+    return this.timetableService.cancelJob(id, user)
+  }
 
   @Get('manual')
   @Roles('campus_director')
@@ -72,7 +80,7 @@ export class TimetableController {
   }
 
   @Put('constraints')
-  @Roles('superadmin', 'campus_director')
+  @Roles('campus_director')
   async updateConstraints(@Body() body: any, @CurrentUser() user: AuthUser) {
     return this.timetableService.updateConstraints(body, user)
   }
@@ -102,12 +110,14 @@ export class TimetableController {
     @Query('departmentId') departmentId: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.timetableService.getEntries(academicYear, Number(semester), departmentId, user)
+    const parsed = TimetableQuerySchema.safeParse({ academicYear, semester, departmentId })
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.timetableService.getEntries(parsed.data.academicYear, parsed.data.semester, parsed.data.departmentId || undefined, user)
   }
 
   // ──────────────── Generate ────────────────
   @Post('generate')
-  @Roles('superadmin', 'campus_director')
+  @Roles('campus_director')
   @RateLimit('timetable')
   @UseGuards(RateLimitGuard)
   async generate(
@@ -121,7 +131,7 @@ export class TimetableController {
 
   // ──────────────── Job Status ────────────────
   @Get('job-status')
-  @Roles('superadmin', 'campus_director')
+  @Roles('campus_director')
   async getJobStatus(
     @Query('academicYear') academicYear: string,
     @Query('semester') semester: string,
@@ -140,7 +150,7 @@ export class TimetableController {
   }
 
   @Post('publish')
-  @Roles('superadmin', 'campus_director')
+  @Roles('campus_director')
   async publish(
     @Body() body: unknown,
     @CurrentUser() user: AuthUser,

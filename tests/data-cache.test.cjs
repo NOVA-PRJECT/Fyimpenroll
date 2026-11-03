@@ -198,11 +198,11 @@ test('six teacher periods require one status batch rather than four reads per pe
     courses:{course_code:'C'+i,title:'Course '+i,semester:1},time_slots:{day_of_week:1,period_number:i+1,start_time:'09:30',end_time:'10:30'}}))
   const db={from(table){let from=0;const q={select(){return q},eq(){return q},or(){return q},order(){return q},range(a){from=a;return q},
     maybeSingle(){queries++;return Promise.resolve({data:{id:'teacher',full_name:'Teacher'}})},
-    then(resolve){queries++;return Promise.resolve({data:table==='current_teacher_course_assignments'?entries.map(e=>({course_id:e.course_id,courses:e.courses})):from?[]:entries}).then(resolve)}};return q},
+    then(resolve){queries++;return Promise.resolve({data:from?[]:table==='current_teacher_course_assignments'?entries.map(e=>({course_id:e.course_id,courses:e.courses})):entries}).then(resolve)}};return q},
     async rpc(name,args){assert.equal(name,'display_period_status');batches++;assert.equal(args.p_slots.length,6);return {data:Object.fromEntries(args.p_slots.map(s=>[s.id,{total_enrolled:20,present:18,absent:2,is_marked:true,revision:3,revision_token:'three'}]))}}}
   const result=await new PeriodAttendanceService({admin:db},{}).getTeacherSchedule({userId:'teacher',role:'teacher',campus_id:'home',term_version:0},'2026-10-26')
   assert.equal(result.periods.length,6);assert.equal(result.periods[0].total_enrolled,20);assert.equal(result.periods[0].revision,3)
-  assert.equal(batches,1);assert.equal(queries,4)
+  assert.equal(batches,1);assert.equal(queries,5)
 })
 
 test('server response cache separates role, campus and term and force refresh preserves API shape', async () => {

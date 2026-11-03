@@ -1,3 +1,4 @@
+import { dataScope } from '../auth/data-scope'
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common'
 import { defer, lastValueFrom, Observable } from 'rxjs'
 import { canonicalDataUrl, dataReadDomains, dataChangeDomains, projectReadData } from '@fyimp/contracts'
@@ -10,11 +11,11 @@ export class DataCacheInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest(), res = context.switchToHttp().getResponse(), user = req.user
     if (!user) return next.handle()
     const path = canonicalDataUrl(req.originalUrl || req.url)
-    const scope = [user.userId, user.role, user.campus_id, user.department_id, user.current_semester, user.term_version].join(':')
+    const scope = dataScope(user)
     res.setHeader('X-Data-Scope', scope)
     const domains = req.method === 'GET' ? dataReadDomains(path) : []
     if (/\/progress(?:\?|$)|\/export(?:\/|-)/.test(path)) return next.handle()
-    return defer(() => readContext.run({ force: req.headers['x-refresh-data'] === '1', scope, cacheReferences: req.method === 'GET',
+    return defer(() => readContext.run({ force: req.headers['x-refresh-data'] === '1', scope, actorId: user.userId, cacheReferences: req.method === 'GET',
       verifiedCampusSettings: req.method === 'GET' ? user.verifiedCampusSettings : undefined, pending: new Map() }, async () => {
       const load = () => lastValueFrom(next.handle())
       if (req.method !== 'GET') {

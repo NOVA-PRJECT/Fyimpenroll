@@ -36,6 +36,8 @@ function applySecurityPatches() {
     const dir = path.join(root, relative)
     if (!fs.existsSync(path.join(dir, 'package.json'))) continue // A backend-only installation omits mobile tooling.
     const version = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version
+    // node-forge 1.4.2 contains the upstream fixes; keep the RSA exploit regression.
+    if (name === 'node-forge' && version === '1.4.2') continue
     const expected = name === 'braces' ? '3.0.3' : '1.4.0'
     if (version !== expected) throw new Error(`Review ${name}@${version} before retiring or updating its security patch`)
     if (name === 'braces') {

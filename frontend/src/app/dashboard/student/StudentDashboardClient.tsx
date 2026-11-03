@@ -107,6 +107,7 @@ export default function StudentDashboardClient({
   const [timetableEntries, setTimetableEntries] = useState<{ day: number; period: number; courseId: string; courseCode: string; courseName: string; category: string; isLabBlock: boolean; id: string; course_id: string; day_of_week: number; period_number: number; start_time: string; end_time: string; course_title: string; course_code: string; teacher_name: string; time_slots?: {day_of_week: number; period_number: number}; courses?: {title: string; course_code: string} }[]>([])
   const [loadingTimetable, setLoadingTimetable] = useState(false)
   const [timetableError, setTimetableError] = useState('')
+  const [classroomTimetableRequired, setClassroomTimetableRequired] = useState(true)
   const [timetableRefresh, setTimetableRefresh] = useState(0)
 
   // Load on tab entry, a cohort change, or an explicit refresh.
@@ -122,7 +123,7 @@ export default function StudentDashboardClient({
           const res = await fetch(`/api/timetable/entries?academicYear=${encodeURIComponent(ay)}&semester=${sem}`, { cache: 'no-store', signal: controller.signal })
           const data = await res.json()
           if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Unable to load your published timetable.')
-          if (!controller.signal.aborted) { setTimetableEntries(data.entries || []); setTimetableError('') }
+          if (!controller.signal.aborted) { setTimetableEntries(data.entries || []); setClassroomTimetableRequired(data.classroomTimetableRequired !== false); setTimetableError('') }
         } catch (err) {
           if (!controller.signal.aborted) setTimetableError(err instanceof Error ? err.message : 'Unable to load your published timetable.')
         } finally {
@@ -736,6 +737,7 @@ export default function StudentDashboardClient({
 
             {/* Day Selector Bar */}
             {timetableError && <p role="alert">{timetableError}</p>}
+            {!classroomTimetableRequired && <p role="status">No classroom timetable is required for this research or project cohort.</p>}
             <div className={styles.daySelectorBar}>
               <button
                 type="button"

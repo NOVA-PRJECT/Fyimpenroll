@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
 import { configureManualTimetableBodyParser } from './core/http/manual-timetable-body-parser'
 import { AppModule } from './app.module'
+import { ReviewWorker } from './core/jobs/review-worker'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const cookieParser = require('cookie-parser')
 
@@ -76,6 +77,10 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000
   await app.listen(port, '0.0.0.0')
+  if (process.env.RUN_REVIEW_WORKER === 'true') {
+    void app.get(ReviewWorker).run()
+    logger.log('Queue processing enabled in the API process')
+  }
 
   logger.log(`NestJS Backend running at http://127.0.0.1:${port}`)
   logger.log(`Supabase database & auth connected`)

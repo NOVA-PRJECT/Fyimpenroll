@@ -1,10 +1,10 @@
-# Temporary dependency security patches
+# Dependency security patches
 
-`scripts/apply-security-patches.cjs` runs after installation. It checks exact package versions and patch locations and refuses unexpected source layouts. Backend-only installations safely skip absent mobile tools. These changes retain the original upstream licenses and versions; npm audit continues to report the upstream advisories.
+`scripts/apply-security-patches.cjs` runs after installation and verifies exact source layouts. Keep scripts enabled for clean installs, including mobile build environments.
 
-- `braces@3.0.3`, MIT, [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): cap parser nesting and validate supplied ASTs iteratively before recursive compile, expansion and stringify. Deep/cyclic ASTs raise a controlled SyntaxError before recursion.
-- `node-forge@1.4.0`, BSD-3-Clause, [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv): require the nested DigestAlgorithm sequence to contain exactly the OID and its optional empty NULL parameter. Reject trailing nested elements.
+- `braces@3.0.3`: keep the parser-depth cap and iterative AST guard. Deep/cyclic patterns must fail without stack exhaustion.
+- `node-forge@1.4.2`: use the upstream fixes; the installer deliberately skips the old 1.4.0 RSA rewrite on this exact version. Retain valid-signature and malformed DigestAlgorithm regressions. Unexpected forge versions still require review.
+- The CommonJS URI decoder wrapper now aliases upstream `decode-uri-component@0.5.1`.
+- Fixed transitive dependencies are pinned in root overrides; Zod is 4.6.7 throughout the workspace.
 
-Both advisories list no patched upstream release as of 2026-10-22. Remove each patch only after upgrading to an upstream fix and retaining the exploit regression tests. Never disable these install scripts in the mobile development/build environment. CI runs the regressions to detect an omitted patch.
-
-The vulnerable URI decoder is upgraded to upstream 0.5.0 via a small CommonJS compatibility package in `vendor/decode-uri-component`. The old UUID dependency under xcode is overridden with 11.1.1. Expo and React Native versions are retained.
+See [the current advisory register](../docs/security/dependency-advisory-register-2026-11-02.md) for individual advisories, reachability, selected fixes, and residual low/moderate chains. Local patches are not a blanket exemption from future advisories.

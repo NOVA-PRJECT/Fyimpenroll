@@ -1,3 +1,4 @@
+import { sameDelivery } from '../../core/auth/delivery-authority'
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { SupabaseService } from '../../core/database/supabase.service'
 import { AuthUser } from '../../core/auth/types'
@@ -44,7 +45,7 @@ export class CreditLedgerService {
         .select('id, course_id, campus_id, academic_year, semester, term_version').eq('teacher_id', user.userId).eq('campus_id', student.campus_id).order('id'))
     }
     const enrollments = registrations.flatMap(reg => registrationSlots(reg).map(slot => ({ ...slot, reg })))
-      .filter(item => deliveries === null || deliveries.some(d => d.course_id === item.courseId && d.semester === item.reg.semester && d.academic_year === item.reg.academic_year && d.term_version === item.reg.term_version))
+      .filter(item => deliveries === null || deliveries.some(d => sameDelivery(d, { ...item.reg, course_id: item.courseId })))
     if (deliveries !== null && !enrollments.length) throw new ForbiddenException('No assigned class enrollment for this student')
     const ids = [...new Set(enrollments.map(item => item.courseId))]
     const courses = ids.length ? await fetchAllPaginated<any>(this.supabase.admin.from('courses')
@@ -56,7 +57,7 @@ export class CreditLedgerService {
       const snapshot = selections.find((s: any) => (s.course_id || s.id) === courseId && (s.slot == null || Number(s.slot) === slot))
       const hasSnapshot = snapshot?.credits != null && Number.isFinite(Number(snapshot.credits))
       const category = snapshot?.category ?? c.category ?? 'Other'
-      return { id: courseId!, courseCode: c.course_code || 'Unavailable', title: c.title || 'Unavailable',
+      return { id: courseId!, courseCode: snapshot?.course_code || c.course_code || 'Unavailable', title: snapshot?.title || c.title || 'Unavailable',
         credits: hasSnapshot ? Number(snapshot.credits) : Number(c.credits) || 0,
         creditSource: hasSnapshot ? 'registration_snapshot' : 'current_catalogue_missing_snapshot',
         category, normalizedCategory: this.normalizeCategory(category, c.course_code),
@@ -76,7 +77,7 @@ export class CreditLedgerService {
     })
     const byDepartment = [...new Set(registeredCourses.map(c => c.departmentId))].map(departmentId => {
       const items = registeredCourses.filter(c => c.departmentId === departmentId)
-      return { departmentId, departmentName: items[0].departmentName, earned: items.reduce((a,c) => a+c.credits,0), count: items.length }
+      return { departmentId, departmentName: items[0].departmentName, registeredCredits: items.reduce((a,c) => a+c.credits,0), earned: items.reduce((a,c) => a+c.credits,0), count: items.length }
     })
     const pending = (title: string) => ({ title, eligible: null, advisoryEligible: null, totalCredits,
       registeredCredits: totalCredits, requiredCredits: null, targetCredits: null, totalShortfall: null,
@@ -85,6 +86,7 @@ export class CreditLedgerService {
       student: { id: student.id, fullName: student.full_name, capApplicationNumber: student.cap_application_number,
         currentSemester: student.current_semester, academicYearJoined: student.academic_year_joined,
         departmentName: (student.departments as any)?.name || 'Unknown', departmentCode: (student.departments as any)?.code || '', campusName: (student.campuses as any)?.name || 'Unknown' },
+      creditBasis: 'registered', deprecatedFields: ['earned'],
       advisoryMatrixVersion: null, requirementsAvailable: false, disclaimer: ADVISORY_CREDIT_DISCLAIMER,
       unresolvedRequirementNote: UNRESOLVED_REQUIREMENT_NOTE, totalCredits, totalRegisteredCredits: totalCredits,
       historicalSnapshotsComplete: registeredCourses.every(c => c.creditSource === 'registration_snapshot'),

@@ -14,8 +14,8 @@ import styles from './credit-ledger.module.css'
 interface CategoryItem {
   category: string
   title: string
-  registeredCredits?: number
-  earned: number
+  registeredCredits: number
+  earned?: number
   min3Year: number
   min4Year: number
   shortfall3Year: number
@@ -28,7 +28,8 @@ interface CategoryItem {
 interface DeptItem {
   departmentId: string
   departmentName: string
-  earned: number
+  registeredCredits: number
+  earned?: number
   count: number
 }
 
@@ -172,7 +173,7 @@ export default function CreditLedgerView({
   const exportUrl = (fmt: 'csv' | 'xlsx') =>
     `/api/export/credit-ledger/${studentId || 'me'}?format=${fmt}`
   const registeredTotal = data.totalRegisteredCredits ?? totalCredits
-  const categoryTotal = categories.reduce((sum, category) => sum + (category.registeredCredits ?? category.earned), 0)
+  const categoryTotal = categories.reduce((sum, category) => sum + category.registeredCredits, 0)
   const categoryColors = ['#3b82f6', '#14b8a6', '#a78bfa', '#f59e0b', '#38bdf8', '#f472b6']
 
   return (
@@ -238,7 +239,7 @@ export default function CreditLedgerView({
             </div>
           </div>
           <div className={styles.circularGrid}>{categories.map((category, index) => {
-            const credits = category.registeredCredits ?? category.earned
+            const credits = category.registeredCredits
             const share = categoryTotal > 0 ? credits / categoryTotal : 0
             return <article key={category.category} className={`${styles.circularCard} ${credits === 0 ? styles.emptyCategory : ''}`}
               style={{ '--category-color': categoryColors[index % categoryColors.length] } as CSSProperties}>
@@ -266,9 +267,9 @@ export default function CreditLedgerView({
           {byDepartment.length > 0 ? (
             <div className={styles.barGraph}>
               {(() => {
-                const maxCredits = Math.max(...byDepartment.map((d) => d.earned), 1)
+                const maxCredits = Math.max(...byDepartment.map((d) => d.registeredCredits), 1)
                 return byDepartment.map((dept) => {
-                  const widthPercent = Math.max(6, Math.round((dept.earned / maxCredits) * 100))
+                  const widthPercent = Math.max(6, Math.round((dept.registeredCredits / maxCredits) * 100))
                   return (
                     <div key={dept.departmentId} className={styles.barItem}>
                       <div className={styles.barHeader}>
@@ -284,7 +285,7 @@ export default function CreditLedgerView({
                             style={{ width: `${widthPercent}%` }}
                           />
                         </div>
-                        <span className={styles.barBadge}>{dept.earned} Credits</span>
+                        <span className={styles.barBadge}>{dept.registeredCredits} Credits</span>
                       </div>
                     </div>
                   )

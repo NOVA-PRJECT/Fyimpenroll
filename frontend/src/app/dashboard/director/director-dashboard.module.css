@@ -605,3 +605,26 @@
     font-size: 0.82rem;
   }
 }
+.allocationStatus [data-allocation-status] {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #334155;
+  color: var(--portal-info-text, #94a3b8);
+}
+.allocationStatus :is([data-allocation-status="queued"], [data-allocation-status="running"]) {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--portal-warning-text, #fbbf24);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.allocationStatus [data-allocation-status="completed"] {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--portal-success-text, #4ade80);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+.allocationStatus [data-allocation-status="failed"] {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--portal-danger-text, #f87171);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}

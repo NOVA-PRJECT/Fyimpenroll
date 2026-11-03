@@ -29,118 +29,18 @@ function ConfirmResetForm() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [canRetrySync, setCanRetrySync] = useState(false)
+  const [tokenHash] = useState(() => searchParams.get('token_hash') || '')
 
   useEffect(() => {
-    let isMounted = true
-
-    // 1. Extract from search parameters
-    const code = searchParams.get('code')
-    const queryError = searchParams.get('error_description') || searchParams.get('error')
-
-    // 2. Extract from hash fragment
-    let hashAccessToken: string | null = null
-    let hashRefreshToken: string | null = null
-    let hashError: string | null = null
-
-    if (typeof window !== 'undefined' && window.location.hash) {
-      try {
-        const hashStr = window.location.hash.startsWith('#')
-          ? window.location.hash.substring(1)
-          : window.location.hash
-        const hashParams = new URLSearchParams(hashStr)
-
-        hashAccessToken = hashParams.get('access_token')
-        hashRefreshToken = hashParams.get('refresh_token')
-        const errDesc = hashParams.get('error_description') || hashParams.get('error')
-        if (errDesc) {
-          hashError = decodeURIComponent(errDesc.replace(/\+/g, ' '))
-        }
-      } catch (err) {
-        console.error('Failed to parse URL hash:', err)
-      }
-    }
-
-    const explicitError =
-      hashError ||
-      (queryError ? decodeURIComponent(queryError.replace(/\+/g, ' ')) : null)
-
-    // Check for explicit error from Supabase (e.g. token expired, already used)
-    if (explicitError) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the client view with fetched data, browser storage, or the selected resource.
+    // Never accept a pre-existing login session or consume the token on a GET/email preview.
+    if (/^[a-fA-F0-9]{64}$/.test(tokenHash)) {
+      setStatus('ready')
+      window.history.replaceState(window.history.state, '', window.location.pathname)
+    } else {
       setStatus('error')
-      setErrorMessage(explicitError)
-      return
+      setErrorMessage('Request a new password reset link. This link does not contain valid recovery proof.')
     }
-
-    // Step C: Listen to onAuthStateChange for PASSWORD_RECOVERY
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        setStatus('ready')
-      }
-    })
-
-    async function initializeSession() {
-      try {
-        // Option A: Active session already established
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData?.session) {
-          if (isMounted) setStatus('ready')
-          return
-        }
-
-        // Option B: Access token in hash fragment (implicit flow)
-        if (hashAccessToken) {
-          const { data: setSessionData, error: setSessionError } =
-            await supabase.auth.setSession({
-              access_token: hashAccessToken,
-              refresh_token: hashRefreshToken || '',
-            })
-          if (!setSessionError && setSessionData?.session) {
-            if (isMounted) setStatus('ready')
-            return
-          }
-        }
-
-        // Option C: PKCE authorization code in query params
-        if (code) {
-          const { data: exchangeData, error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(code)
-
-          if (exchangeError || !exchangeData?.session) {
-            if (isMounted) {
-              setStatus('error')
-              setErrorMessage('This reset link has expired or has already been used.')
-            }
-            return
-          }
-
-          if (isMounted) setStatus('ready')
-          return
-        }
-
-        // Neither code, hash token, nor session present: direct navigation
-        if (isMounted) {
-          router.replace(
-            '/reset-password?message=Please%20request%20a%20new%20password%20reset%20link.',
-          )
-        }
-      } catch (err: unknown) {
-        console.error('Session initialization error:', err)
-        if (isMounted) {
-          setStatus('error')
-          setErrorMessage('This reset link has expired or has already been used.')
-        }
-      }
-    }
-
-    initializeSession()
-
-    return () => {
-      isMounted = false
-      authListener?.subscription?.unsubscribe()
-    }
-  }, [searchParams, router])
+  }, [tokenHash])
 
   const checks = getChecks(password)
   const passwordLevel = getPasswordLevel(password)
@@ -187,10 +87,14 @@ function ConfirmResetForm() {
     try {
       // The backend owns the password update and its recoverable profile sync.
       // Recovery uses its explicit session, independently of an older portal logout.
-      const resetRes = await requestPasswordRecovery(supabase, '/api/auth/complete-password-reset', { newPassword: password })
+      const resetRes = await requestPasswordRecovery(supabase, '/api/auth/complete-password-reset', { newPassword: password, token_hash: tokenHash })
 
       const resetData = await resetRes.json().catch(() => ({}))
 
+      if (resetData.canRetrySync && resetData.token && resetData.refreshToken) {
+        const { error } = await supabase.auth.setSession({ access_token: resetData.token, refresh_token: resetData.refreshToken })
+        if (error) throw new Error('Password updated; request a new recovery link to finish account synchronization.')
+      }
       // Step F.4: F10 fix - If backend synchronization fails, do NOT show false success or redirect
       if (!resetRes.ok || resetData.success === false) {
         const errorMsg =

@@ -20,6 +20,7 @@ import { CampusAttendanceModule } from './modules/campus-attendance/campus-atten
 import { CreditLedgerModule } from './modules/credit-ledger/credit-ledger.module'
 import { AllocationModule } from './modules/allocation/allocation.module'
 import { HealthController } from './modules/health/health.controller'
+import { ReviewWorker } from './core/jobs/review-worker'
 
 @Module({
   imports: [
@@ -47,5 +48,6 @@ import { HealthController } from './modules/health/health.controller'
     AllocationModule,
   ],
   controllers: [HealthController],
+  providers: [ReviewWorker],
 })
 export class AppModule {}

@@ -56,14 +56,19 @@ export class HealthController {
   private async checkDatabase(): Promise<boolean> {
     try {
       const { data, error } = await this.supabase.admin.rpc('production_readiness')
-      return !error && data?.ready === true
+      return !error && data?.ready === true && data?.schema?.version === 1 && data?.schema?.compatible === true
     } catch { return false }
   }
 
+  private async checkWorker(): Promise<boolean> {
+    try { const { data, error } = await this.supabase.admin.rpc('review_worker_health'); return !error && data === true }
+    catch { return false }
+  }
+
   private async checkDependencies() {
-    const [database, solverAndRules] = await Promise.all([this.checkDatabase(), this.checkSolver()])
-    const ready = database && solverAndRules
-    return { ready, result: { status: ready ? 'ready' : 'unavailable', database, solverAndRules,
+    const [database, solverAndRules, worker] = await Promise.all([this.checkDatabase(), this.checkSolver(), this.checkWorker()])
+    const ready = database && solverAndRules && worker
+    return { ready, result: { status: ready ? 'ready' : 'unavailable', database, solverAndRules, worker,
       rateLimiter: process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? 'shared-with-local-fallback' : 'single-process',
       authenticationProvider: 'checked-on-authentication-requests' } }
   }

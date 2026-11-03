@@ -9,7 +9,13 @@ export function databaseFetch(native: typeof fetch, cache?: DataCacheService): t
     const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
     const name = url.pathname.split('/').pop() || '', rest = url.pathname.startsWith('/rest/v1/'), context = readContext.getStore()
     const load = async (): Promise<StoredResponse> => {
-      const response = await native(input, init)
+      let options = init
+      if (rest && context?.actorId) {
+        const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined))
+        headers.set('x-fyimp-actor', context.actorId)
+        options = { ...init, headers }
+      }
+      const response = await native(input, options)
       const result = { body: await response.text(), status: response.status, headers: [...response.headers.entries()] as [string, string][] }
       if (!response.ok) throw new UncachedResponse(result)
       return result

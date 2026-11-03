@@ -2,7 +2,7 @@ import { QueryClient, isCancelledError, type Query } from '@tanstack/react-query
 import { canonicalDataUrl, dataReadDomains, dataChangeDomains, type DataDomain } from '@fyimp/contracts'
 
 export const dataClient = new QueryClient({ defaultOptions: { queries: {
-  staleTime: Infinity, gcTime: Infinity, retry: false, refetchOnWindowFocus: false,
+  staleTime: 60000, gcTime: 1800000, retry: false, refetchOnWindowFocus: false,
   refetchOnReconnect: false, refetchInterval: false,
 }, mutations: { retry: false } } })
 interface StoredResponse { body: string; status: number; headers: [string, string][] }
@@ -10,6 +10,16 @@ class ResponseFailure { constructor(readonly response: StoredResponse) {} }
 let epoch = 0
 let scope = 'session'
 const fresh = new Set<string>()
+const activeDomains = new Map<string, number>()
+export function retainDataDomains(domains: readonly string[]) {
+  for (const domain of domains) activeDomains.set(domain, (activeDomains.get(domain) || 0) + 1)
+  return () => { for (const domain of domains) activeDomains.set(domain, Math.max(0, (activeDomains.get(domain) || 0) - 1)) }
+}
+export const domainMaxAge = (domains: readonly string[]) => domains.every(domain => domain === 'catalogue') ? 600000 : 60000
+export function bindDataScope(value: string) {
+  if (scope !== value) { clearDataCache(); scope = value }
+}
+export function currentDataScope() { return scope }
 const domainsOf = (query: Query) => (query.meta?.domains || []) as DataDomain[]
 const matches = (domains: readonly string[]) => (query: Query) => domainsOf(query).some(domain => domains.includes(domain))
 const makeResponse = (value: StoredResponse) => new Response(value.body, { status: value.status, headers: value.headers })
@@ -55,6 +65,7 @@ export async function cachedDataFetch(input: RequestInfo | URL, init: RequestIni
   if (/\/auth\/(login|logout|complete-password-reset)$/.test(parsed.pathname) && method !== 'GET') clearDataCache()
   if (method !== 'GET') {
     const response = await network(input, init)
+    if (response.ok && /\/auth\/(login|logout|complete-password-reset)$/.test(parsed.pathname)) window.dispatchEvent(new Event('fyimp:account-transition'))
     if (response.ok && parsed.pathname !== '/api/timetable/manual/preview') {
       await invalidateData(dataChangeDomains(url))
     }
@@ -69,15 +80,22 @@ export async function cachedDataFetch(input: RequestInfo | URL, init: RequestIni
   const force = headers.get('X-Refresh-Data') === '1' || fresh.has(url)
   if (force) fresh.delete(url)
   if (force && query) { await dataClient.cancelQueries({ queryKey: key, exact: true }); await dataClient.invalidateQueries({ queryKey: key, exact: true, refetchType: 'none' }) }
-  const request = dataClient.fetchQuery<StoredResponse>({ queryKey: key, meta: { domains }, queryFn: async ({ signal }) => {
+  const request = dataClient.fetchQuery<StoredResponse>({ queryKey: key, meta: { domains }, staleTime: domainMaxAge(domains), queryFn: async ({ signal }) => {
     if (force) headers.set('X-Refresh-Data', '1')
     const response = await network(url, { ...init, headers, signal })
     const result = { body: await response.text(), status: response.status, headers: [...response.headers.entries()] as [string, string][] }
     if (!response.ok || !response.headers.get('content-type')?.includes('json')) throw new ResponseFailure(result)
+    const responseScope = response.headers.get('X-Data-Scope')
+    if (responseScope && scope !== 'session' && responseScope !== scope) {
+      clearDataCache()
+      window.dispatchEvent(new Event('fyimp:identity-changed'))
+    }
     if (currentEpoch !== epoch) throw new DOMException('Session changed', 'AbortError')
     return result
   } }).then(value => {
     if (currentEpoch !== epoch) throw new DOMException('Session changed', 'AbortError')
+    const updatedAt = Number(new Headers(value.headers).get('X-Data-Updated-At'))
+    if (updatedAt > 0 && updatedAt <= Date.now()) dataClient.setQueryData(key, value, { updatedAt })
     return makeResponse(value)
   }).catch(error => {
     if (isCancelledError(error)) throw new DOMException('Request superseded', 'AbortError')
@@ -96,4 +114,13 @@ export async function cachedDataFetch(input: RequestInfo | URL, init: RequestIni
       signal.removeEventListener('abort', abort); reject(error)
     })
   })
+}
+
+/** Revalidate only datasets mounted by visible consumers; no hidden-tab polling. */
+export async function revalidateVisibleData() {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+  const stale = dataClient.getQueryCache().getAll().filter(query => query.queryKey[0] === 'data' && domainsOf(query).some(domain => activeDomains.get(domain)) &&
+    Date.now() - query.state.dataUpdatedAt >= domainMaxAge(domainsOf(query)))
+  const domains = [...new Set(stale.flatMap(domainsOf))]
+  if (domains.length) await invalidateData(domains)
 }

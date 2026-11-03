@@ -1,4 +1,5 @@
 'use client'
+import AuthCleanupStatus from '@/components/AuthCleanupStatus'
 
 import { useDataRevision } from '@/core/hooks/useDataRevision'
 import { refreshDatasets } from '@/core/data-cache'
@@ -71,6 +72,7 @@ export default function SuperAdminDashboard() {
   const [loadingAdmin, setLoadingAdmin] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [cleanupRequestId, setCleanupRequestId] = useState<string | null>(null)
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({})
 
   // Campuses state
@@ -217,7 +219,7 @@ export default function SuperAdminDashboard() {
       const data = await adminRequest('/api/admin/campuses', 'Unable to delete the campus. Please retry.', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campus_id: deleteCampus.id }),
       })
-      setSuccess(data.message); setDeleteCampus(null); void fetchCampuses()
+      setSuccess(data.message); setCleanupRequestId(data.cleanupRequestId || null); setDeleteCampus(null); void fetchCampuses()
     })
   }
   function handleSaveDept() {
@@ -237,7 +239,7 @@ export default function SuperAdminDashboard() {
       const data = await adminRequest('/api/admin/departments', 'Unable to delete the department. Please retry.', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department_id: deleteDept.id }),
       })
-      setSuccess(data.message); setDeleteDept(null); void fetchDepartments()
+      setSuccess(data.message); setCleanupRequestId(data.cleanupRequestId || null); setDeleteDept(null); void fetchDepartments()
     })
   }
   function handleAddFaculty() {
@@ -284,7 +286,7 @@ export default function SuperAdminDashboard() {
       const data = await adminRequest('/api/admin/faculty-list', 'Unable to remove the staff account. Please retry.', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faculty_id: deleteFaculty.id }),
       })
-      setSuccess(data.message); setDeleteFaculty(null); void fetchFaculty()
+      setSuccess(data.message); setCleanupRequestId(data.cleanupRequestId || null); setDeleteFaculty(null); void fetchFaculty()
     })
   }
 
@@ -356,6 +358,7 @@ export default function SuperAdminDashboard() {
         {Object.entries(loadErrors).filter(([, message]) => message).map(([key, message]) => <div key={key} role="alert" className={styles.errorBanner}>
           {message}{' '}<button type="button" onClick={() => void ({ campuses: fetchCampuses, departments: fetchDepartments, faculty: fetchFaculty, logs: fetchLogs, profile: loadAdminProfile }[key as Tab | 'profile']?.())}>Retry</button>
         </div>)}
+        {cleanupRequestId && <AuthCleanupStatus requestId={cleanupRequestId} />}
         {success && <div className={styles.successBanner}><UiCheck size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /> {success}</div>}
 
         {/* ══ CAMPUSES TAB ══ */}

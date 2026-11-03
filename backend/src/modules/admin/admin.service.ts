@@ -21,6 +21,19 @@ export class AdminService {
     private readonly serverLogger: ServerLoggerService,
   ) {}
 
+  async cleanupStatus(requestId: string) {
+    const tasks = await fetchAllPaginated<any>(this.supabase.admin.from('auth_cleanup_tasks')
+      .select('id,user_id,status,attempts,error,updated_at').eq('request_id', requestId).order('id'))
+    return { requestId, total: tasks.length, completed: tasks.filter(t => t.status === 'completed').length,
+      pending: tasks.filter(t => ['pending','running'].includes(t.status)).length,
+      failed: tasks.filter(t => t.status === 'failed').length, tasks }
+  }
+  async retryCleanup(requestId: string, user: AuthUser) {
+    const { error } = await this.supabase.admin.rpc('retry_auth_cleanup', { p_request: requestId, p_actor: user.userId })
+    if (error) throw new BadRequestException(error.message)
+    return this.cleanupStatus(requestId)
+  }
+
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Campuses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async getCampuses() {
     const { data, error } = await this.supabase.admin
@@ -128,53 +141,12 @@ export class AdminService {
   }
 
   async deleteCampus(campusId: string, user: AuthUser) {
-    const { data: students } = await this.supabase.admin
-      .from('students')
-      .select('id')
-      .eq('campus_id', campusId)
-
-    const { data: faculty } = await this.supabase.admin
-      .from('faculty')
-      .select('id')
-      .eq('campus_id', campusId)
-
-    const { error } = await this.supabase.admin.rpc('delete_campus_cascade', {
-      p_campus_id: campusId,
-    })
-
-    if (error) throw new InternalServerErrorException('Failed to delete campus')
-
-    const allUserIds = [
-      ...(students ?? []).map((s) => s.id),
-      ...(faculty ?? []).map((f) => f.id),
-    ]
-
-    if (allUserIds.length > 0) {
-      const deleteResults = await Promise.allSettled(
-        allUserIds.map((id) => this.supabase.admin.auth.admin.deleteUser(id)),
-      )
-      const failedDeletions = deleteResults.filter((r) => r.status === 'rejected')
-      if (failedDeletions.length > 0) {
-        this.serverLogger.warn(
-          `deleteCampus: ${failedDeletions.length} user auth deletions failed out of ${allUserIds.length}`,
-        )
-      }
-    }
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.CAMPUS_DELETED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `deleted campus: ${campusId}`,
-      resourceType: 'campus',
-      resourceId: campusId,
-      status: 'success',
-    })
-
-    return { success: true, message: 'Campus deleted successfully' }
+    const { data, error } = await this.supabase.admin.rpc('review_delete_accounts', { p_scope: 'campus', p_id: campusId, p_actor: user.userId })
+    if (error?.code === 'P4030') throw new ForbiddenException(error.message)
+    if (error) throw new InternalServerErrorException('Deletion failed; domain records and cleanup manifest were rolled back')
+    return { ...data, message: 'Domain records deleted. Authentication cleanup status is tracked separately.' }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async getDepartments() {
     const { data, error } = await this.supabase.admin
       .from('departments')
@@ -271,47 +243,12 @@ export class AdminService {
   }
 
   async deleteDepartment(deptId: string, user: AuthUser) {
-    const { data: students } = await this.supabase.admin
-      .from('students')
-      .select('id')
-      .eq('department_id', deptId)
-
-    const { data: faculty } = await this.supabase.admin
-      .from('faculty')
-      .select('id')
-      .eq('department_id', deptId)
-
-    const { error } = await this.supabase.admin.rpc('delete_department_cascade', {
-      p_dept_id: deptId,
-    })
-
-    if (error) throw new InternalServerErrorException('Failed to delete department')
-
-    const allUserIds = [
-      ...(students ?? []).map((s) => s.id),
-      ...(faculty ?? []).map((f) => f.id),
-    ]
-
-    if (allUserIds.length > 0) {
-      await Promise.allSettled(
-        allUserIds.map((id) => this.supabase.admin.auth.admin.deleteUser(id)),
-      )
-    }
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.DEPARTMENT_DELETED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `deleted department: ${deptId}`,
-      resourceType: 'department',
-      resourceId: deptId,
-      status: 'success',
-    })
-
-    return { success: true, message: 'Department deleted successfully' }
+    const { data, error } = await this.supabase.admin.rpc('review_delete_accounts', { p_scope: 'department', p_id: deptId, p_actor: user.userId })
+    if (error?.code === 'P4030') throw new ForbiddenException(error.message)
+    if (error) throw new InternalServerErrorException('Deletion failed; domain records and cleanup manifest were rolled back')
+    return { ...data, message: 'Domain records deleted. Authentication cleanup status is tracked separately.' }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Faculty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   private async checkAdministrativeFaculty(role: string, campusId: string, departmentId?: string | null, excludeId?: string) {
     if (role === 'teacher') throw new ForbiddenException('Teachers are managed by their HOD and are read-only here')
     if (!['hod', 'campus_director', 'teaching_staff'].includes(role)) throw new BadRequestException('Invalid administrative faculty role')
@@ -484,33 +421,12 @@ export class AdminService {
   }
 
   async deleteFaculty(facultyId: string, user: AuthUser) {
-    const existing = await this.editableFaculty(facultyId)
-    const { error } = await this.supabase.admin
-      .from('faculty')
-      .delete()
-      .eq('id', facultyId)
-      .eq('role', existing.role)
-      .select('id')
-      .single()
-
-    if (error) throw new InternalServerErrorException('Failed to delete faculty record')
-
-    await this.supabase.admin.auth.admin.deleteUser(facultyId)
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.FACULTY_DELETED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `deleted faculty: ${facultyId}`,
-      resourceType: 'faculty',
-      resourceId: facultyId,
-      status: 'success',
-    })
-
-    return { success: true, message: 'Faculty deleted successfully' }
+    const { data, error } = await this.supabase.admin.rpc('review_delete_accounts', { p_scope: 'faculty', p_id: facultyId, p_actor: user.userId })
+    if (error?.code === 'P4030') throw new ForbiddenException(error.message)
+    if (error) throw new InternalServerErrorException('Deletion failed; domain records and cleanup manifest were rolled back')
+    return { ...data, message: 'Domain records deleted. Authentication cleanup status is tracked separately.' }
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Promote Students â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async promoteStudents(director: AuthUser, expectedTerm: number) {
     if (director.role !== 'campus_director' || !director.campus_id) throw new ForbiddenException('Campus director required')
     const { data, error } = await this.supabase.admin.rpc('promote_campus_students_atomic', {

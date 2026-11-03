@@ -1,3 +1,4 @@
+import { assertDeliveryAuthority } from '../../core/auth/delivery-authority'
 import {
   BadRequestException,
   ForbiddenException,
@@ -89,10 +90,11 @@ export class FacultyService {
     if (user.role === 'teacher') {
       if (!deliveryId) throw new BadRequestException('Select an assigned course delivery');
       const { data, error } = await this.supabase.admin.from('current_teacher_course_assignments')
-        .select('id, campus_id, academic_year, semester').eq('id', deliveryId)
+        .select('id, campus_id, academic_year, semester, term_version').eq('id', deliveryId)
         .eq('teacher_id', user.userId).eq('course_id', courseId).maybeSingle();
       if (error) throw new InternalServerErrorException('Could not verify teaching assignment');
       if (!data?.campus_id) throw new ForbiddenException('You are not assigned to this delivery');
+      await assertDeliveryAuthority(this.supabase.admin, user, { ...data, course_id: courseId });
       delivery = data;
       deliveryCampusId = data.campus_id;
     }

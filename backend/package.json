@@ -6,7 +6,8 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "start:worker": "node dist/worker"
   },
   "dependencies": {
     "@fyimp/contracts": "file:../contracts",
@@ -22,7 +23,7 @@
     "papaparse": "^5.5.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^3.24.2"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.5",

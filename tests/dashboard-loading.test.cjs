@@ -9,7 +9,7 @@ function sourceModule(source) {
   const filename = path.resolve(source), module = new Module(filename)
   module.filename = filename; module.paths = Module._nodeModulePaths(path.dirname(filename))
   module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, filename)
   return module.exports
 }
@@ -20,6 +20,16 @@ function browser(t, network) {
   t.after(() => { if (previous === undefined) delete global.window; else global.window = previous })
   return native
 }
+
+test('director allocation badge distinguishes waiting for a worker from execution and failure', () => {
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const { createElement } = require('react')
+  const Badge = sourceModule('frontend/src/app/dashboard/director/AllocationStatusBadge.tsx').default
+  for (const [status, label] of [[undefined, 'Not Started'], ['queued', 'Queued · waiting for worker'],
+    ['running', 'Algorithm Running (Rounds 1–3)...'], ['completed', 'Completed'], ['failed', 'Failed']]) {
+    assert.ok(renderToStaticMarkup(createElement(Badge, { status })).includes('>' + label + '</span>'))
+  }
+})
 
 test('course loading resumes after a development effect cleanup and reloads invalidated data', async () => {
   const { createSemesterCatalogue } = sourceModule('frontend/src/core/semester-catalogue.ts')

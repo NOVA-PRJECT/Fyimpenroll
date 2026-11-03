@@ -1,3 +1,4 @@
+import { ChangePasswordSchema } from '@fyimp/contracts'
 import {
   BadRequestException,
   Body,
@@ -22,22 +23,6 @@ import { AuthUser } from '../../core/auth/types'
 import { RateLimitGuard } from '../../core/security/rate-limit.guard'
 import { RateLimit } from '../../core/security/rate-limit.decorator'
 import { z } from 'zod'
-
-const ChangePasswordSchema = z
-  .object({
-    current_password: z.string().min(1, 'Current password is required'),
-    new_password: z
-      .string()
-      .min(10, 'Password must be at least 10 characters')
-      .max(128, 'Password must not exceed 128 characters')
-      .regex(/[A-Za-z]/, 'Password must contain at least one letter')
-      .regex(/[0-9]/, 'Password must contain at least one number'),
-    confirm_password: z.string().min(1, 'Please confirm your password'),
-  })
-  .refine((data) => data.new_password === data.confirm_password, {
-    message: 'Passwords do not match',
-    path: ['confirm_password'],
-  })
 
 @Controller('api/student')
 @UseGuards(AuthGuard, RolesGuard)

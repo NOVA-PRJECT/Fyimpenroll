@@ -1,4 +1,4 @@
-﻿import {
+import {
   Controller,
   Get,
   Header,
@@ -44,10 +44,7 @@ export class CampusAttendanceController {
       throw new BadRequestException(parsed.error.issues[0]?.message || 'Invalid coordinates payload');
     }
 
-    const ip =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
-      req.ip ||
-      'unknown-ip';
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown-ip';
 
     return this.campusService.recordCampusSignIn(
       user,

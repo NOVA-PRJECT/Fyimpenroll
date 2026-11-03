@@ -10,7 +10,7 @@ export const secureStorage = {
       return await SecureStore.getItemAsync(key);
     } catch (error) {
       console.warn(`[SecureStore] Error reading key "${key}":`, error);
-      return null;
+      throw new Error('Could not read encrypted local data; existing data was preserved');
     }
   },
 

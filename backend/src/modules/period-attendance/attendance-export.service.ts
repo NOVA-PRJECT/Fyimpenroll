@@ -1,5 +1,9 @@
+import { AttendanceExportSchema } from '@fyimp/contracts'
+import type { Response } from 'express'
 import {
   Injectable,
+  BadRequestException,
+  UnprocessableEntityException,
   ForbiddenException,
   NotFoundException,
   InternalServerErrorException,
@@ -14,6 +18,16 @@ import { sanitizeSpreadsheetValue } from '../credit-ledger/export.service';
 @Injectable()
 export class AttendanceExportService {
   constructor(private readonly supabase: SupabaseService) {}
+
+  async sendStatement(user: AuthUser, query: { semesterId?: string; departmentId?: string }, res: Response) {
+    const parsed = AttendanceExportSchema.safeParse(query)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    const { buffer, filename } = await this.generateAttendanceStatement(user, parsed.data.semesterId, parsed.data.departmentId)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}"`)
+    res.setHeader('Content-Length', buffer.length)
+    return res.end(buffer)
+  }
 
   /**
    * Generates a styled XLSX Attendance Statement (APC) for a department and semester.
@@ -32,9 +46,11 @@ export class AttendanceExportService {
     if (user.role !== 'superadmin' && (!user.campus_id || department.campus_id !== user.campus_id)) throw new ForbiddenException('Campus outside scope');
     const { data: settings, error: settingsError } = await this.supabase.admin.from('campus_settings').select('academic_year').eq('campus_id', department.campus_id).single();
     if (settingsError || !settings?.academic_year) throw new InternalServerErrorException('Active academic year unavailable');
+    const rowLimit = Math.min(100000, Math.max(1, Number(process.env.EXPORT_MAX_ROWS) || 10000))
     const studentList = await fetchAllPaginated<any>(this.supabase.admin.from('students')
       .select('id, full_name, cap_application_number, current_semester').eq('department_id',deptId)
-      .eq('campus_id',department.campus_id).eq('current_semester',semester).order('id'));
+      .eq('campus_id',department.campus_id).eq('current_semester',semester).order('id'), 1000, rowLimit + 1000);
+    if (studentList.length > rowLimit) throw new UnprocessableEntityException('Report exceeds the configured row limit; select a smaller cohort');
     const studentIds = studentList.map(s => s.id);
     const registrations = studentIds.length ? await fetchByIdChunks<any>(studentIds, chunk => this.supabase.admin.from('current_student_registrations')
       .select('*').eq('semester',semester).eq('academic_year',settings.academic_year).in('student_id',chunk).order('id')) : [];
@@ -58,6 +74,7 @@ export class AttendanceExportService {
       studentCoursePresentMap.set(key, Number(row.present));
     }
 
+    if ((studentList.length + 10) * (courseList.length + 4) > (Number(process.env.EXPORT_MAX_CELLS) || 500000)) throw new UnprocessableEntityException('Report exceeds the configured cell limit');
     // 7. Build XLSX using exceljs
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'FYIMP Portal';

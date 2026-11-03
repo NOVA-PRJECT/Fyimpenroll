@@ -1,4 +1,5 @@
-﻿import { Module } from '@nestjs/common'
+import { AccountPasswordService } from '../../core/security/account-password.service'
+import { Module } from '@nestjs/common'
 import { StudentService } from './student.service'
 import { StudentController } from './student.controller'
 import { AuthCoreModule } from '../../core/auth/auth-core.module'
@@ -8,7 +9,7 @@ import { CampusAttendanceModule } from '../campus-attendance/campus-attendance.m
 @Module({
   imports: [AuthCoreModule, CampusAttendanceModule],
   controllers: [StudentController],
-  providers: [StudentService, StudentPortalService],
+  providers: [AccountPasswordService, StudentService, StudentPortalService],
   exports: [StudentService],
 })
 export class StudentModule {}

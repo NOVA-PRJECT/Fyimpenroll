@@ -7,12 +7,13 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity,
-      gcTime: Infinity,
+      staleTime: 60000,
+      gcTime: 1800000,
       retry: false,
-      refetchInterval: false,
-      refetchOnReconnect: false,
-      refetchOnWindowFocus: false, // On mobile, we avoid aggressive window focus refetches
+      refetchInterval: 60000,
+      refetchIntervalInBackground: false,
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: true, // Native focus is wired to AppState.
     },
     mutations: {
       retry: 0,

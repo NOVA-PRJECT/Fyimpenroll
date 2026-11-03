@@ -102,142 +102,51 @@ function resolveSolverScriptPath(): string {
   return directPath
 }
 
-export async function runOrtoolsSolver(payload: OrtoolsInputPayload): Promise<OrtoolsSolverResult> {
-  const pythonBin = resolvePythonBinary()
-  const scriptPath = resolveSolverScriptPath()
-
-  const maxSeconds = payload.config?.max_time_in_seconds ?? 300
-  const timeoutMs = (maxSeconds + 15) * 1000
-
-  return new Promise<OrtoolsSolverResult>((resolve) => {
-    let child: any
-    try {
-      child = spawn(pythonBin, [scriptPath, '-'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
-    } catch (err: any) {
-      return resolve({
-        status: 'MODEL_INVALID',
-        assignments: [],
-        diagnostics: [`Failed to spawn Python process (${pythonBin}): ${err.message}`],
-        stats: {
-          wall_time_seconds: 0,
-          total_courses: payload.courses.length,
-          total_sessions_assigned: 0,
-        },
-      })
+export async function runOrtoolsSolver(payload: OrtoolsInputPayload, signal?: AbortSignal): Promise<OrtoolsSolverResult> {
+  const maxSeconds = Math.max(1, Math.min(900, payload.config?.max_time_in_seconds ?? 300))
+  return new Promise(resolve => {
+    const child = spawn(resolvePythonBinary(), [resolveSolverScriptPath(), '-'], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+    let stdout = '', stderr = '', outputBytes = 0, errorBytes = 0, failure = '', settled = false
+    let escalation: ReturnType<typeof setTimeout> | undefined
+    const failed = (message: string): OrtoolsSolverResult => ({ status: 'UNKNOWN', assignments: [], diagnostics: [message],
+      stats: { wall_time_seconds: 0, total_courses: payload.courses.length, total_sessions_assigned: 0 } })
+    const stop = (message: string) => {
+      if (failure || settled) return
+      failure = message
+      child.kill('SIGTERM')
+      escalation = setTimeout(() => { child.kill('SIGKILL') }, 2000)
     }
-
-    let stdoutData = ''
-    let stderrData = ''
-    let isSettled = false
-
-    const timer = setTimeout(() => {
-      if (!isSettled) {
-        isSettled = true
-        try {
-          child.kill('SIGTERM')
-        } catch {}
-        resolve({
-          status: 'UNKNOWN',
-          assignments: [],
-          diagnostics: [`Solver execution timed out after ${maxSeconds} seconds`],
-          stats: {
-            wall_time_seconds: maxSeconds,
-            total_courses: payload.courses.length,
-            total_sessions_assigned: 0,
-          },
-        })
-      }
-    }, timeoutMs)
-
+    const timeout = setTimeout(() => stop(`Solver execution timed out after ${maxSeconds} seconds`), (maxSeconds + 15) * 1000)
+    const abort = () => stop('Solver cancelled or worker lease lost')
+    const finish = (result: OrtoolsSolverResult) => {
+      if (settled) return
+      settled = true; clearTimeout(timeout); if (escalation) clearTimeout(escalation)
+      signal?.removeEventListener('abort', abort)
+      resolve(result)
+    }
     child.stdout.on('data', (chunk: Buffer) => {
-      stdoutData += chunk.toString()
+      outputBytes += chunk.length
+      if (outputBytes > 4194304) stop('Solver stdout exceeded 4 MiB limit')
+      else stdout += chunk.toString()
     })
-
     child.stderr.on('data', (chunk: Buffer) => {
-      stderrData += chunk.toString()
+      errorBytes += chunk.length
+      if (errorBytes > 262144) stop('Solver stderr exceeded 256 KiB limit')
+      else stderr += chunk.toString()
     })
-
-    child.on('error', (err: Error) => {
-      clearTimeout(timer)
-      if (!isSettled) {
-        isSettled = true
-        resolve({
-          status: 'MODEL_INVALID',
-          assignments: [],
-          diagnostics: [`Child process error: ${err.message}`],
-          stats: {
-            wall_time_seconds: 0,
-            total_courses: payload.courses.length,
-            total_sessions_assigned: 0,
-          },
-        })
-      }
-    })
-
-    child.on('close', (code: number) => {
-      clearTimeout(timer)
-      if (isSettled) return
-      isSettled = true
-
-      if (!stdoutData.trim()) {
-        return resolve({
-          status: 'MODEL_INVALID',
-          assignments: [],
-          diagnostics: [
-            `Solver produced no output. Exit code: ${code}. Stderr: ${stderrData.trim() || 'none'}`,
-          ],
-          stats: {
-            wall_time_seconds: 0,
-            total_courses: payload.courses.length,
-            total_sessions_assigned: 0,
-          },
-        })
-      }
-
+    child.stdin.on('error', error => stop(`Solver input failed: ${error.message}`))
+    child.on('error', error => finish(failed(`Solver process failed: ${error.message}`)))
+    child.on('close', code => {
+      if (failure) return finish(failed(failure))
+      if (code !== 0) return finish(failed(`Solver exited with code ${code}: ${stderr.slice(0, 1500)}`))
       try {
-        const parsed = JSON.parse(stdoutData) as OrtoolsSolverResult
-        if (stderrData.trim()) {
-          parsed.diagnostics = [...(parsed.diagnostics || []), `Stderr: ${stderrData.trim()}`]
-        }
-        resolve(parsed)
-      } catch (parseErr: any) {
-        resolve({
-          status: 'MODEL_INVALID',
-          assignments: [],
-          diagnostics: [
-            `Failed to parse solver JSON output: ${parseErr.message}`,
-            `Raw output: ${stdoutData.slice(0, 500)}`,
-          ],
-          stats: {
-            wall_time_seconds: 0,
-            total_courses: payload.courses.length,
-            total_sessions_assigned: 0,
-          },
-        })
-      }
+        const parsed = JSON.parse(stdout) as OrtoolsSolverResult
+        if (!Array.isArray(parsed.assignments) || !Array.isArray(parsed.diagnostics) || !parsed.stats) throw new Error('Malformed solver result')
+        finish(parsed)
+      } catch { finish(failed(`Solver returned invalid JSON: ${stderr.slice(0, 1500)}`)) }
     })
-
-    // Write input payload to child stdin
-    try {
-      child.stdin.write(JSON.stringify(payload))
-      child.stdin.end()
-    } catch (writeErr: any) {
-      clearTimeout(timer)
-      if (!isSettled) {
-        isSettled = true
-        resolve({
-          status: 'MODEL_INVALID',
-          assignments: [],
-          diagnostics: [`Failed to write input to solver stdin: ${writeErr.message}`],
-          stats: {
-            wall_time_seconds: 0,
-            total_courses: payload.courses.length,
-            total_sessions_assigned: 0,
-          },
-        })
-      }
-    }
+    signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
+    try { child.stdin.end(JSON.stringify(payload)) } catch (error) { stop(`Solver input failed: ${(error as Error).message}`) }
   })
 }

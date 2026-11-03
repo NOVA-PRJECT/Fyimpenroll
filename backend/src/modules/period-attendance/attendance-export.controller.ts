@@ -1,5 +1,7 @@
-﻿import {
+import { ExportBudgetInterceptor } from '../../core/security/export-budget.interceptor'
+import {
   Controller,
+  UseInterceptors,
   Get,
   Query,
   UseGuards,
@@ -19,6 +21,7 @@ export class AttendanceExportController {
   constructor(private readonly exportService: AttendanceExportService) {}
 
   @Get('export/statement')
+  @UseInterceptors(ExportBudgetInterceptor)
   @Roles('hod', 'superadmin')
   async exportStatement(
     @CurrentUser() user: AuthUser,
@@ -26,16 +29,6 @@ export class AttendanceExportController {
     @Query('departmentId') departmentId: string,
     @Res() res: Response
   ) {
-    const sem = semesterId ? parseInt(semesterId, 10) : 1;
-    const { buffer, filename } = await this.exportService.generateAttendanceStatement(
-      user,
-      sem,
-      departmentId
-    );
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', buffer.length);
-    return res.end(buffer);
+    return this.exportService.sendStatement(user, { semesterId, departmentId }, res)
   }
 }

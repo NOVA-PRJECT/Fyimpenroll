@@ -9,17 +9,18 @@ const { AuthService } = require('../backend/dist/modules/auth/auth.service')
 const { assertPasswordNotCompromised } = require('../backend/dist/core/security/password-security')
 const provider = { auth: { getSession: async () => ({ data: { session: { access_token: 'recovery-token' } } }) } }
 const logger = { log: async () => {}, warn() {}, error() {} }
+const tokenHash = 'a'.repeat(64)
 const safeResponse = () => new Response('A'.repeat(35) + ':0\r\n')
 
 test('reset and synchronization use the recovery bearer session without old logout cookies', async () => {
   for (const endpoint of ['/api/auth/complete-password-reset', '/api/auth/sync-password-status']) {
-    const response = await requestPasswordRecovery(provider, endpoint, endpoint.endsWith('reset') ? { newPassword: 'Synthetic-Permanent-Password-381' } : undefined, async (url, options) => {
+    const response = await requestPasswordRecovery(provider, endpoint, endpoint.endsWith('reset') ? { newPassword: 'Synthetic-Permanent-Password-381', token_hash: tokenHash } : undefined, async (url, options) => {
       assert.equal(url, endpoint)
       const request = new Request('https://portal.example.test' + url, options)
       assert.equal(request.credentials, 'omit')
-      assert.equal(request.headers.get('Authorization'), 'Bearer recovery-token')
+      assert.equal(request.headers.get('Authorization'), endpoint.endsWith('reset') ? null : 'Bearer recovery-token')
       assert.equal(request.headers.has('Cookie'), false)
-      if (endpoint.endsWith('reset')) assert.deepEqual(await request.json(), { newPassword: 'Synthetic-Permanent-Password-381' })
+      if (endpoint.endsWith('reset')) assert.deepEqual(await request.json(), { newPassword: 'Synthetic-Permanent-Password-381', token_hash: tokenHash })
       return Response.json({ success: true })
     })
     assert.equal(response.ok, true)
@@ -40,16 +41,16 @@ test('explicit recovery authorization is never replaced by cookie refresh on 401
 
 test('the controller accepts the reset contract and rejects the old unverified assertion', async () => {
   const controller = new AuthController({ completePasswordReset: async (user, body) => ({ user, body }) })
-  const result = await controller.completePasswordReset({ userId: 'student' }, { newPassword: 'Synthetic-Password-381' })
+  const result = await controller.completePasswordReset({ newPassword: 'Synthetic-Password-381', token_hash: tokenHash })
   assert.equal(result.body.newPassword, 'Synthetic-Password-381')
-  await assert.rejects(controller.completePasswordReset({ userId: 'student' }, { passwordUpdated: true }), error => error.getStatus() === 400)
+  await assert.rejects(controller.completePasswordReset({ passwordUpdated: true }), error => error.getStatus() === 400)
 })
 
 test('a partially synchronized reset retries account status without setting the password twice', async t => {
   t.mock.method(globalThis, 'fetch', async () => safeResponse())
   let metadata = { role: 'student', must_change_password: true }
   let passwordsChanged = 0, profileWrites = 0
-  const supabase = { admin: {
+  const supabase = { createAuthClient: () => ({ auth: { verifyOtp: async () => ({ data: { user: { id: 'student', app_metadata: { ...metadata } }, session: { access_token: 'recovery', refresh_token: 'refresh' } }, error: null }) } }), admin: {
     auth: { admin: {
       getUserById: async () => ({ data: { user: { app_metadata: { ...metadata } } }, error: null }),
       updateUserById: async (_id, patch) => { if (patch.password) passwordsChanged++; metadata = { ...metadata, ...patch.app_metadata }; return { error: null } },
@@ -57,7 +58,7 @@ test('a partially synchronized reset retries account status without setting the 
     from: () => ({ update: () => ({ eq: async () => ({ error: ++profileWrites === 1 ? { message: 'temporary database failure' } : null }) }) }),
   } }
   const service = new AuthService(supabase, {}, logger, logger)
-  const first = await service.completePasswordReset('student', { newPassword: 'Synthetic-Permanent-Password-381' })
+  const first = await service.completePasswordReset('student', { newPassword: 'Synthetic-Permanent-Password-381', token_hash: tokenHash })
   assert.equal(first.canRetrySync, true)
   assert.equal(metadata.pending_profile_sync, true)
   assert.equal((await service.syncPasswordStatus('student')).success, true)
@@ -84,4 +85,28 @@ test('password screening fails closed on outages and malformed responses', async
     await assert.rejects(assertPasswordNotCompromised('Synthetic-Permanent-Password-381'), error => error.getStatus() === 503)
     mock.mock.restore()
   }
+})
+
+
+test('ordinary authenticated identity and client recovery assertions cannot reset a password', async () => {
+  let writes = 0
+  const service = new AuthService({ admin: { auth: { admin: { updateUserById: async () => { writes++ } } } } }, {}, logger, logger)
+  for (const body of [{ newPassword: 'Synthetic-Password-381' }, { passwordUpdated: true }]) {
+    await assert.rejects(service.completePasswordReset('ordinary-login-user', body), error => error.getStatus() === 400)
+  }
+  assert.equal(writes, 0)
+})
+test('provider recovery proof determines the account and single-use tokens cannot be replayed', async t => {
+  t.mock.method(globalThis, 'fetch', async () => safeResponse())
+  let used = false, target
+  const supabase = { createAuthClient: () => ({ auth: { verifyOtp: async args => {
+    assert.equal(args.type, 'recovery')
+    if (used) return { data: null, error: { status: 400, code: 'otp_expired' } }
+    used = true
+    return { data: { user: { id: 'recovered-account', app_metadata: { role: 'teacher' } }, session: { access_token: 'recovery', refresh_token: 'refresh' } }, error: null }
+  } } }), admin: { auth: { admin: { updateUserById: async id => { target = id; return { error: null } } } } } }
+  const service = new AuthService(supabase, {}, logger, logger)
+  await service.completePasswordReset('attacker-supplied-account', { newPassword: 'Synthetic-Permanent-Password-381', token_hash: tokenHash })
+  assert.equal(target, 'recovered-account')
+  await assert.rejects(service.completePasswordReset('recovered-account', { newPassword: 'Synthetic-Permanent-Password-381', token_hash: tokenHash }), error => error.getStatus() === 401)
 })

@@ -1,3 +1,5 @@
+import { SettingsUpdateSchema, CreditRangeSchema } from '@fyimp/contracts'
+import { z } from 'zod'
 import {
   BadRequestException,
   Injectable,
@@ -95,6 +97,14 @@ export class DirectorService {
     const campusId = user.campus_id
     if (!campusId) throw new BadRequestException('Campus ID missing')
 
+    const parsed = SettingsUpdateSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    body = parsed.data
+    const { data: current, error: settingsError } = await this.supabase.admin.from('campus_settings').select('min_credits,max_credits').eq('campus_id', campusId).single()
+    if (settingsError || !current) throw new NotFoundException('Campus settings unavailable')
+    if (!CreditRangeSchema.safeParse({ min_credits: body.min_credits ?? current.min_credits, max_credits: body.max_credits ?? current.max_credits }).success) {
+      throw new BadRequestException('Credit limits must be integers and minimum cannot exceed maximum')
+    }
     const updatePayload: Record<string, any> = {}
     if (body.deadline !== undefined) updatePayload.deadline = body.deadline
     if (body.min_credits !== undefined) updatePayload.min_credits = body.min_credits

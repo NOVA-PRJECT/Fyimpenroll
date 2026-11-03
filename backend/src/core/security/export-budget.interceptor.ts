@@ -1,13 +1,20 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor, ServiceUnavailableException } from '@nestjs/common'
+import { defer } from 'rxjs'
 import { finalize } from 'rxjs/operators'
 
-/** Bound simultaneous in-memory workbook construction across all export controllers. */
 @Injectable()
 export class ExportBudgetInterceptor implements NestInterceptor {
   private static active = 0
-  intercept(_context: ExecutionContext, next: CallHandler) {
-    if (ExportBudgetInterceptor.active >= 2) throw new ServiceUnavailableException('Two reports are already running. Please retry shortly.')
-    ExportBudgetInterceptor.active++
-    return next.handle().pipe(finalize(() => { ExportBudgetInterceptor.active-- }))
+  private static users = new Set<string>()
+  intercept(context: ExecutionContext, next: CallHandler) {
+    return defer(() => {
+      const user = context.switchToHttp().getRequest().user?.userId || 'unknown'
+      if (ExportBudgetInterceptor.active >= 2 || ExportBudgetInterceptor.users.has(user)) {
+        throw new ServiceUnavailableException('Report capacity is busy. Wait for your current report and retry shortly.')
+      }
+      ExportBudgetInterceptor.active++; ExportBudgetInterceptor.users.add(user)
+      const release = () => { ExportBudgetInterceptor.active--; ExportBudgetInterceptor.users.delete(user) }
+      try { return next.handle().pipe(finalize(release)) } catch (error) { release(); throw error }
+    })
   }
 }

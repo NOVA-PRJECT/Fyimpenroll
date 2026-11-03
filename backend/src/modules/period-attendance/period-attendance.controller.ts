@@ -139,17 +139,6 @@ export class PeriodAttendanceController {
     @Query('departmentId') departmentId: string,
     @Res() res: Response
   ) {
-    const sem = semesterId ? parseInt(semesterId, 10) : 1;
-    const { buffer, filename } = await this.exportService.generateAttendanceStatement(
-      user,
-      sem,
-      departmentId
-    );
-
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
-    res.setHeader('Content-Length', buffer.length);
-    return res.end(buffer);
+    return this.exportService.sendStatement(user, { semesterId, departmentId }, res)
   }
 }

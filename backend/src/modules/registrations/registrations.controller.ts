@@ -1,5 +1,7 @@
-﻿import {
+import { RegistrationSubmitSchema, SlotUpdateSchema } from '@fyimp/contracts'
+import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -52,7 +54,9 @@ export class RegistrationsController {
     },
     @CurrentUser() user: AuthUser,
   ) {
-    return this.registrationsService.submitCourses(body, user)
+    const parsed = RegistrationSubmitSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.registrationsService.submitCourses(parsed.data, user)
   }
 
   @Get('available-seats')
@@ -77,6 +81,8 @@ export class RegistrationsController {
     @Body() body: { slot_key: string; course_id: string },
     @CurrentUser() user: AuthUser,
   ) {
-    return this.registrationsService.updateSlot(body, user)
+    const parsed = SlotUpdateSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.registrationsService.updateSlot(parsed.data, user)
   }
 }

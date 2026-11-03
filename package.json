@@ -18,7 +18,9 @@
     "build:frontend": "npm run build --workspace=frontend",
     "postinstall": "node scripts/apply-security-patches.cjs",
     "test:regression": "node --test tests/*.test.cjs frontend/tests/*.test.cjs",
-    "test": "npm run build:backend && npm run test:regression"
+    "test": "npm run build:backend && npm run test:regression",
+    "test:browser": "playwright test",
+    "test:postgres": "node --test tests/review-postgres.test.cjs"
   },
   "engines": {
     "node": ">=24.19.0 <25",
@@ -33,10 +35,19 @@
     "decode-uri-component": "file:./vendor/decode-uri-component",
     "xcode": {
       "uuid": "11.1.1"
-    }
+    },
+    "body-parser": "2.4.0",
+    "multer": "2.5.0",
+    "dompurify": "3.4.17",
+    "node-forge": "1.4.2",
+    "qs": "6.17.1",
+    "zod": "4.6.7",
+    "fast-uri": "3.1.9"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11",
-    "concurrently": "^9.2.5"
+    "concurrently": "^9.2.5",
+    "pg": "8.23.1",
+    "@playwright/test": "1.64.1"
   }
 }

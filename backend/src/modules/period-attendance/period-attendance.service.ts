@@ -1,3 +1,5 @@
+import { assertDeliveryAuthority } from '../../core/auth/delivery-authority'
+import { Revision, UniqueIds } from '@fyimp/contracts'
 import {
   Injectable,
   BadRequestException,
@@ -16,7 +18,7 @@ import { AuthUser } from '../../core/auth/types';
 import { AuthorizationPolicy } from '../../core/auth/authorization-policy';
 import { getISTDateTime } from '../../core/utils/date-time.util';
 import { CopyPracticalDto } from './dto/copy-practical.dto';
-import { fetchAllPaginated } from '../../core/database/pagination.util';
+import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/pagination.util';
 
 @Injectable()
 export class PeriodAttendanceService {
@@ -25,6 +27,10 @@ export class PeriodAttendanceService {
     private readonly auditLogger: AuditLoggerService,
     @Optional() private readonly cache?: DataCacheService,
   ) {}
+
+  private async allRows(query: any, order = 'id') {
+    return { data: await fetchAllPaginated<any>(query.order(order)), error: null }
+  }
 
   /**
    * Helper to convert time string (HH:MM:SS or HH:MM) to minutes from midnight.
@@ -149,6 +155,7 @@ export class PeriodAttendanceService {
         teacher_id,
         academic_year,
         semester,
+        term_version,
         status,
         session_type,
         is_lab_block,
@@ -227,47 +234,8 @@ export class PeriodAttendanceService {
    * Roster-only teaching_staff and students fail closed.
    */
   public async assertClassDeliveryAuthority(user: AuthUser, entry: any): Promise<void> {
-    AuthorizationPolicy.assertNotRosterOnly(user, 'mark or copy period attendance');
-
-    if (user.role === 'superadmin') return;
-
-    if (user.role === 'hod') {
-      if (!user.department_id || user.department_id !== entry.department_id) {
-        throw new ForbiddenException('Cannot manage attendance for another department (R03).');
-      }
-      return;
-    }
-
-    if (user.role === 'teacher') {
-      if (entry.teacher_id === user.userId) {
-        return; // Direct assignment on timetable entry
-      }
-
-      const hostCampusId = entry.campus_id || entry.departments?.campus_id;
-      const { data: assignments } = await this.supabase.admin
-        .from('current_teacher_course_assignments')
-        .select('id, course_id, campus_id, academic_year, semester')
-        .eq('teacher_id', user.userId)
-        .eq('course_id', entry.course_id);
-
-      const isAssigned = (assignments || []).some((a: any) => {
-        if (a.campus_id && hostCampusId && a.campus_id !== hostCampusId) return false;
-        if (a.academic_year && a.academic_year !== entry.academic_year) return false;
-        if (a.semester && a.semester !== entry.semester) return false;
-        return true;
-      });
-
-      if (!isAssigned) {
-        throw new ForbiddenException(
-          'You are not assigned to instruct this course. Teacher is not assigned to teach this course/class delivery (R03/R07).'
-        );
-      }
-      return;
-    }
-
-    throw new ForbiddenException(
-      `Role '${user.role}' is not authorized to manage attendance marks.`
-    );
+    return assertDeliveryAuthority(this.supabase.admin, user, { ...entry,
+      campus_id: entry.campus_id || entry.departments?.campus_id })
   }
 
   /**
@@ -276,10 +244,10 @@ export class PeriodAttendanceService {
    * NOTE: Post-period 15-minute lockout is retired; authorized teachers can mark or correct at any time.
    */
   async getCurrentPeriod(user: AuthUser) {
-    const { data: assignments, error: assignError } = await this.supabase.admin
+    const { data: assignments, error: assignError } = await this.allRows(this.supabase.admin
       .from('current_teacher_course_assignments')
       .select('course_id, campus_id, academic_year, semester')
-      .eq('teacher_id', user.userId);
+      .eq('teacher_id', user.userId));
 
     if (assignError) {
       throw new InternalServerErrorException(`Failed to check assignments: ${assignError.message}`);
@@ -298,7 +266,7 @@ export class PeriodAttendanceService {
     const dayOfWeek = ist.dayOfWeek;
     const currentMinutes = ist.totalMinutes;
 
-    const { data: rawEntries, error: entriesError } = await this.supabase.admin
+    const { data: rawEntries, error: entriesError } = await this.allRows(this.supabase.admin
       .from('current_timetable_entries')
       .select(`
         id,
@@ -315,7 +283,7 @@ export class PeriodAttendanceService {
         departments(campus_id)
       `)
       .in('course_id', assignedCourseIds)
-      .eq('status', 'published');
+      .eq('status', 'published'));
 
     if (entriesError) {
       throw new InternalServerErrorException(`Failed to fetch timetable entries: ${entriesError.message}`);
@@ -371,11 +339,11 @@ export class PeriodAttendanceService {
         const campusId = (entry as any).campus_id || (entry as any).departments?.campus_id;
         const [roster, { data: existingMarks }] = await Promise.all([
           this.getEnrolledRoster(entry.course_id, entry.academic_year, campusId, entry.semester),
-          this.supabase.admin
+          this.allRows(this.supabase.admin
             .from('period_attendance')
             .select('student_id, status, marked_at')
             .eq('timetable_slot_id', entry.id)
-            .eq('attendance_date', ist.dateString),
+            .eq('attendance_date', ist.dateString)),
         ]);
 
         const markedMap = new Map((existingMarks || []).map((m: any) => [m.student_id, m.status]));
@@ -420,10 +388,10 @@ export class PeriodAttendanceService {
       .eq('id', user.userId)
       .maybeSingle();
 
-    const { data: assignments, error: assignError } = await this.supabase.admin
+    const { data: assignments, error: assignError } = await this.allRows(this.supabase.admin
       .from('current_teacher_course_assignments')
       .select('course_id, campus_id, academic_year, semester, courses(id, course_code, title, category, semester, credits)')
-      .eq('teacher_id', user.userId);
+      .eq('teacher_id', user.userId));
 
     if (assignError) {
       throw new InternalServerErrorException(`Failed to check assignments: ${assignError.message}`);
@@ -606,7 +574,8 @@ export class PeriodAttendanceService {
       query = query.eq('semester', semester);
     }
 
-    const { data: registrations, error: regError } = await query;
+    const registrations = await fetchAllPaginated<any>(query.order('id'));
+    const regError = null;
 
     if (regError) {
       throw new InternalServerErrorException(`Failed to fetch student registrations: ${regError.message}`);
@@ -620,21 +589,12 @@ export class PeriodAttendanceService {
     const studentIds = Array.from(studentIdSet);
     if (studentIds.length === 0) return [];
 
-    let studentQuery = this.supabase.admin
-      .from('students')
-      .select('id, full_name, cap_application_number, current_semester, campus_id')
-      .in('id', studentIds);
-
-    if (campusId) {
-      studentQuery = studentQuery.eq('campus_id', campusId);
-    }
-
-    const { data: students, error: studentError } = await studentQuery.order('full_name', { ascending: true });
-
-    if (studentError) {
-      throw new InternalServerErrorException(`Failed to fetch student profiles: ${studentError.message}`);
-    }
-
+    const students = await fetchByIdChunks<any>(studentIds, ids => {
+      let query = this.supabase.admin.from('students').select('id, full_name, cap_application_number, current_semester, campus_id').in('id', ids)
+      if (campusId) query = query.eq('campus_id', campusId)
+      return query.order('id')
+    }, true)
+    students.sort((a, b) => a.full_name.localeCompare(b.full_name))
     return students || [];
   }
 
@@ -658,11 +618,11 @@ export class PeriodAttendanceService {
 
     // 4. Fetch existing marks and session revision (R29)
     const [marksRes, sessionRes] = await Promise.all([
-      this.supabase.admin
+      this.allRows(this.supabase.admin
         .from('period_attendance')
         .select('student_id, status, marked_at, marked_by')
         .eq('timetable_slot_id', slotId)
-        .eq('attendance_date', resolved.attendanceDate),
+        .eq('attendance_date', resolved.attendanceDate)),
       (() => {
         const sq = this.supabase.admin.from('period_attendance_sessions');
         return typeof (sq as any)?.select === 'function'
@@ -783,15 +743,10 @@ export class PeriodAttendanceService {
       }
     }
 
-    // 4. Parse expected revision (R29)
-    let parsedExpectedRev: number | null = null;
-    if (expectedRevisionInput !== undefined && expectedRevisionInput !== null && expectedRevisionInput !== '') {
-      parsedExpectedRev =
-        typeof expectedRevisionInput === 'number'
-          ? expectedRevisionInput
-          : parseInt(expectedRevisionInput.toString(), 10);
-      if (isNaN(parsedExpectedRev)) parsedExpectedRev = null;
-    }
+    const revision = Revision.safeParse(expectedRevisionInput)
+    if (!revision.success) throw new BadRequestException('A nonnegative integer expected_revision is required')
+    if (!UniqueIds.safeParse(absentStudentIds).success) throw new BadRequestException('Invalid or duplicate absent student IDs')
+    const parsedExpectedRev = revision.data
 
     const allRosterIds = roster.map((s) => s.id);
     const nowIso = new Date().toISOString();
@@ -812,22 +767,6 @@ export class PeriodAttendanceService {
       );
 
       if (!rpcError && rpcData) {
-        await this.auditLogger.log({
-          eventType: 'period_attendance_marked',
-          userId: user.userId,
-          userRole: user.role,
-          action: `marked period attendance for slot ${slotId} on ${resolved.attendanceDate} (${absentStudentIds.length} absent, revision ${rpcData.revision})`,
-          resourceType: 'period_attendance',
-          resourceId: slotId,
-          status: 'success',
-          ipAddress: ip,
-          metadata: {
-            attendance_date: resolved.attendanceDate,
-            revision: rpcData.revision,
-            marked_at: rpcData.marked_at,
-          },
-        });
-
         return {
           success: true,
           attendance_date: resolved.attendanceDate,
@@ -918,11 +857,11 @@ export class PeriodAttendanceService {
     }
 
     // 6. Fetch marks from source slot on requested attendance_date
-    const { data: sourceMarks, error: sourceMarksError } = await this.supabase.admin
+    const { data: sourceMarks, error: sourceMarksError } = await this.allRows(this.supabase.admin
       .from('period_attendance')
       .select('student_id, status, course_id')
       .eq('timetable_slot_id', dto.source_slot_id)
-      .eq('attendance_date', dto.attendance_date);
+      .eq('attendance_date', dto.attendance_date));
 
     if (sourceMarksError || !sourceMarks || sourceMarks.length === 0) {
       throw new BadRequestException(
@@ -930,14 +869,9 @@ export class PeriodAttendanceService {
       );
     }
 
-    // 7. Parse expected target revision (R29)
-    let parsedExpectedTargetRev: number | null = null;
-    const candidateRev = dto.expected_target_revision ?? dto.expected_revision;
-    if (candidateRev !== undefined && candidateRev !== null && candidateRev !== '') {
-      parsedExpectedTargetRev =
-        typeof candidateRev === 'number' ? candidateRev : parseInt(candidateRev.toString(), 10);
-      if (isNaN(parsedExpectedTargetRev)) parsedExpectedTargetRev = null;
-    }
+    const revision = Revision.safeParse(dto.expected_target_revision ?? dto.expected_revision)
+    if (!revision.success) throw new BadRequestException('A nonnegative integer target revision is required')
+    const parsedExpectedTargetRev = revision.data
 
     // 8. Attempt atomic database RPC (R03, R29)
     if (typeof (this.supabase.admin as any).rpc === 'function') {
@@ -953,23 +887,6 @@ export class PeriodAttendanceService {
       );
 
       if (!rpcError && rpcData) {
-        await this.auditLogger.log({
-          eventType: 'period_attendance_copied',
-          userId: user.userId,
-          userRole: user.role,
-          action: `copied practical attendance from slot ${dto.source_slot_id} to ${dto.target_slot_id} on ${dto.attendance_date} (${rpcData.copied_count} records, revision ${rpcData.target_revision})`,
-          resourceType: 'period_attendance',
-          resourceId: dto.target_slot_id,
-          status: 'success',
-          ipAddress: ip,
-          metadata: {
-            source_slot_id: dto.source_slot_id,
-            target_slot_id: dto.target_slot_id,
-            attendance_date: dto.attendance_date,
-            target_revision: rpcData.target_revision,
-          },
-        });
-
         return {
           success: true,
           copied_count: rpcData.copied_count,
@@ -1041,11 +958,11 @@ export class PeriodAttendanceService {
     );
 
     const [{ data: marks }, { data: session }] = await Promise.all([
-      this.supabase.admin
+      this.allRows(this.supabase.admin
         .from('period_attendance')
         .select('student_id, status, marked_at, marked_by')
         .eq('timetable_slot_id', slotId)
-        .eq('attendance_date', attendanceDate),
+        .eq('attendance_date', attendanceDate)),
       (() => {
         const sq = this.supabase.admin.from('period_attendance_sessions');
         return typeof (sq as any)?.select === 'function'
@@ -1138,7 +1055,7 @@ export class PeriodAttendanceService {
       query = query.eq('time_slots.day_of_week', dayOfWeek);
     }
 
-    const { data: entries, error } = await query;
+    const { data: entries, error } = await this.allRows(query);
     if (error) {
       throw new InternalServerErrorException(`Failed to fetch department slots: ${error.message}`);
     }
@@ -1148,19 +1065,13 @@ export class PeriodAttendanceService {
     let sessions: any[] = [];
 
     if (entryIds.length > 0) {
-      const [marksRes, sessionsRes] = await Promise.all([
-        this.supabase.admin
-          .from('period_attendance')
-          .select('timetable_slot_id, status')
-          .in('timetable_slot_id', entryIds)
-          .eq('attendance_date', attendanceDate),
-        (() => {
-          const sq = this.supabase.admin.from('period_attendance_sessions');
-          return typeof (sq as any)?.select === 'function'
-            ? sq.select('timetable_slot_id, revision, revision_token').in('timetable_slot_id', entryIds).eq('attendance_date', attendanceDate)
-            : Promise.resolve({ data: [] });
-        })(),
-      ]);
+      const [markRows, sessionRows] = await Promise.all([
+        fetchByIdChunks<any>(entryIds, ids => this.supabase.admin.from('period_attendance')
+          .select('id,timetable_slot_id,status').in('timetable_slot_id', ids).eq('attendance_date', attendanceDate).order('id')),
+        fetchByIdChunks<any>(entryIds, ids => this.supabase.admin.from('period_attendance_sessions')
+          .select('timetable_slot_id,revision,revision_token').in('timetable_slot_id', ids).eq('attendance_date', attendanceDate).order('timetable_slot_id'), true),
+      ])
+      const marksRes = { data: markRows }, sessionsRes = { data: sessionRows }
 
       marks = marksRes.data || [];
       sessions = sessionsRes.data || [];

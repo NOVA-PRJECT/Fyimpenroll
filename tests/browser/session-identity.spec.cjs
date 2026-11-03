@@ -1,0 +1,56 @@
+const { test, expect } = require('@playwright/test')
+test.beforeEach(async({context,request})=>{
+  await request.get('/test/release')
+  await context.addCookies([{name:'identity',value:'A',url:'http://127.0.0.1:4178'}])
+})
+test('another tab switches the cookie account and removes previously rendered private data',async({context,page})=>{
+  await page.goto('/dashboard');await expect(page.getByTestId('private-name')).toHaveText('Private account A')
+  const other=await context.newPage();await other.goto('/dashboard')
+  await expect(other.getByTestId('private-name')).toHaveText('Private account A')
+  await other.evaluate(()=>fetch('/api/auth/login',{method:'POST'}))
+  await expect(page.getByTestId('private-name')).toHaveText('Private account B')
+  await expect(page.getByText('Private account A')).toHaveCount(0)
+})
+test('a late response from the previous account cannot populate the new account view',async({context,page,request})=>{
+  await page.goto('/dashboard');await expect(page.getByTestId('private-name')).toHaveText('Private account A')
+  await request.get('/test/hold')
+  await page.evaluate(()=>{void fetch('/api/hod/students',{headers:{'X-Refresh-Data':'1'}}).catch(()=>{})})
+  const other=await context.newPage();await other.goto('/login')
+  await expect(other.getByText('Sign in',{exact:true})).toBeVisible()
+  await other.evaluate(()=>fetch('/api/auth/login',{method:'POST'}))
+  await expect(page.getByTestId('private-name')).toHaveText('Private account B')
+  await request.get('/test/release')
+  await expect(page.getByTestId('private-name')).toHaveText('Private account B')
+})
+test('logout in another tab aborts an in-flight refresh and clears the private view',async({context,page,request})=>{
+  await page.goto('/dashboard');await expect(page.getByTestId('private-name')).toHaveText('Private account A')
+  await request.get('/test/hold-refresh')
+  await page.evaluate(()=>{void window.startRefresh()})
+  const other=await context.newPage();await other.goto('/login')
+  await expect(other.getByText('Sign in',{exact:true})).toBeVisible()
+  await other.evaluate(()=>fetch('/api/auth/logout',{method:'POST'}))
+  await expect(page).toHaveURL(/\/login$/)
+  await request.get('/test/release')
+  await expect(page.getByText('Sign in',{exact:true})).toBeVisible()
+  await expect(page.getByText('Private account A')).toHaveCount(0)
+})
+test('visible mutable data revalidates after its age limit',async({page,request})=>{
+  await page.clock.install()
+  await page.goto('/dashboard');await expect(page.getByTestId('private-name')).toHaveText('Private account A')
+  const before=(await(await request.get('/test/counts')).json()).A
+  await page.clock.fastForward(61000)
+  await expect.poll(async()=>(await(await request.get('/test/counts')).json()).A).toBeGreaterThan(before)
+})
+
+test('client navigation into a private route verifies identity before mounting data consumers',async({page,request})=>{
+  await page.goto('/login');await expect(page.getByText('Sign in',{exact:true})).toBeVisible()
+  const before=(await(await request.get('/test/counts')).json()).A
+  await request.get('/test/hold-session')
+  const verifying=page.waitForRequest('**/api/auth/session')
+  await page.evaluate(()=>window.fixtureNavigate('/dashboard'))
+  await verifying
+  await expect(page.getByTestId('private-name')).toHaveCount(0)
+  expect((await(await request.get('/test/counts')).json()).A).toBe(before)
+  await request.get('/test/release')
+  await expect(page.getByTestId('private-name')).toHaveText('Private account A')
+})

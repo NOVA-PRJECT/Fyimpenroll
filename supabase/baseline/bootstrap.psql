@@ -9,4 +9,9 @@
 \ir ../changes/manual_timetable.sql
 \ir ../changes/data_read_optimization.sql
 \ir ../changes/preferences_before_allocation.sql
+\ir ../changes/review_integrity.sql
+\ir ../changes/review_operations.sql
+\ir ../changes/review_scheduling.sql
+\ir ../changes/review_workflow_fixes.sql
+\ir ../changes/review_readiness.sql
 SELECT public.production_readiness();

@@ -1,3 +1,4 @@
+import { enqueueReviewJob } from '../../core/jobs/review-queue'
 import { enrollmentCounts } from '../../core/database/enrollment-counts'
 import { termOperation } from '../../core/database/term-operation'
 import {
@@ -57,9 +58,22 @@ export class AllocationService {
   ) {}
 
   // ──────────────── Campus Director: Trigger 3-Round Allocation ────────────────
+  async cancelAllocation(id: string, user: AuthUser) {
+    const { error } = await this.supabase.admin.rpc('cancel_review_job', { p_id: id, p_actor: user.userId })
+    if (error?.code === 'P4030') throw new ForbiddenException(error.message)
+    if (error?.code === 'P4090') throw new ConflictException(error.message)
+    if (error) throw new BadRequestException(error.message)
+    return { success: true }
+  }
+
+  queueAllocation(body: { academicYear: string; semester: number }, user: AuthUser) {
+    return enqueueReviewJob(this.supabase.admin, 'allocation', user, body.academicYear, body.semester, {})
+  }
+
   async runAllocation(
     body: { academicYear: string; semester: number },
     user: AuthUser,
+    execution?: { runId: string; fencingToken: string },
   ) {
     const campusId = user.campus_id
     if (!campusId) {
@@ -126,9 +140,9 @@ export class AllocationService {
     }
 
     // F23 & R16: Atomically claim allocation run via claim_allocation_run RPC with worker fencing token
-    const fencingToken = crypto.randomUUID()
+    const fencingToken = execution?.fencingToken || crypto.randomUUID()
     let runId: string
-    const { data: claimedRunId, error: claimErr } = await termOperation(this.supabase.admin, user, 'claim_allocation_run',
+    const { data: claimedRunId, error: claimErr } = execution ? { data: execution.runId, error: null } : await termOperation(this.supabase.admin, user, 'claim_allocation_run',
       {
         p_campus_id: campusId,
         p_academic_year: body.academicYear,

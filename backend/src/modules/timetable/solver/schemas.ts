@@ -1,3 +1,4 @@
+import { AcademicYear } from '@fyimp/contracts'
 import { z } from 'zod';
 
 export const RuleKindSchema = z.enum([
@@ -48,31 +49,31 @@ export const DynamicConstraintSchema = z.object({
 });
 
 export const GenerateRequestSchema = z.object({
-  academicYear: z.string().min(1, 'Academic year is required'),
+  academicYear: AcademicYear,
   semester: z.number().int().min(1).max(10),
-  dynamicConstraints: z.array(DynamicConstraintSchema).default([]),
+  dynamicConstraints: z.array(DynamicConstraintSchema).max(100).default([]),
   rules: z.array(RuleDefinitionSchema).min(1).max(100).optional(),
 });
 
 export const PublishRequestSchema = z.object({
-  academicYear: z.string().min(1, 'Academic year is required'),
+  academicYear: AcademicYear,
   semester: z.number().int().min(1).max(10),
   force: z.boolean().optional().default(false),
 });
 
 export const ValidateRequestSchema = z.object({
-  academicYear: z.string().min(1, 'Academic year is required'),
+  academicYear: AcademicYear,
   semester: z.number().int().min(1).max(10),
 });
 
 export const TimetableQuerySchema = z.object({
-  academicYear: z.string().min(1, 'Academic year is required'),
+  academicYear: AcademicYear,
   semester: z.coerce.number().int().min(1).max(10),
   departmentId: z.string().uuid().optional().or(z.literal('')),
 });
 
 export const JobStatusQuerySchema = z.object({
-  academicYear: z.string().min(1, 'Academic year is required'),
+  academicYear: AcademicYear,
   semester: z.coerce.number().int().min(1).max(10),
 });
 
@@ -92,7 +93,7 @@ export const ManualEntrySchema = z.object({
 }).strict();
 
 export const ManualTimetableSchema = z.object({
-  academicYear: z.string().regex(/^\d{4}-\d{2}$/),
+  academicYear: AcademicYear,
   semester: z.number().int().min(1).max(10),
   revision: z.string().regex(/^[a-f0-9]{32}$/),
   entries: z.array(ManualEntrySchema).max(10000),
@@ -101,7 +102,7 @@ export const ManualTimetableSchema = z.object({
 }).strict();
 
 export const ManualPublishSchema = z.object({
-  academicYear: z.string().regex(/^\d{4}-\d{2}$/),
+  academicYear: AcademicYear,
   semester: z.number().int().min(1).max(10),
   revision: z.string().regex(/^[a-f0-9]{32}$/),
   acknowledgeOverrides: z.boolean().default(false),

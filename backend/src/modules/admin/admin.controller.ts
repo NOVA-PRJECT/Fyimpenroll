@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { z } from 'zod'
+import { FacultyProvisioningSchema as CreateFacultySchema } from '@fyimp/contracts'
 import { AdminService } from './admin.service'
 import { AuthGuard } from '../../core/auth/guards/auth.guard'
 import { RolesGuard } from '../../core/auth/guards/roles.guard'
@@ -55,13 +56,27 @@ const FacultyFields = z.object({
   campus_id: z.string().uuid(),
   department_id: z.string().uuid().nullable().optional(),
 })
-const CreateFacultySchema = FacultyFields.extend({ email: z.string().email(), password: z.string().min(8) })
 const UpdateFacultySchema = FacultyFields.extend({ id: z.string().uuid() })
 
 @Controller('api/admin')
 @UseGuards(AuthGuard, RolesGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  @Get('auth-cleanup')
+  @Roles('superadmin')
+  async cleanupStatus(@Query('requestId') requestId: string) {
+    if (!z.string().uuid().safeParse(requestId).success) throw new BadRequestException('A cleanup request ID is required')
+    return this.adminService.cleanupStatus(requestId)
+  }
+
+  @Post('auth-cleanup/retry')
+  @Roles('superadmin')
+  async retryCleanup(@Body() body: unknown, @CurrentUser() user: AuthUser) {
+    const parsed = z.object({ requestId: z.string().uuid() }).safeParse(body)
+    if (!parsed.success) throw new BadRequestException('A cleanup request ID is required')
+    return this.adminService.retryCleanup(parsed.data.requestId, user)
+  }
 
   // ──────────────── Campuses ────────────────
   @Get('campuses')

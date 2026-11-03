@@ -1,5 +1,9 @@
+import { Uuid } from '@fyimp/contracts'
+import { CohortRequestSchema } from '@fyimp/contracts'
 import {
   Body,
+  BadRequestException,
+  HttpCode,
   Controller,
   Delete,
   Get,
@@ -20,14 +24,24 @@ import { AuthUser } from '../../core/auth/types'
 export class AllocationController {
   constructor(private readonly allocationService: AllocationService) {}
 
+  @Delete('runs/:runId/cancel')
+  @Roles('campus_director')
+  cancel(@Param('runId') runId: string, @CurrentUser() user: AuthUser) {
+    if (!Uuid.safeParse(runId).success) throw new BadRequestException('Invalid run ID')
+    return this.allocationService.cancelAllocation(runId, user)
+  }
+
   // ──────────────── Campus Director: Run Allocation ────────────────
   @Post('run')
+  @HttpCode(202)
   @Roles('campus_director')
   async runAllocation(
     @Body() body: { academicYear: string; semester: number },
     @CurrentUser() user: AuthUser,
   ) {
-    return this.allocationService.runAllocation(body, user)
+    const parsed = CohortRequestSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0].message)
+    return this.allocationService.queueAllocation(parsed.data, user)
   }
 
   // ──────────────── Status Polling (Director & HOD) ────────────────

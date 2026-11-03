@@ -3,6 +3,7 @@
 import { useDataRevision } from '@/core/hooks/useDataRevision'
 import SectionRefreshButton from '@/components/SectionRefreshButton'
 
+import AllocationStatusBadge from './AllocationStatusBadge'
 import GraduationPanel from './GraduationPanel'
 
 import LoadingState, { ProfilePlaceholder, LoadingIndicator } from '@/components/LoadingState'
@@ -136,7 +137,7 @@ export default function DirectorDashboard() {
     setLoadingAllocation(true)
     setAllocationError('')
     try {
-      const response = await fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`, { signal })
+      const response = await fetch(`/api/allocation/status?academicYear=${encodeURIComponent(allocationAcademicYear || getAcademicYear())}&semester=${allocationSemester}`, { signal, headers: { 'X-Refresh-Data': '1' } })
       if (!response.ok) throw new Error('Unable to load allocation status. Please refresh to retry.')
       const data = await response.json()
       if (!signal?.aborted && request === allocationRequest.current) setAllocationRun(data.run)
@@ -153,6 +154,12 @@ export default function DirectorDashboard() {
     void loadAllocationStatus(controller.signal)
     return () => controller.abort()
   }, [activeTab, loadAllocationStatus, dataRevision])
+
+  useEffect(() => {
+    if (activeTab !== 'allocation' || !['queued', 'running'].includes(allocationRun?.status || '')) return
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') void loadAllocationStatus() }, 5000)
+    return () => clearInterval(timer)
+  }, [activeTab, allocationRun?.status, loadAllocationStatus])
 
   function handleSetPreset(days: number) {
     setDeadline(utcIsoToKolkataInput(new Date(Date.now() + days * 24 * 60 * 60 * 1000)))
@@ -214,8 +221,8 @@ export default function DirectorDashboard() {
         throw new Error(data.error || 'Failed to start course allocation')
       }
 
-      setAllocationSuccess('Course allocation run completed successfully!')
-      setAllocationRun({ ...data, id: data.run_id, status: 'completed', triggered_at: new Date().toISOString() })
+      setAllocationSuccess('Course allocation queued. Progress will update here.')
+      setAllocationRun({ ...data, id: data.runId, status: 'queued', triggered_at: new Date().toISOString() })
     } catch (err: unknown) {
       setAllocationError((err instanceof Error ? err.message : '') || 'Error triggering allocation')
     } finally {
@@ -844,70 +851,12 @@ export default function DirectorDashboard() {
                   gap: '0.75rem',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div className={styles.allocationStatus} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: "var(--portal-info-text,#cbd5e1)" }}>
                     Latest Run Status ({allocationAcademicYear || 'Current Year'} • Semester {allocationSemester}):
                   </span>
 
-                  {!allocationRun ? (
-                    <span
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: '#334155',
-                        color: "var(--portal-info-text,#94a3b8)",
-                      }}
-                    >
-                      Not Started
-                    </span>
-                  ) : allocationRun.status === 'running' ? (
-                    <span
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: 'rgba(245, 158, 11, 0.2)',
-                        color: "var(--portal-warning-text,#fbbf24)",
-                        border: '1px solid rgba(245, 158, 11, 0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                      }}
-                    >
-                      Algorithm Running (Rounds 1–3)...
-                    </span>
-                  ) : allocationRun.status === 'completed' ? (
-                    <span
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: 'rgba(34, 197, 94, 0.2)',
-                        color: "var(--portal-success-text,#4ade80)",
-                        border: '1px solid rgba(34, 197, 94, 0.4)',
-                      }}
-                    >
-                      Completed
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: "var(--portal-danger-text,#f87171)",
-                        border: '1px solid rgba(239, 68, 68, 0.4)',
-                      }}
-                    >
-                      Failed
-                    </span>
-                  )}
+                  <AllocationStatusBadge status={allocationRun?.status} />
                 </div>
 
                 {allocationRun && (
@@ -1047,7 +996,7 @@ export default function DirectorDashboard() {
                   <button
                     className={styles.primaryBtn}
                     onClick={() => handleRunAllocation()}
-                    disabled={loadingAllocation || triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'completed'}
+                    disabled={loadingAllocation || triggeringRun || allocationRun?.status === 'running' || allocationRun?.status === 'queued' || allocationRun?.status === 'completed'}
                     style={{
                       background: allocationRun?.status === 'completed'
                         ? '#334155'
@@ -1063,6 +1012,8 @@ export default function DirectorDashboard() {
                   >
                     {triggeringRun || allocationRun?.status === 'running' ? (
                       <LoadingIndicator message="Allocating courses…" />
+                    ) : allocationRun?.status === 'queued' ? (
+                      'Allocation queued'
                     ) : allocationRun?.status === 'completed' ? (
                       'Allocation Completed (Locked for this semester)'
                     ) : allocationRun?.status === 'failed' ? (
@@ -1072,6 +1023,14 @@ export default function DirectorDashboard() {
                     )}
                   </button>
                 </div>
+                {['queued', 'running'].includes(allocationRun?.status || '') && <button type="button" onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/allocation/runs/${allocationRun!.id}/cancel`, { method: 'DELETE' })
+                    if (!response.ok && response.status !== 409) throw new Error('Could not cancel allocation')
+                    await loadAllocationStatus()
+                  } catch (error) { setAllocationError((error as Error).message) }
+                }}>Cancel allocation</button>}
+
                 {allocationRun?.status === 'completed' && (
                   <p style={{ margin: 0, fontSize: '0.8rem', color: "var(--portal-info-text,#94a3b8)", display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <span style={{ color: "var(--portal-success-text,#10b981)", fontSize: '1rem' }}><UiInfo size="1em" aria-hidden="true" className="inline-block shrink-0 align-[-0.125em]" /></span>

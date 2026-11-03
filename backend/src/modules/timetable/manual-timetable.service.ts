@@ -38,6 +38,8 @@ export class ManualTimetableService {
     let input: Awaited<ReturnType<typeof loadGenerationInput>>;
     try { input = await loadGenerationInput(this.supabase.admin, academicYear, semester, user.campus_id!); }
     catch (error) { throw new UnprocessableEntityException((error as Error).message); }
+    const checked = await this.context(academicYear, semester, user);
+    if (checked.revision !== context.revision) throw new ConflictException('Scheduling inputs changed while loading; reload the manual editor.');
     const manual = context.job.metadata?.manualDraft;
     const rules = z.array(RuleDefinitionSchema).max(100).parse(manual?.rules ?? context.job.metadata?.effectiveRules ??
       new FileConstraintStoreService().getEffectiveConstraints(user.campus_id!, semester).rules) as RuleDefinition[];

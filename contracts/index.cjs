@@ -116,3 +116,5 @@ module.exports.projectReadData = (input, value, now = Date.now()) => {
   }
   return value
 }
+
+Object.assign(module.exports, require('./validation.cjs'))

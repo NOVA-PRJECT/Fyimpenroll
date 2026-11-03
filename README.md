@@ -1,5 +1,7 @@
 # FYIMP course registration
 
+The November review release adds verified password recovery, attendance integrity repairs and a durable queue processed by the free API web service. Follow [the owner-run review rollout](supabase/REVIEW_RELEASE_ROLLOUT.md) before deploying. New SQL is supplied in `supabase/changes/review_release.sql`; do not replay old lifecycle SQL. See [finding disposition](docs/reviews/2026-11-02-implementation.md).
+
 The manual timetable fallback adds director placement with strict rules or recorded overrides and keeps teacher-course assignments exclusively with HODs. Apply the new owner-run SQL before deploying this feature; see [manual timetable rollout](supabase/MANUAL_TIMETABLE_ROLLOUT.md).
 
 The semester lifecycle implementation separates promotion from semester-11 account deletion and preserves registration/credit-ledger, timetable and teacher-assignment history. It is merged into local `main`. The owner confirmed applying its SQL migration on 26 October 2026; a read-only check returned `ready: true`, with 20 application tables and four current-term views present. Do not rerun the migration on this project. The matching application changes have not yet been pushed or deployed; follow [the semester lifecycle rollout](supabase/SEMESTER_LIFECYCLE_ROLLOUT.md) for the remaining release verification. No Supabase CLI installation is required for this workflow.

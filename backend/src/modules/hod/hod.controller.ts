@@ -17,12 +17,7 @@ import { Roles } from '../../core/auth/decorators/roles.decorator'
 import { CurrentUser } from '../../core/auth/decorators/current-user.decorator'
 import { AuthUser } from '../../core/auth/types'
 import { z } from 'zod'
-
-const CreateTeacherSchema = z.object({
-  full_name: z.string().min(1, 'Full name is required').max(100),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-})
+import { TeacherProvisioningSchema as CreateTeacherSchema, StudentProvisioningSchema as AddStudentSchema, BlueprintUpdateSchema as BlueprintSchema } from '@fyimp/contracts'
 
 import { HOD_COURSE_CATEGORIES } from '@fyimp/contracts'
 
@@ -36,7 +31,7 @@ const CreateCourseSchema = z.object({
   theory_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   practical_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   category: z.enum(HOD_COURSE_CATEGORIES, {
-    errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
+    error: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
   seat_limit: z.coerce.number().int().min(1).max(500).optional().default(60),
   prerequisites: CoursePrerequisitesSchema.optional().default([]),
@@ -52,20 +47,11 @@ const UpdateCourseSchema = z.object({
   theory_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   practical_hours_per_week: z.coerce.number().int().min(0).max(40).optional().default(0),
   category: z.enum(HOD_COURSE_CATEGORIES, {
-    errorMap: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
+    error: () => ({ message: 'Category must be one of: DSS, DSC, DSE, VAC, SEC, MDC, MOOC, AEC, INT, FWD, RPH, CIP' })
   }),
   seat_limit: z.coerce.number().int().min(1).max(500).optional(),
   prerequisites: CoursePrerequisitesSchema.optional(),
   department_id: z.string().uuid().optional(),
-})
-
-const AddStudentSchema = z.object({
-  full_name: z.string().min(1, 'Full name is required').max(100),
-  cap_application_number: z.string().min(1, 'CAP Application Number is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  current_semester: z.coerce.number().int().min(1).max(10),
-  academic_year_joined: z.string().min(1, 'Academic year is required'),
 })
 
 const UpdateStudentSchema = z.object({
@@ -84,22 +70,6 @@ const UpdateStudentSchema = z.object({
   current_semester: data.current_semester,
   expected_semester: data.expected_semester,
 }))
-
-const BlueprintSchema = z.object({
-  semester: z.coerce.number().int().min(1).max(10),
-  min_credits: z.coerce.number().int().min(0).max(50),
-  max_credits: z.coerce.number().int().min(0).max(50),
-  pathways: z.array(z.object({
-    id: z.string().optional(),
-    name: z.string().trim().min(1),
-    slots: z.array(z.object({
-      rule: z.string().min(1),
-      target: z.string().nullable().optional(),
-      name: z.string().optional(),
-      slot: z.number().int().min(1).max(8).optional(),
-    })).min(1).max(8),
-  })).optional().default([]),
-})
 
 @Controller('api/hod')
 @UseGuards(AuthGuard, RolesGuard)

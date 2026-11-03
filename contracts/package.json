@@ -1,1 +1,10 @@
-{"name":"@fyimp/contracts","version":"1.0.0","private":true,"main":"index.cjs","types":"index.d.ts"}
+{
+  "name": "@fyimp/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

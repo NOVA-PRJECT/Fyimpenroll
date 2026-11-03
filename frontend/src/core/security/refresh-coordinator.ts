@@ -38,6 +38,7 @@ export function resumeSessionAfterLogoutFailure(): void {
 }
 
 export function invalidateRefreshSession(): void {
+  refreshController?.abort()
   sessionGeneration += 1
   activeRefreshPromise = null
 }

@@ -1,3 +1,4 @@
+import { enqueueReviewJob } from '../../core/jobs/review-queue'
 import { termOperation } from '../../core/database/term-operation'
 import type { Request, Response } from 'express'
 import { timetableProgressKey } from './solver/progress-key'
@@ -30,6 +31,14 @@ import { fetchAllPaginated, fetchByIdChunks } from '../../core/database/paginati
 
 @Injectable()
 export class TimetableService implements OnModuleInit, OnModuleDestroy {
+  async cancelJob(id: string, user: AuthUser) {
+    const { error } = await this.supabase.admin.rpc('cancel_review_job', { p_id: id, p_actor: user.userId })
+    if (error?.code === 'P4030') throw new ForbiddenException(error.message)
+    if (error?.code === 'P4090') throw new ConflictException(error.message)
+    if (error) throw new BadRequestException(error.message)
+    await getRedisClient().set(timetableProgressKey(user.campus_id || '', user.term_version || 0, id), JSON.stringify({ status: 'failed', progress: 0, stepMessage: 'Cancelled by director', jobId: id }), { ex: 3600 }).catch(() => {})
+    return { success: true }
+  }
   private recoveryTimer?: ReturnType<typeof setInterval>
   constructor(
     private readonly supabase: SupabaseService,
@@ -61,19 +70,28 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
     throw new BadRequestException('Rules are saved in your browser and sent with generation requests. Server files are read-only.');
   }
 
-  private async publicationState(campusId: string, academicYear: string, semester: number) {
+  private async publicationState(campusId: string, academicYear: string, semester: number, term?: number) {
     const { data, error, count } = await this.supabase.admin.from('current_timetable_entries')
       .select('id, published_at', { count: 'exact' })
       .eq('campus_id', campusId).eq('academic_year', academicYear).eq('semester', semester)
       .eq('status', 'published').order('published_at', { ascending: false }).limit(1)
     if (error) throw new ServiceUnavailableException('Could not verify timetable publication. Please retry.')
-    return { published: !!data?.length, publishedAt: data?.[0]?.published_at ?? null, publishedCount: count ?? 0 }
+    const { data: outcome, error: outcomeError } = await this.supabase.admin.from('cohort_schedule_outcomes')
+      .select('outcome,finalized_at').eq('campus_id', campusId).eq('academic_year', academicYear).eq('semester', semester)
+      .eq('term_version', term ?? 0).maybeSingle()
+    if (outcomeError) throw new ServiceUnavailableException('Could not verify cohort scheduling outcome')
+    return { finalized: !!data?.length || !!outcome, schedulingStatus: outcome?.outcome || (data?.length ? 'published' : 'pending'),
+      published: !!data?.length, publishedAt: data?.[0]?.published_at ?? null, publishedCount: count ?? 0 }
   }
 
   async getEntries(academicYear: string, semester: number, departmentId: string | undefined, user: AuthUser) {
     const scope = AuthorizationPolicy.resolveTimetableScope(user)
-    const publication = user.role === 'campus_director' && scope.campusId
-      ? await this.publicationState(scope.campusId, academicYear, semester) : undefined
+    if (user.role === 'teaching_staff' && !scope.campusId) throw new ForbiddenException('Teaching staff requires a campus affiliation')
+    const publication = ['campus_director','student'].includes(user.role) && scope.campusId
+      ? await this.publicationState(scope.campusId, academicYear, semester, user.term_version) : undefined
+
+    if (publication?.schedulingStatus === 'not_required') return { academicYear, semester, publication,
+      schedulingStatus: 'not_required', classroomTimetableRequired: false, departments: [], entries: [], conflicts: [] }
 
     let campusDeptIds: string[] = []
     let campusDepartments: any[] = []
@@ -109,6 +127,8 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
         if (!campusDeptIds.includes(departmentId)) {
           throw new ForbiddenException('Requested department does not belong to your campus')
         }
+      } else if (user.role === 'teaching_staff') {
+        if (!campusDeptIds.includes(departmentId)) throw new ForbiddenException('Requested department does not belong to your campus')
       } else if (user.role === 'hod') {
         if (departmentId !== user.department_id) {
           throw new ForbiddenException('HOD can only view timetable entries for their own department')
@@ -231,6 +251,8 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       `)
       .eq('academic_year', academicYear)
       .eq('semester', semester)
+
+    if (user.role === 'teaching_staff') query = query.eq('campus_id', scope.campusId).eq('status', 'published')
 
     // STUDENTS only see published entries, NEVER drafts or generated unreviewed schedules
     if (user.role === 'student') {
@@ -385,12 +407,12 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
   // ──────────────── Generate (F33, F41, F42) ────────────────
   async generate(academicYear: string, semester: number, dynamicConstraints: any[] | undefined, user: AuthUser, rules?: unknown) {
     if (!user.campus_id) throw new BadRequestException('An explicit campus is required for generation')
-    if ((await this.publicationState(user.campus_id, academicYear, semester)).published) {
+    if ((await this.publicationState(user.campus_id, academicYear, semester, user.term_version)).finalized) {
       throw new ConflictException('This timetable is already published. Generation is locked for this campus, academic year and semester.')
     }
     const parsedRules = rules === undefined ? undefined : z.array(RuleDefinitionSchema).min(1).max(100).safeParse(rules)
     if (parsedRules && !parsedRules.success) throw new BadRequestException(parsedRules.error.issues[0].message)
-    const effectiveRules = parsedRules?.success ? parsedRules.data : undefined
+    const effectiveRules = parsedRules?.success ? parsedRules.data : this.fileConstraintStore.getEffectiveConstraints(user.campus_id, semester).rules
     if (dynamicConstraints?.some(rule => !rule.typedRule)) throw new BadRequestException('Use structured scheduling rules; free-text rules cannot be enforced')
     let settingsQuery = this.supabase.admin
       .from('campus_settings')
@@ -416,71 +438,9 @@ export class TimetableService implements OnModuleInit, OnModuleDestroy {
       )
     }
 
-    // The claim transaction checks completed allocation under the cohort lock.
-    // F42 & R16: Atomically claim timetable generation job with worker fencing token
-    const fencingToken = crypto.randomUUID()
-    let newJobId: string | undefined
-
-    const { data: claim, error: claimError } = await termOperation(this.supabase.admin, user, 'claim_timetable_generation_job', {
-      p_campus_id: user.campus_id, p_academic_year: academicYear, p_semester: semester,
-      p_user_id: user.userId, p_lease_seconds: 600, p_fencing_token: fencingToken,
+    return enqueueReviewJob(this.supabase.admin, 'timetable', user, academicYear, semester, {
+      dynamicConstraints: dynamicConstraints || [], ...(effectiveRules ? { rules: effectiveRules } : {}),
     })
-    if (claimError) throw new BadRequestException(`Could not claim generation job: ${claimError.message}`)
-    if (!claim?.job_id) throw new InternalServerErrorException('Generation claim returned no job ID')
-    newJobId = claim.job_id
-
-    const redis = getRedisClient()
-
-    // Run the background generation job using local OR-Tools CP-SAT solver
-    runGenerationJob(
-      newJobId,
-      academicYear,
-      semester,
-      user.userId,
-      this.supabase.admin,
-      redis,
-      user.campus_id ?? undefined,
-      dynamicConstraints || [],
-      effectiveRules ? { rules: effectiveRules } : undefined,
-      fencingToken,
-      user.term_version,
-    ).catch(async (err: any) => {
-      this.serverLogger.error(
-        `Background generation job error for job ${newJobId}`,
-        err?.stack || String(err),
-      )
-      try {
-        await this.supabase.admin.rpc('update_timetable_worker', {
-          p_job_id: newJobId, p_fencing_token: fencingToken, p_status: 'failed', p_progress: 0,
-          p_error: err?.message || 'Background generation failed',
-        })
-      } catch (updateErr: any) {
-        this.serverLogger.error(
-          `Failed to update failed status for job ${newJobId}`,
-          updateErr?.stack || String(updateErr),
-        )
-      }
-    })
-
-    await this.auditLogger.log({
-      eventType: AuditEvents.TIMETABLE_GENERATED,
-      userId: user.userId,
-      userRole: user.role,
-      action: `initiated timetable generation for ${academicYear} sem ${semester}`,
-      resourceType: 'timetable',
-      status: 'success',
-      metadata: { academicYear, semester, campusId: user.campus_id },
-    })
-
-    return {
-      success: true,
-      jobId: newJobId,
-      status: 'queued',
-      message: 'Timetable generation job initiated with OR-Tools CP-SAT solver',
-      fencingToken,
-      academicYear,
-      semester,
-    }
   }
 
   // ──────────────── Teacher Substitution (F33, F37, R08) ────────────────

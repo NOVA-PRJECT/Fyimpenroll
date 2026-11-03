@@ -1,3 +1,5 @@
+import { dataScope } from '../../core/auth/data-scope'
+import { ChangePasswordSchema, RecoveryPasswordSchema } from '@fyimp/contracts'
 import {
   BadRequestException,
   Body,
@@ -26,11 +28,6 @@ const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
   preloadDashboard: z.boolean().optional(),
-})
-
-const ChangePasswordSchema = z.object({
-  current_password: z.string().min(1, 'Current password is required'),
-  new_password: z.string().min(8, 'New password must be at least 8 characters'),
 })
 
 @Controller('api/auth')
@@ -103,6 +100,7 @@ export class AuthController {
   session(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     res.setHeader('Cache-Control', 'private, no-store')
     return {
+      dataScope: dataScope(user),
       role: user.role,
       must_change_password: !!user.must_change_password,
       consent: user.consent,
@@ -228,16 +226,13 @@ export class AuthController {
   }
 
   @Post('complete-password-reset')
-  @UseGuards(AuthGuard, RateLimitGuard)
+  @UseGuards(RateLimitGuard)
   @RateLimit('password_change')
   @HttpCode(HttpStatus.OK)
-  async completePasswordReset(
-    @CurrentUser() user: AuthUser,
-    @Body() body?: { newPassword?: string; passwordUpdated?: boolean },
-  ) {
-    const parsed = z.object({ newPassword: z.string().min(8).max(256) }).safeParse(body)
-    if (!parsed.success) throw new BadRequestException('A new password of 8–256 characters is required')
-    return this.authService.completePasswordReset(user.userId, parsed.data)
+  async completePasswordReset(@Body() body: unknown) {
+    const parsed = RecoveryPasswordSchema.safeParse(body)
+    if (!parsed.success) throw new BadRequestException('A valid recovery link and new password of 8–256 characters are required')
+    return this.authService.completePasswordReset(undefined, parsed.data)
   }
 
   @Post('sync-password-status')

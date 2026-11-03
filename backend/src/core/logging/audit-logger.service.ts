@@ -1,4 +1,5 @@
-﻿import { Injectable, Logger } from '@nestjs/common'
+import { isIP } from 'node:net'
+import { Injectable, Logger } from '@nestjs/common'
 import { SupabaseService } from '../database/supabase.service'
 import { Optional } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
@@ -60,27 +61,8 @@ export class AuditLoggerService {
     const trimmed = rawIp.trim()
     if (!trimmed) return { sanitizedIp: null }
 
-    // If forwarded header has comma-separated list e.g. "1.2.3.4, 10.0.0.1", take the first
-    let candidate = trimmed.split(',')[0].trim()
-
-    // Strip IPv6-mapped IPv4 prefix (e.g., "::ffff:127.0.0.1" -> "127.0.0.1")
-    if (candidate.startsWith('::ffff:')) {
-      candidate = candidate.replace(/^::ffff:/, '')
-    }
-
-    // Check standard IPv4 regex (each octet 0-255)
-    const ipv4Regex = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}$/
-    if (ipv4Regex.test(candidate)) {
-      return { sanitizedIp: candidate }
-    }
-
-    // Check standard IPv6 or loopback
-    if (candidate === '::1' || candidate.includes(':')) {
-      return { sanitizedIp: candidate }
-    }
-
-    // Invalid INET format (e.g. "localhost", "unknown", socket path)
-    return { sanitizedIp: null, rawAttempted: trimmed }
+    const candidate = trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed
+    return isIP(candidate) ? { sanitizedIp: candidate } : { sanitizedIp: null, rawAttempted: trimmed.slice(0, 256) }
   }
 
   async log(entry: AuditLogEntry, options?: { signal: AbortSignal }): Promise<void> {

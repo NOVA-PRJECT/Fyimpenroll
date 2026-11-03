@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 export interface ReadContext {
   force: boolean
   scope: string
+  actorId?: string
   cacheReferences?: boolean
   verifiedCampusSettings?: Record<string, unknown>
   pending: Map<string, Promise<unknown>>

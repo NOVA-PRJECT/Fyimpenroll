@@ -40,7 +40,8 @@ export async function runGenerationJob(
   dynamicConstraints: DynamicConstraint[] = [],
   campusConstraints?: Record<string, any>,
   fencingToken?: string,
-  termVersion = 0
+  termVersion = 0,
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const redisKey = timetableProgressKey(campusId || '', termVersion, jobId);
   const dbClient = supabase;
@@ -148,6 +149,14 @@ export async function runGenerationJob(
       }
     );
 
+    if (courses.length > 0 && courses.every(course => course.theoryHours === 0 && course.practicalHours === 0)) {
+      const { error } = await dbClient.rpc('finalize_research_cohort', { p_campus: campusId, p_year: academicYear,
+        p_semester: semester, p_actor: _triggeredBy, p_term: termVersion, p_job: jobId, p_fence: fencingToken })
+      if (error) throw new Error(error.message)
+      await redis.set(redisKey, { status: 'completed', progress: 100, stepMessage: 'No classroom timetable is required for this research cohort.', schedulingStatus: 'not_required' }, { ex: 86400 })
+      return
+    }
+
     // R19 & R20: Load effective typed rules and schedule config from durable file store
     await reportProgress(
       25,
@@ -194,7 +203,7 @@ export async function runGenerationJob(
       rules: effectiveDoc.rules,
       config: {
         max_time_in_seconds: 240,
-        num_workers: 4,
+        num_workers: process.env.RUN_REVIEW_WORKER === 'true' ? 1 : 4,
         random_seed: 42,
       },
     };
@@ -202,12 +211,14 @@ export async function runGenerationJob(
     await reportProgress(40, 'Executing local OR-Tools CP-SAT constraint optimization...');
 
     // 4. Run solver process
-    let solverResult = await runOrtoolsSolver(ortoolsPayload);
+    let solverResult = await runOrtoolsSolver(ortoolsPayload, abortSignal);
+    if (abortSignal?.aborted) return;
     if (solverResult.status === 'INFEASIBLE' || solverResult.status === 'UNKNOWN') {
       const completeDiagnostics = solverResult.diagnostics;
       await reportProgress(60, 'Building a conflict-free review draft and listing sessions that cannot fit...');
       solverResult = await runOrtoolsSolver({ ...ortoolsPayload,
-        config: { ...ortoolsPayload.config, allow_partial: true, max_time_in_seconds: 60 } });
+        config: { ...ortoolsPayload.config, allow_partial: true, max_time_in_seconds: 60 } }, abortSignal);
+      if (abortSignal?.aborted) return;
       solverResult.diagnostics = [...completeDiagnostics, ...solverResult.diagnostics];
       if (solverResult.status === 'UNKNOWN') {
         solverResult.status = 'PARTIAL';
@@ -373,6 +384,7 @@ export async function runGenerationJob(
     };
     await redis.set(redisKey, JSON.stringify(finalPayload), { ex: 3600 }).catch(() => {});
   } catch (err: any) {
+    if (abortSignal?.aborted) return
     console.error('Timetable generation job failed:', err);
 
     const friendlyError = formatSolverErrorMessage(err.message || String(err));

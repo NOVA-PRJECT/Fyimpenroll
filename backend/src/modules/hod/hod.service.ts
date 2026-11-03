@@ -1,3 +1,4 @@
+import { teacherProvisioning } from '../../core/auth/teacher-provisioning'
 import { termOperation } from '../../core/database/term-operation'
 import {
   BadRequestException,
@@ -849,6 +850,7 @@ export class HodService {
 
     const { full_name, email, password } = body
 
+    const teacherMetadata = await teacherProvisioning(this.supabase.admin, campusId, departmentId)
     await assertPasswordNotCompromised(password)
 
     // 1. Create auth user with Supabase admin API
@@ -856,12 +858,7 @@ export class HodService {
       email,
       password,
       email_confirm: true,
-      app_metadata: {
-        role: 'teacher',
-        department_id: departmentId,
-        campus_id: campusId,
-        must_change_password: true,
-      },
+      app_metadata: teacherMetadata,
     })
 
     if (authError || !authData?.user) {
@@ -892,11 +889,7 @@ export class HodService {
 
     // 3. Set app_metadata
     await this.supabase.admin.auth.admin.updateUserById(teacherId, {
-      app_metadata: {
-        role: 'teacher',
-        department_id: departmentId,
-        campus_id: campusId,
-      },
+      app_metadata: teacherMetadata,
     })
 
     await this.auditLogger.log({

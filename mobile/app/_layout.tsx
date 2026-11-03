@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { AppState } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
+import { focusManager, onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
@@ -11,6 +13,13 @@ import { SemesterProvider } from '../src/context/SemesterContext';
 import { OfflineQueueProvider } from '../src/context/OfflineQueueContext';
 import { AccountAccessGate } from '../src/components/AccountAccessGate';
 import { useTheme } from '../src/hooks/useTheme';
+
+onlineManager.setEventListener(setOnline => NetInfo.addEventListener(state => setOnline(!!state.isConnected)));
+focusManager.setEventListener(setFocused => {
+  setFocused(AppState.currentState === 'active');
+  const subscription = AppState.addEventListener('change', state => setFocused(state === 'active'));
+  return () => subscription.remove();
+});
 
 function NavigationGuard() {
   const { session, role, isLoading } = useAuth();

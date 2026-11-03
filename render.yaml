@@ -23,9 +23,11 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: UPSTASH_REDIS_REST_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false
       - key: TRUST_PROXY_HOPS
         value: 1
+      - key: RUN_REVIEW_WORKER
+        value: "true"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"

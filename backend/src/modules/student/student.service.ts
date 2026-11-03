@@ -1,3 +1,4 @@
+import { AccountPasswordService } from '../../core/security/account-password.service'
 import {
   BadRequestException,
   Injectable,
@@ -12,6 +13,7 @@ import { AuthUser } from '../../core/auth/types'
 export class StudentService {
   constructor(
     private readonly supabase: SupabaseService,
+    private readonly passwords: AccountPasswordService,
   ) {}
 
   async getDashboardSummary(user: AuthUser) {
@@ -271,77 +273,7 @@ export class StudentService {
     }
   }
 
-  async changePassword(currentPassword: string, newPassword: string, user: AuthUser) {
-    // 1. Verify current password
-    const verifyAuthClient = this.supabase.createAuthClient()
-    const { error: verifyError } = await verifyAuthClient.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    })
-
-    if (verifyError) {
-      throw new BadRequestException('Current password is incorrect')
-    }
-
-    // 2. Update to new password in Supabase Auth (mark pending_profile_sync: true as proof)
-    const { error: pwError } = await this.supabase.admin.auth.admin.updateUserById(
-      user.userId,
-      {
-        password: newPassword,
-        app_metadata: {
-          role: 'student',
-          department_id: user.department_id,
-          campus_id: user.campus_id,
-          must_change_password: true,
-          pending_profile_sync: true,
-        },
-      },
-    )
-
-    if (pwError) {
-      throw new InternalServerErrorException('Failed to update password')
-    }
-
-    const { error: flagError } = await this.supabase.admin
-      .from('students')
-      .update({ must_change_password: false })
-      .eq('id', user.userId)
-
-    if (flagError) {
-      return {
-        success: false,
-        code: 'SYNC_FAILED',
-        message: 'Password was updated in auth system, but student profile synchronization failed. Please retry synchronization.',
-        canRetrySync: true,
-      }
-    }
-
-    // 3. Clear must_change_password and pending_profile_sync once profile update succeeds
-    await this.supabase.admin.auth.admin.updateUserById(user.userId, {
-      app_metadata: {
-        role: 'student',
-        department_id: user.department_id,
-        campus_id: user.campus_id,
-        must_change_password: false,
-        pending_profile_sync: false,
-      },
-    })
-
-    // Sign in to get fresh session tokens
-    const refreshAuthClient = this.supabase.createAuthClient()
-    const { data: signInData } = await refreshAuthClient.auth.signInWithPassword({
-      email: user.email,
-      password: newPassword,
-    })
-
-    const freshToken = signInData?.session?.access_token
-    const freshRefreshToken = signInData?.session?.refresh_token
-
-    return {
-      success: true,
-      token: freshToken,
-      refreshToken: freshRefreshToken,
-      message: 'Password changed successfully',
-    }
+  changePassword(currentPassword: string, newPassword: string, user: AuthUser) {
+    return this.passwords.changePassword(currentPassword, newPassword, user)
   }
 }

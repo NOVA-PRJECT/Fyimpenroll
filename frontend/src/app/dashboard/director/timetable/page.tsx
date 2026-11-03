@@ -127,7 +127,7 @@ export default function CampusDirectorTimetablePage() {
   const [manualSummary, setManualSummary] = useState<{ mode: string; reason: string; violations: { detail: string }[] } | null>(null);
   const [unscheduledPeriods, setUnscheduledPeriods] = useState(0);
   const [timetableDiagnostics, setTimetableDiagnostics] = useState<string[]>([]);
-  const [publication, setPublication] = useState<{ published: boolean; publishedAt: string | null; publishedCount: number } | null>(null);
+  const [publication, setPublication] = useState<{ published: boolean; finalized?: boolean; schedulingStatus?: string; publishedAt: string | null; publishedCount: number } | null>(null);
   const entriesRequest = useRef(0);
   const cohortRef = useRef('');
   cohortRef.current = `${academicYear}:${semester}`;
@@ -431,7 +431,7 @@ export default function CampusDirectorTimetablePage() {
   // Handle Generate Timetable
   async function handleGenerate() {
     if (!settingsReady || !rulesReady || !baseConstraints || loading || error || !publication || publishing) return;
-    if (publication.published) { setErrorMsg('This timetable is published. Generation is locked for this academic year and semester.'); return; }
+    if (publication.published || publication.finalized) { setErrorMsg('This timetable is published. Generation is locked for this academic year and semester.'); return; }
     if (!registrationClosed) {
       setShowCloseWindowConfirmModal(true);
       return;
@@ -440,7 +440,7 @@ export default function CampusDirectorTimetablePage() {
   }
 
   async function executeGeneration() {
-    if (!settingsReady || !rulesReady || !baseConstraints || loading || error || !publication || publication.published || publishing) return;
+    if (!settingsReady || !rulesReady || !baseConstraints || loading || error || !publication || publication.published || publication.finalized || publishing) return;
     setErrorMsg(null);
     setSuccessMsg(null);
     setJobError(null);
@@ -479,7 +479,7 @@ export default function CampusDirectorTimetablePage() {
   }
 
   async function handlePublish() {
-    if (!settingsReady || loading || error || publishing || publication?.published) return;
+    if (!settingsReady || loading || error || publishing || publication?.published || publication?.finalized) return;
     if (manualDraft) { setShowManualEditor(true); return; }
     if (reviewDraft || allConflicts.length > 0) {
       setErrorMsg('Resolve unscheduled sessions and generate a complete verified timetable before publication.');
@@ -715,6 +715,9 @@ export default function CampusDirectorTimetablePage() {
       </div>
 
       <div className={styles.mainContent}>
+        {publication?.schedulingStatus === 'not_required' && <div role="status" className={styles.bannerSuccess}>
+          <strong>No classroom timetable required</strong><p>This allocated cohort contains only zero-contact research or project components. Scheduling is finalized.</p>
+        </div>}
         {publication?.published && <div role="status" className={styles.bannerSuccess}>
           <strong>Published — Semester {semester} ({academicYear})</strong>
           <p>{publication.publishedCount} sessions are published. Generation is locked for this campus, academic year and semester.</p>
@@ -824,7 +827,7 @@ export default function CampusDirectorTimetablePage() {
               <button
                 className={styles.generateBtn}
                 onClick={handleGenerate}
-                disabled={!settingsReady || !rulesReady || !baseConstraints || loading || !!error || !publication || publication.published || publishing || manualEditing || jobStatus === 'running' || jobStatus === 'queued'}
+                disabled={!settingsReady || !rulesReady || !baseConstraints || loading || !!error || !publication || publication.published || publication.finalized || publishing || manualEditing || jobStatus === 'running' || jobStatus === 'queued'}
                 title={
                   publication?.published ? 'Published timetables cannot be regenerated' : !registrationClosed
                     ? 'Registration window must be closed before generation'
@@ -862,7 +865,7 @@ export default function CampusDirectorTimetablePage() {
                       setPublishConflicts(null);
                       setShowPublishModal(true);
                     }}
-                    disabled={!settingsReady || loading || !!error || publication?.published || publishing || jobStatus === 'running' || jobStatus === 'queued' || reviewDraft || (!manualDraft && allConflicts.length > 0)}
+                    disabled={!settingsReady || loading || !!error || (publication?.published || publication?.finalized) || publishing || jobStatus === 'running' || jobStatus === 'queued' || reviewDraft || (!manualDraft && allConflicts.length > 0)}
                     title="Publish timetable for students and faculty"
                     style={{ background: '#059669' }}
                   >
@@ -878,7 +881,7 @@ export default function CampusDirectorTimetablePage() {
         {(reviewDraft || manualDraft || jobStatus === 'failed') && <div className={styles.bannerWarning}>
           <strong>{manualDraft ? 'Continue the manual timetable' : 'Manual scheduling is available'}</strong>
           <p>Place sessions by department, follow scheduling rules or record explicit overrides. Teacher assignments remain with the HOD.</p>
-          <button type="button" className={styles.rulesTriggerBtn} disabled={!settingsReady || loading || !!error || (!publication?.published && !registrationClosed) || jobStatus === 'running' || jobStatus === 'queued'}
+          <button type="button" className={styles.rulesTriggerBtn} disabled={!settingsReady || loading || !!error || (!(publication?.published || publication?.finalized) && !registrationClosed) || jobStatus === 'running' || jobStatus === 'queued'}
             onClick={() => { setShowGenerationOverlay(false); setShowManualEditor(true); }}>
             {publication?.published ? 'Review manual timetable' : 'Open manual editor'}
           </button>
@@ -1300,6 +1303,15 @@ export default function CampusDirectorTimetablePage() {
                 )}
               </div>
             )}
+
+            {observedJobId && ['queued','running'].includes(jobStatus) && <button type="button" className={styles.generationModalCloseBtn} onClick={async () => {
+              try {
+                const response = await fetch(`/api/timetable/jobs/${observedJobId}`, { method: 'DELETE' })
+                if (response.status === 409) { invalidateCache(); return }
+                if (!response.ok) throw new Error('Could not cancel generation')
+                setJobStatus('failed'); setJobError('Cancelled by director')
+              } catch (error) { setJobError((error as Error).message) }
+            }}>Cancel generation</button>}
 
             {/* Footer Buttons for Failed, Completed, or Error States */}
             {(jobStatus === 'failed' || jobStatus === 'completed' || !!jobError) && (

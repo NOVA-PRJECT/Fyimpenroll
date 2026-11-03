@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 const READ = `if redis.call('GET',KEYS[4])~=ARGV[3] then return nil end
 local raw=redis.call('HGET',KEYS[1],ARGV[1]); if not raw then return nil end
 local entry=cjson.decode(raw)
+if not entry.createdAt or tonumber(ARGV[2])-entry.createdAt>=tonumber(ARGV[4]) then return nil end
 for tag,version in pairs(entry.versions) do
  if (redis.call('HGET',KEYS[2],tag) or '0')~=version then return nil end
 end
@@ -70,7 +71,7 @@ export class DataCacheService {
       hash = createHash('sha256').update(key).digest('hex')
       if (!force) {
         const hit = await this.redis.eval<string[], string | null>(READ,
-          [base + ':entries', base + ':versions', base + ':lru', this.prefix + ':epoch'], [hash, String(Date.now()), base.slice(this.prefix.length + 1)])
+          [base + ':entries', base + ':versions', base + ':lru', this.prefix + ':epoch'], [hash, String(Date.now()), base.slice(this.prefix.length + 1), String(tags.every(tag => tag === 'catalogue') ? 600000 : 60000)])
         if (hit != null) return JSON.parse(hit) as T
       }
     } catch { this.failure(); return load() }
@@ -78,7 +79,7 @@ export class DataCacheService {
     if (!force && this.pending.has(pendingKey)) return this.pending.get(pendingKey) as Promise<T>
     const operation = (async () => {
       const value = await load()
-      const payload = JSON.stringify(value), entry = JSON.stringify({ versions, payload })
+      const payload = JSON.stringify(value), entry = JSON.stringify({ versions, payload, createdAt: Date.now() })
       if (Buffer.byteLength(entry) <= 1048576) {
         try { await this.redis!.eval(WRITE, [base + ':entries', base + ':versions', base + ':lru', base + ':sizes', base + ':bytes', this.prefix + ':epoch'],
           [hash, JSON.stringify(versions), entry, String(Date.now()), base.slice(this.prefix.length + 1)]) } catch { this.failure() }
