@@ -18,6 +18,8 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
+  useNodesInitialized,
+  useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
@@ -77,6 +79,40 @@ interface Course {
 }
 
 // ── Custom Node Components for React Flow ──
+const COURSES_PER_COLUMN = 5
+
+function FitAssignmentCanvas({ layoutKey }: { layoutKey: string }) {
+  const initialized = useNodesInitialized()
+  const { fitView, getNodes, setNodes } = useReactFlow()
+
+  useEffect(() => {
+    if (!initialized) return
+    let frame = requestAnimationFrame(() => {
+      const currentNodes = getNodes()
+      const teachers = currentNodes.filter(node => node.type === 'teacherNode')
+      const courses = currentNodes.filter(node => node.type === 'courseNode')
+      if (teachers.length > 0 && courses.length > 0) {
+        const centerY = (group: Node[]) => (
+          Math.min(...group.map(node => node.position.y)) +
+          Math.max(...group.map(node => node.position.y + (node.measured?.height ?? 0)))
+        ) / 2
+        const offset = centerY(courses) - centerY(teachers)
+        if (Math.abs(offset) > 0.5) {
+          setNodes(previous => previous.map(node => node.type === 'teacherNode'
+            ? { ...node, position: { ...node.position, y: node.position.y + offset } }
+            : node))
+        }
+      }
+      frame = requestAnimationFrame(() => {
+        void fitView({ padding: 0.12, maxZoom: 1 })
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [initialized, layoutKey, fitView, getNodes, setNodes])
+
+  return null
+}
+
 function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: number } }) {
   return (
     <div
@@ -85,7 +121,7 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
         border: "1.5px solid var(--portal-info-border,#002147)",
         borderRadius: '10px',
         padding: '10px 14px',
-        minWidth: '220px',
+        width: '260px',
         boxShadow: '0 4px 12px rgba(0, 33, 71, 0.08)',
         position: 'relative',
       }}
@@ -124,16 +160,16 @@ function TeacherNode({ data }: { data: { teacher: Teacher; assignmentCount: numb
           {data.assignmentCount} {data.assignmentCount === 1 ? 'Course' : 'Courses'}
         </span>
       </div>
-      {/* Target handle on right for connecting to courses */}
+      {/* Source handle on right for connecting to courses */}
       <Handle
         type="source"
         position={Position.Right}
         id="teacher-source"
+        className={styles.assignmentHandle}
+        title="Drag to a course to assign this teacher"
+        aria-label={`Connect ${data.teacher.full_name} to a course`}
         style={{
           background: "var(--portal-primary,#002147)",
-          width: '10px',
-          height: '10px',
-          border: "2px solid var(--portal-border,#fff)",
         }}
       />
     </div>
@@ -165,7 +201,7 @@ function CourseNode({
           : "2px dashed var(--portal-warning-border,#f59e0b)",
         borderRadius: '10px',
         padding: '10px 14px',
-        minWidth: '240px',
+        width: '280px',
         boxShadow: hasStaged
           ? '0 4px 14px rgba(224, 169, 44, 0.25)'
           : isAssigned
@@ -178,11 +214,11 @@ function CourseNode({
         type="target"
         position={Position.Left}
         id="course-target"
+        className={styles.assignmentHandle}
+        title="Drop a teacher connection here"
+        aria-label={`Assign a teacher to ${data.course.course_code}`}
         style={{
           background: hasStaged ? '#E0A92C' : isAssigned ? '#0284c7' : '#f59e0b',
-          width: '10px',
-          height: '10px',
-          border: "2px solid var(--portal-border,#fff)",
         }}
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -543,12 +579,14 @@ export default function TeacherAssignmentTab({
     const newNodes: Node[] = []
     const newEdges: Edge[] = []
 
-    // Place Teacher nodes on the Left (X: 50)
+    // Keep faculty in short columns as well, so a large roster cannot make the canvas taller.
+    const teacherColumns = Math.max(1, Math.ceil(matchingFaculty.length / 6))
+    const teacherRows = Math.max(1, Math.ceil(matchingFaculty.length / teacherColumns))
     matchingFaculty.forEach((teacher, idx) => {
       newNodes.push({
         id: `teacher-${teacher.id}`,
         type: 'teacherNode',
-        position: { x: 50, y: 50 + idx * 110 },
+        position: { x: 50 + Math.floor(idx / teacherRows) * 310, y: 50 + (idx % teacherRows) * 110 },
         data: {
           teacher,
           assignmentCount: teacherCountMap.get(teacher.id) || 0,
@@ -556,14 +594,25 @@ export default function TeacherAssignmentTab({
       })
     })
 
-    // Place Course nodes on the Right (X: 520)
+    // Fill each column from top to bottom before starting the next column.
+    const rowOffsets = [50]
+    for (let row = 0; row < Math.min(COURSES_PER_COLUMN, filteredCourses.length); row++) {
+      const rowCourses = filteredCourses.filter((_, index) => index % COURSES_PER_COLUMN === row)
+      const rowHeight = Math.max(...rowCourses.map(course =>
+        120 + course.assignments.length * 30 + (stagedAssignments.has(course.id) ? 30 : 0),
+      ))
+      rowOffsets.push(rowOffsets[row] + rowHeight + 24)
+    }
     filteredCourses.forEach((course, idx) => {
       const staged = stagedAssignments.get(course.id)
 
       newNodes.push({
         id: `course-${course.id}`,
         type: 'courseNode',
-        position: { x: 520, y: 50 + idx * 130 },
+        position: {
+          x: 50 + teacherColumns * 310 + 90 + Math.floor(idx / COURSES_PER_COLUMN) * 340,
+          y: rowOffsets[idx % COURSES_PER_COLUMN],
+        },
         data: {
           course,
           stagedAssignment: staged,
@@ -619,7 +668,15 @@ export default function TeacherAssignmentTab({
       }
     })
 
-    setNodes(newNodes)
+    setNodes(previous => {
+      const sameLayout = previous.length === newNodes.length && previous.every((node, index) => node.id === newNodes[index].id)
+      if (!sameLayout) return newNodes
+      // Retain centered faculty positions while assignment data changes on the same grid.
+      const teacherPositions = new Map(previous.filter(node => node.type === 'teacherNode').map(node => [node.id, node.position]))
+      return newNodes.map(node => node.type === 'teacherNode'
+        ? { ...node, position: teacherPositions.get(node.id) ?? node.position }
+        : node)
+    })
     setEdges(newEdges)
   }, [eligibleFaculty, courses, filteredCourses, isMobileView, searchQuery, stagedAssignments, handleCancelStaged, setNodes, setEdges])
 
@@ -1039,38 +1096,33 @@ export default function TeacherAssignmentTab({
             borderRadius: '12px',
             overflow: 'hidden',
             position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              top: '12px',
-              left: '12px',
-              zIndex: 10,
-              background: "var(--portal-glass,rgba(255, 255, 255, 0.92))",
-              backdropFilter: 'blur(4px)',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              border: "1px solid var(--portal-strong-border,#e2e8f0)",
-              fontSize: '11px',
-              color: "var(--portal-info-text,#475569)",
-            }}
-          >
-            <strong>Tip:</strong> Drag from right handle of <b>Teacher</b> to left handle of <b>Course</b>.
+          <div className={styles.assignmentCanvasToolbar}>
+            <span><strong>Tip:</strong> Drag from the right dot of a <b>Teacher</b> to the left dot of a <b>Course</b>. Pan or zoom to explore.</span>
+            <span aria-live="polite">{filteredCourses.length === 0 ? 'No courses found' : `${filteredCourses.length} courses on canvas`}</span>
           </div>
 
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            fitView
-          >
-            <Background gap={16} size={1} color="#cbd5e1" />
-            <Controls />
-          </ReactFlow>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              connectionRadius={32}
+              minZoom={0.2}
+              fitView
+              fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
+            >
+              <FitAssignmentCanvas layoutKey={`${nodes.map(node => node.id).join(',')}:${stagedAssignments.size}`} />
+              <Background gap={16} size={1} color="#cbd5e1" />
+              <Controls />
+            </ReactFlow>
+          </div>
         </div>
       ) : (
         /* ── Fallback View: Touch-Friendly Card List (< 1024px) ── */

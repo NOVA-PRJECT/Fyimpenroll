@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { DASHBOARD_ROLE_MAP, ROLE_DASHBOARD_MAP, SHARED_DASHBOARD_ROUTES } from './src/core/security/routeConfig'
+import { DASHBOARD_ROLE_MAP, ROLE_DASHBOARD_MAP } from './src/core/security/routeConfig'
 import { Role, ROLES } from './src/core/constants/roles'
 
 type ProfileCheck =
@@ -214,25 +214,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isDashboardRoute) {
-    // F57: Check shared routes first (e.g. credit ledger)
-    const matchedSharedRoute = Object.keys(SHARED_DASHBOARD_ROUTES)
-      .sort((a, b) => b.length - a.length)
-      .find((route) => pathname === route || pathname.startsWith(route + '/'))
-
-    if (matchedSharedRoute) {
-      const allowedRoles = SHARED_DASHBOARD_ROUTES[matchedSharedRoute]
-      if (allowedRoles.includes(role)) {
-        const response = NextResponse.next()
-        if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
-        return response
-      } else {
-        // Denied role (e.g. teaching_staff on credit ledger)
-        const response = NextResponse.redirect(new URL(ROLE_DASHBOARD_MAP[role] || '/login', request.url))
-        if (refreshedTokens) attachAuthCookies(response, refreshedTokens.token, refreshedTokens.refreshToken)
-        return response
-      }
-    }
-
     // Role-exclusive dashboard routes
     const matchedRoute = Object.keys(DASHBOARD_ROLE_MAP)
       .sort((a, b) => b.length - a.length)
